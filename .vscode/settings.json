@@ -1,0 +1,12 @@
+{
+	"C_Cpp.default.includePath": [
+		"${default}",
+		"/home/u5665436/repo/oomph-lib/src/**",
+		"/home/u5665436/repo/oomph-lib/external_src"
+	],
+	"files.associations": {
+		"new": "cpp",
+		"ostream": "cpp",
+		"numbers": "cpp"
+	}
+}
