@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+
+from visualizer import Visualizer
+
+def main():
+	assert len(sys.argv) == 3
+
+	for dir in os.listdir("RESLT"):
+		print(f'Processing results in RESLT/{dir}')
+		vis = Visualizer(f'RESLT/{dir}', 'imgs', sys.argv[1], int(sys.argv[2]), times='times.dat')
+
+		vis.make_anim(
+			fname='results.mp4',
+			opts = {
+				'soln': {
+					'c': 'blue',
+					'label': 'Numerical'
+				},
+				'exact_soln': {
+					'c': 'red',
+					'linestyle': '--',
+					'label': 'Analytical'
+				}
+			},
+			ax_options = {
+				'ylim': [0.0, 2.0],
+				'ylabel': 'Temperature-ish',
+				'xlabel': 'x'
+			}
+		)
+
+
+
+if __name__ == '__main__':
+	main()
