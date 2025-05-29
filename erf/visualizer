@@ -8,9 +8,15 @@ from visualizer import Visualizer
 def main():
 	assert len(sys.argv) == 3
 
-	for dir in os.listdir("RESLT"):
-		print(f'Processing results in RESLT/{dir}')
-		vis = Visualizer(f'RESLT/{dir}', 'imgs', sys.argv[1], int(sys.argv[2]), times='times.dat')
+	for reslt in os.listdir("RESLT"):
+		if not os.path.isdir(f'RESLT/{reslt}'):
+			continue
+
+		if not os.path.exists(f"imgs/{reslt}"):
+			os.mkdir(f'imgs/{reslt}')
+
+		print(f'Processing results in RESLT/{reslt}')
+		vis = Visualizer(f'RESLT/{reslt}', f'imgs/{reslt}', sys.argv[1], int(sys.argv[2]), times='times.dat')
 
 		vis.make_anim(
 			fname='results.mp4',
@@ -31,8 +37,6 @@ def main():
 				'xlabel': 'x'
 			}
 		)
-
-
 
 if __name__ == '__main__':
 	main()
