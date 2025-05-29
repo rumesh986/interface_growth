@@ -204,8 +204,8 @@ int main(int argc, char **argv) {
 
 	cout << "Output directory: " << info.directory() << endl;
 
-	// double t_shift = (T_ORDER + 1) * dt;
-	double t_shift = 0.1;
+	double t_shift = (T_ORDER + 1) * dt;
+	// double t_shift = 0.1;
 	auto problem_def = Erf1Problem(Nx, t_steps, dt, t_shift);
 
 	cout << problem_def.Nx << " " << problem_def.t_steps << " " << problem_def.dt << " " << problem_def.t_shift << endl;

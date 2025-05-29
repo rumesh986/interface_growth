@@ -16,12 +16,15 @@ class Erf1Problem {
 		unordered_map<uint, FluxFctPt> flux_boundaries = {
 			// {1, get_flux}
 		};
+
 		unordered_map<uint, double> pinned_boundaries = {
 			{0, 0.0}
 		};
+
 		Vector<uint> analytical_boundaries = {
 			1
 		};
+		
 		static constexpr double kappa = 1.0;
 
 		Erf1Problem(uint Nx, uint t_steps, double dt, double t_shift)

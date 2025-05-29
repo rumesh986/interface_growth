@@ -24,6 +24,12 @@
 		"streambuf": "cpp",
 		"type_traits": "cpp",
 		"utility": "cpp",
-		"tuple": "cpp"
+		"tuple": "cpp",
+		"filesystem": "cpp",
+		"algorithm": "cpp",
+		"memory": "cpp",
+		"random": "cpp",
+		"iostream": "cpp",
+		"numeric": "cpp"
 	}
 }
