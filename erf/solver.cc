@@ -91,16 +91,22 @@ template<class EL, class P> class Solver : public Problem {
 			Vector<double> x(1);
 			Vector<double> u(1);
 
+			for (int n = 0; n < nnode; n++) {
+				mesh_pt()->node_pt(n)
+					->position_time_stepper_pt()
+					->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
+			}
+
 			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
 				double cur_t = time_pt()->time((uint) t);
-				cout << "Setting initial condition at t = " << cur_t << endl;
+				printf("[% 2d] Setting initial condition at t = %10.8f\n", t, cur_t);
 
 				for (int n = 0; n < nnode; n++) {
 					x[0] = mesh_pt()->node_pt(n)->x(0);
 
 					problem.get_exact_u(cur_t, x, u);
 					mesh_pt()->node_pt(n)->set_value(t, 0, u[0]);
-					// printf("[%10.8f] x=%10.8f, u=%10.8f, t=%10.8f\n", cur_t, x[0], u[0], time_pt()->time());
+					printf("[%10.8f] x=%10.8f, u=%10.8f\n", cur_t, x[0], u[0]);
 				}
 			}
 
@@ -198,7 +204,8 @@ int main(int argc, char **argv) {
 
 	cout << "Output directory: " << info.directory() << endl;
 
-	double t_shift = (T_ORDER + 1) * dt;
+	// double t_shift = (T_ORDER + 1) * dt;
+	double t_shift = 0.1;
 	auto problem_def = Erf1Problem(Nx, t_steps, dt, t_shift);
 
 	cout << problem_def.Nx << " " << problem_def.t_steps << " " << problem_def.dt << " " << problem_def.t_shift << endl;

@@ -1,7 +1,7 @@
 #include "includes.h"
 #include "unsteady_heat.h"
 
-#define T_ORDER 1
+#define T_ORDER 2
 
 typedef void (*FluxFctPt)(const double &, const Vector<double>&, double &) ;
 
@@ -14,12 +14,14 @@ class Erf1Problem {
 		double t_shift;
 		
 		unordered_map<uint, FluxFctPt> flux_boundaries = {
-			{1, get_flux}
+			// {1, get_flux}
 		};
 		unordered_map<uint, double> pinned_boundaries = {
 			{0, 0.0}
 		};
-		Vector<uint> analytical_boundaries = {};
+		Vector<uint> analytical_boundaries = {
+			1
+		};
 		static constexpr double kappa = 1.0;
 
 		Erf1Problem(uint Nx, uint t_steps, double dt, double t_shift)
