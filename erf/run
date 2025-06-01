@@ -21,9 +21,14 @@ fi
 
 rm -rf RESLT/*
 
-for i in 10 100
+dt=0.0001
+nx=10
+
+for nx in 10 100 1000 10000 100000
+# for dt in 1e-2 1e-4
 do
-	./$1 --nx $i --dt 0.01 --tsteps $2 | tee RESLT/$i.stdout &
+	./$1 --nx $nx --dt $dt --tsteps $2 >> RESLT/n$nx\_t$dt.stdout &
+	# ./$1 --nx $nx --dt $dt --tsteps $2 | tee RESLT/n$nx\_t$dt.stdout &
 
 	if [[ $? != 0 ]]
 	then
@@ -31,5 +36,7 @@ do
 		exit 3
 	fi
 done
+
+wait
 
 ./visualizer $1 $2
