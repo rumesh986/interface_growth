@@ -3,10 +3,13 @@
 import os
 import sys
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 from visualizer import Visualizer
 
 def main():
-	assert len(sys.argv) == 3
+	viss = {}
 
 	for reslt in os.listdir("RESLT"):
 		if not os.path.isdir(f'RESLT/{reslt}'):
@@ -18,25 +21,76 @@ def main():
 		print(f'Processing results in RESLT/{reslt}')
 		vis = Visualizer(f'RESLT/{reslt}', f'imgs/{reslt}', sys.argv[1], int(sys.argv[2]), times='times.dat')
 
-		vis.make_anim(
-			fname='results.mp4',
-			opts = {
-				'soln': {
-					'c': 'blue',
-					'label': 'Numerical'
-				},
-				'exact_soln': {
-					'c': 'red',
-					'linestyle': '--',
-					'label': 'Analytical'
-				}
-			},
-			ax_options = {
-				'ylim': [0.0, 2.0],
-				'ylabel': 'Temperature-ish',
-				'xlabel': 'x'
-			}
-		)
+		# vis.make_anim(
+		# 	fname='results.mp4',
+		# 	opts = {
+		# 		'soln': {
+		# 			'c': 'blue',
+		# 			'label': 'Numerical'
+		# 		},
+		# 		'exact_soln': {
+		# 			'c': 'red',
+		# 			'linestyle': '--',
+		# 			'label': 'Analytical'
+		# 		}
+		# 	},
+		# 	ax_options = {
+		# 		'ylim': [0.0, 2.0],
+		# 		'ylabel': 'Temperature-ish',
+		# 		'xlabel': 'x'
+		# 	}
+		# )
+
+		# vis.plot_errors()
+		# vis.plot_error_norms()
+
+		# vis.make_diffs_anim(
+		# 	fname='diffs.gif',
+		# 	prefixs=['exact_soln', 'soln'],
+		# 	ax_options = {
+		# 		'ylim': [-0.1, 0.1],
+		# 		'ylabel': 'Error',
+		# 		'xlabel': 'x'
+		# 	}
+		# )
+
+		viss[reslt] = vis
+	
+	return viss
 
 if __name__ == '__main__':
-	main()
+	assert len(sys.argv) == 3
+
+	viss = main()
+
+	ns = np.zeros(len(viss.keys()))
+	err_norms = np.zeros(len(viss.keys()))
+	for i, (k, v) in enumerate(viss.items()):
+		nx = k.split('_')[0][1:]
+		# ns.append(nx)
+		ns[i] = nx
+
+		# err_norms.append(v.get_error_norm())
+		err_norms[i] = v.get_error_norm()
+	
+	xs = 1/ns
+
+	ref_xs = np.logspace(-5, -1)
+	ref_ys_1 = ref_xs * 1e-4
+	ref_ys_2 = np.square(ref_xs)
+
+	fig, ax = plt.subplots(1)
+
+	ax.scatter(xs, err_norms, label='actual')
+	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
+
+	plt.title(f'{sys.argv[1]} error analysis')
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.set_xlabel('dx')
+	ax.set_ylabel('normalized norm of error')
+	ax.legend()
+	plt.savefig(f'imgs/{sys.argv[1]}_nx_errors.png')
+
+

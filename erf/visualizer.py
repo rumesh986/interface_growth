@@ -97,7 +97,6 @@ class Visualizer:
 
 		ani = anim.FuncAnimation(fig, update, self.n)
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
-
 	
 	def plot_errors(self):
 		plt.cla()
@@ -123,15 +122,13 @@ class Visualizer:
 		plt.cla()
 		
 		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.n)])
-		# exact_vals = np.array([np.fabs(self.read_file('exact_soln', i)[1]) for i in range(self.n)])
-		# rel_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]/self.read_file('exact_soln', i)[1]) for i in range(self.n)])
+		abs_error /= len(self.read_file('error', 0)[2][:, 2])
 
-		plt.semilogy(abs_error, label='Absolute error')
-		# plt.semilogy(rel_error, label='Relative error')
+		plt.semilogy(abs_error, label='Error norms')
 
-		plt.title('L2 norm of errors')
+		plt.title('L2 norm of errors, normalized for number of elements')
 		plt.xlabel('timestep')
-		plt.ylabel('Error noem')
+		plt.ylabel('Error norm')
 		plt.legend()
 
 		plt.savefig(f'{self.out_folder}/{self.prefix}-error-norms.png')
