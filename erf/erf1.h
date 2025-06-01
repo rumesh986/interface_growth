@@ -2,6 +2,7 @@
 #include "unsteady_heat.h"
 
 #define T_ORDER 2
+#define X_ORDER 3
 
 typedef void (*FluxFctPt)(const double &, const Vector<double>&, double &) ;
 

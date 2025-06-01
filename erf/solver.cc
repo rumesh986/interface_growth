@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 
 	cout << problem_def.Nx << " " << problem_def.t_steps << " " << problem_def.dt << " " << problem_def.t_shift << endl;
 	
-	Solver problem = Solver<QUnsteadyHeatElement<1,2>, Erf1Problem>(problem_def, info);
+	Solver problem = Solver<QUnsteadyHeatElement<1, X_ORDER>, Erf1Problem>(problem_def, info);
 
 	problem.initialise_dt(problem_def.dt);
 	problem.set_initial_conditions();
