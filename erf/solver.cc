@@ -189,17 +189,17 @@ int main(int argc, char **argv) {
 	}
 
 
-	char fname[256];
-	sprintf(fname, "RESLT/n%u_t%e", Nx, dt);
+	char dname[256];
+	sprintf(dname, "RESLT/%dn%u_%dt%.2e", X_ORDER, Nx, T_ORDER, dt);
 	
-	if (std::filesystem::exists(fname)) {
-		cout << fname << " exists" << endl;
+	if (std::filesystem::exists(dname)) {
+		cout << dname << " exists" << endl;
 	} else {
-		std::filesystem::create_directories(fname);
+		std::filesystem::create_directories(dname);
 	}
 
 	DocInfo info;
-	info.set_directory(fname);
+	info.set_directory(dname);
 	info.number() = 0;
 
 	cout << "Output directory: " << info.directory() << endl;
@@ -217,6 +217,18 @@ int main(int argc, char **argv) {
 	problem.quiet_solve();
 
 	problem.doc_solution(0);
+
+	char config_fname[256];
+	sprintf(config_fname, "%s/config", dname);
+
+	FILE *file = fopen(config_fname, "w");
+	fprintf(file, "nx=%d\n", problem_def.Nx);
+	fprintf(file, "x_order=%d\n", X_ORDER);
+	fprintf(file, "dt=%e\n", problem_def.dt);
+	fprintf(file, "t_shift=%e\n", problem_def.t_shift);
+	fprintf(file, "t_order=%d\n", T_ORDER);
+	fprintf(file, "t_steps=%d\n", problem_def.t_steps);
+	fclose(file);
 
 	for (uint t = 0; t < problem_def.t_steps; t++) {
 		problem.unsteady_newton_solve(problem_def.dt);
