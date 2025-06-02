@@ -4,17 +4,60 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 import numpy as np
 
+class Config:
+	def __init__(self, file):
+		self.nx = 0
+		self.x_order = 0
+		self.dt = 0.0
+		self.t_shift = 0.0
+		self.t_order = 0
+		self.t_steps = 0
+
+
+		with open(file) as f:
+			while line := f.readline():
+				k, v = line.split('=')
+				
+				if k == 'nx':
+					self.nx = int(v)
+				elif k == 'x_order':
+					self.x_order = int(v)
+				elif k == 'dt':
+					self.dt = float(v)
+				elif k == 't_shift':
+					self.t_shift = float(v)
+				elif k == 't_order':
+					self.t_order = int(v)
+				elif k == 't_steps':
+					self.t_steps = int(v)
+				else:
+					raise Exception('Unexpected Value')
+	
+	def toString(self):
+		print(f'nx={self.nx}')
+		print(f'x_order={self.x_order}')
+		print(f'dt={self.dt}')
+		print(f't_shift={self.t_shift}')
+		print(f't_order={self.t_order}')
+		print(f't_steps={self.t_steps}')
+	
+	def title(self):
+		return f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
+				
+
 class Visualizer:
-	def __init__(self, inp_folder, out_folder, prefix, n, times=None, solnf='soln', exact_solnf='exact_soln', errorf='error', ext="dat"):
+	def __init__(self, inp_folder, out_folder, prefix, times=None, solnf='soln', exact_solnf='exact_soln', errorf='error', ext="dat"):
 		self.inp_folder = inp_folder
 		self.out_folder = out_folder
-		self.n = n
 		self.times = times
 		self.solnf = solnf
 		self.exact_solnf = exact_solnf
 		self.errorf = errorf
 		self.ext = ext
 		self.prefix = prefix
+		self.config = Config(f'{inp_folder}/config')
+
+		self.config.toString()
 
 		if times:
 			self.times = []
@@ -53,6 +96,9 @@ class Visualizer:
 			return ax.plot(x, y, **options)
 		else:
 			return ax.plot(x, y)
+	
+	def set_title(self, title):
+		plt.title(f'{title}\n{self.config.title()}')
 
 	def make_anim(self, fname, opts, ax_options):
 		print(f"Making animation of {opts.keys()}")
@@ -75,7 +121,7 @@ class Visualizer:
 				lines[k].set_data(x, y)
 
 		plt.legend(loc='upper left')
-		ani = anim.FuncAnimation(fig, update, self.n)
+		ani = anim.FuncAnimation(fig, update, self.config.nx)
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 
 	def make_diffs_anim(self, fname, prefixs, ax_options):
@@ -95,7 +141,7 @@ class Visualizer:
 			_, y2, _ = self.read_file(prefixs[1], n)
 			line.set_data(x, y1-y2)
 
-		ani = anim.FuncAnimation(fig, update, self.n)
+		ani = anim.FuncAnimation(fig, update, self.config.nx)
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 	
 	def plot_errors(self):
@@ -104,14 +150,15 @@ class Visualizer:
 		error = data[:, 2]
 		node = np.argmax(np.fabs(error))
 
-		abs_errors = np.array([np.fabs(self.read_file('error', i)[2][node, 2]) for i in range(self.n)])
-		exact_vals = np.array([np.fabs(self.read_file('exact_soln', i)[1][node]) for i in range(self.n)])
+		abs_errors = np.array([np.fabs(self.read_file('error', i)[2][node, 2]) for i in range(self.config.nx)])
+		exact_vals = np.array([np.fabs(self.read_file('exact_soln', i)[1][node]) for i in range(self.config.nx)])
 		rel_errors = abs_errors / exact_vals
 
 		plt.semilogy(abs_errors, label='absolute')
 		plt.semilogy(rel_errors, label='relative')
 
-		plt.title(f'Errors at x={x[node]}')
+		# plt.title(f'Errors at x={x[node]}')
+		self.set_title(f'Errors at x={x[node]}')
 		plt.xlabel('timestep')
 		plt.ylabel('Error magnitude')
 		plt.legend()
@@ -121,7 +168,7 @@ class Visualizer:
 	def plot_error_norms(self):
 		plt.cla()
 		
-		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.n)])
+		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.config.nx)])
 		abs_error /= len(self.read_file('error', 0)[2][:, 2])
 
 		plt.semilogy(abs_error, label='Error norms')
@@ -136,9 +183,9 @@ class Visualizer:
 	def get_error_norm(self):
 		plt.cla()
 
-		abs_error = np.zeros(self.n)
+		abs_error = np.zeros(self.config.nx)
 
-		for i in range(self.n):
+		for i in range(self.config.nx):
 			errors = self.read_file('error', i)[2][:, 2]
 			abs_error[i] = np.linalg.norm(errors)/len(errors)
 		
