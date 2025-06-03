@@ -171,10 +171,12 @@ int main(int argc, char **argv) {
 	uint Nx = 0;
 	uint t_steps = 100;
 	double dt = 0.0;
+	double t_shift = 0.0;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx);
 	CommandLineArgs::specify_command_line_flag("--tsteps", &t_steps);
 	CommandLineArgs::specify_command_line_flag("--dt", &dt);
+	CommandLineArgs::specify_command_line_flag("--tshift", &t_shift);
 
 	CommandLineArgs::parse_and_assign();
 
@@ -204,8 +206,10 @@ int main(int argc, char **argv) {
 
 	cout << "Output directory: " << info.directory() << endl;
 
-	double t_shift = (T_ORDER + 1) * dt;
-	// double t_shift = 0.1;
+	if (t_shift == 0.0) {
+		t_shift = (T_ORDER + 1) * dt;
+	}
+
 	auto problem_def = Erf1Problem(Nx, t_steps, dt, t_shift);
 
 	cout << problem_def.Nx << " " << problem_def.t_steps << " " << problem_def.dt << " " << problem_def.t_shift << endl;
