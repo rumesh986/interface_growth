@@ -22,13 +22,14 @@ fi
 rm -rf RESLT/*
 
 dt=0.0001
-nx=10
+nx=100
+tshift=0.5
 
-for nx in 10 100 1000 10000 100000
-# for dt in 1e-2 1e-4
+# for nx in 5 10 50 80 100 500 800 1000 5000 # 10000
+for dt in 1e-1 1e-2 1e-3 1e-4 1e-5
 do
-	./$1 --nx $nx --dt $dt --tsteps $2 >> RESLT/n$nx\_t$dt.stdout &
-	# ./$1 --nx $nx --dt $dt --tsteps $2 | tee RESLT/n$nx\_t$dt.stdout &
+	echo -e "Running $1 with nx=$nx\t\tdt=$dt"
+	./$1 --nx $nx --dt $dt --tshift $tshift --tsteps $2 >> RESLT/n$nx\_t$dt.stdout &
 
 	if [[ $? != 0 ]]
 	then
@@ -39,4 +40,7 @@ done
 
 wait
 
-./visualizer $1 $2
+echo "All processes completed"
+echo "Starting Post-processing"
+
+./visualizer $1 t
