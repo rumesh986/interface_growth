@@ -2,6 +2,7 @@
 
 import os
 import sys
+import asyncio
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,10 +34,7 @@ def analyse_dx(viss):
 
 	for i, (k, v) in enumerate(viss.items()):
 		ns[i] = v.config.nx
-
-		print(f'{i} = {ns[i]}')
-
-		err_norms[i] = v.get_error_norm()
+		err_norms[i] = v.get_total_error_norm()
 
 		if i == 0:
 			config = v.config
@@ -53,25 +51,49 @@ def analyse_dx(viss):
 	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
 	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
 
-	plt.title(f'{sys.argv[1]} error analysis - X({config.x_order}), T({config.t_order})')
+	plt.title(f'{sys.argv[1]} nx error analysis - X({config.x_order}), T({config.t_order})')
 	ax.set_xscale('log')
 	ax.set_yscale('log')
 	ax.set_xlabel('dx')
 	ax.set_ylabel('normalized norm of error')
 	ax.legend()
-	plt.savefig(f'imgs/{sys.argv[1]}_nx_errors.png')
+	plt.savefig(f'imgs/{sys.argv[1]}_x_errors_{config.x_order}x_{config.t_order}t{config.dt}.png')
 
+def analyse_dt(viss):
+	dts = np.zeros(len(viss.keys()))
+	err_norms = np.zeros(len(viss.keys()))
 
-if __name__ == '__main__':
-	assert len(sys.argv) == 3
+	config = None
 
-	viss = main()
+	for i, (k, v) in enumerate(viss.items()):
+		dts[i] = v.config.dt
+		err_norms[i] = v.get_total_error_norm()
 
-	analyse_dx(viss)
+		if i == 0:
+			config = v.config
+	
+	xs = dts
 
-	# exit(0)
+	ref_xs = np.logspace(-5, -1)
+	ref_ys_1 = ref_xs * 1e-4
+	ref_ys_2 = np.square(ref_xs)
 
-	for _, vis in viss.items():
+	fig, ax = plt.subplots(1)
+
+	ax.scatter(xs, err_norms, label='actual')
+	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
+
+	plt.title(f'{sys.argv[1]} dt error analysis - X({config.x_order}), T({config.t_order})')
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.set_xlabel('dt')
+	ax.set_ylabel('normalized norm of error')
+	ax.legend()
+	plt.savefig(f'imgs/{sys.argv[1]}_t_errors_{config.x_order}x{config.nx}_{config.t_order}t.png')
+
+async def make_all(viss):
+	async def _make(vis):
 		vis.make_anim(
 			fname='results.mp4',
 			opts = {
@@ -92,9 +114,6 @@ if __name__ == '__main__':
 			}
 		)
 
-		vis.plot_errors()
-		vis.plot_error_norms()
-
 		vis.make_diffs_anim(
 			fname='diffs.gif',
 			prefixs=['exact_soln', 'soln'],
@@ -104,8 +123,27 @@ if __name__ == '__main__':
 				'xlabel': 'x'
 			}
 		)
+
+		vis.plot_errors()
+		vis.plot_error_norms()
+
+	async with asyncio.TaskGroup() as tg:
+		for vis in viss.values():
+			tg.create_task(_make(vis))
+
+if __name__ == '__main__':
+	assert len(sys.argv) == 3
+	assert not ('x' in sys.argv[2] and 't' in sys.argv[2])
+
+	viss = main()
+
+	print(sys.argv[1])
+
+	if 'x' in sys.argv[2]:
+		analyse_dx(viss)
+
+	if 't' in sys.argv[2]:
+		analyse_dt(viss)
 	
-
-	
-
-
+	if 'a' in sys.argv[2]:
+		asyncio.run(make_all(viss))
