@@ -88,6 +88,9 @@ class Visualizer:
 		data = np.array(data)
 		
 		return data[:, 0], data[:, 1], data
+	
+	def read_errors(self, index):
+		return self.read_file('error', index)[2][:, 2]
 
 	def plot_line(self, ax, prefix, n, options):
 		x, y, _ = self.read_file(prefix, n)
@@ -121,7 +124,7 @@ class Visualizer:
 				lines[k].set_data(x, y)
 
 		plt.legend(loc='upper left')
-		ani = anim.FuncAnimation(fig, update, self.config.nx)
+		ani = anim.FuncAnimation(fig, update, self.config.t_steps)
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 
 	def make_diffs_anim(self, fname, prefixs, ax_options):
@@ -141,18 +144,23 @@ class Visualizer:
 			_, y2, _ = self.read_file(prefixs[1], n)
 			line.set_data(x, y1-y2)
 
-		ani = anim.FuncAnimation(fig, update, self.config.nx)
+		ani = anim.FuncAnimation(fig, update, self.config.t_steps)
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 	
 	def plot_errors(self):
 		plt.cla()
 		x, _, data = self.read_file('error', 1)
-		error = data[:, 2]
-		node = np.argmax(np.fabs(error))
+		node = np.argmax(np.fabs(data[:, 2])[1:]) + 1
 
-		abs_errors = np.array([np.fabs(self.read_file('error', i)[2][node, 2]) for i in range(self.config.nx)])
-		exact_vals = np.array([np.fabs(self.read_file('exact_soln', i)[1][node]) for i in range(self.config.nx)])
-		rel_errors = abs_errors / exact_vals
+		errors = np.array([self.read_errors(i)[node] for i in range(self.config.t_steps)])
+		exact_vals = np.array([self.read_file('exact_soln', i)[1][node] for i in range(self.config.t_steps)])
+		abs_errors = np.fabs(errors)
+
+		mask = exact_vals != 0.0
+		if any(mask == 0.0):
+			self.config.toString()
+			print(f'{self.out_folder}/{self.prefix}-errors.png')
+		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
 
 		plt.semilogy(abs_errors, label='absolute')
 		plt.semilogy(rel_errors, label='relative')
@@ -168,7 +176,7 @@ class Visualizer:
 	def plot_error_norms(self):
 		plt.cla()
 		
-		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.config.nx)])
+		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.config.t_steps)])
 		abs_error /= len(self.read_file('error', 0)[2][:, 2])
 
 		plt.semilogy(abs_error, label='Error norms')
@@ -180,16 +188,16 @@ class Visualizer:
 
 		plt.savefig(f'{self.out_folder}/{self.prefix}-error-norms.png')
 	
-	def get_error_norm(self):
+	def get_total_error_norm(self):
 		plt.cla()
 
-		abs_error = np.zeros(self.config.nx)
+		abs_error = np.zeros(self.config.t_steps)
 
-		for i in range(self.config.nx):
-			errors = self.read_file('error', i)[2][:, 2]
+		for i in range(self.config.t_steps):
+			# errors = self.read_file('error', i)[2][:, 2]
+			errors = self.read_errors(i)
 			abs_error[i] = np.linalg.norm(errors)/len(errors)
 		
-		# abs_error = np.array([np.linalg.norm(np.sqrt(np.abs(self.read_file('error', i)[2][:,2])))/len(self.read_file('error', i)[2][:, 2]) for i in range(self.n)])
 		return np.linalg.norm(abs_error) / len(abs_error)
 
 	def plot_triangle(self, ax, start, gradient):
