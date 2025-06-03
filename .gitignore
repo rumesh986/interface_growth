@@ -1,6 +1,7 @@
 **/RESLT*/**
 **/imgs/**
 **/*.o
+**/*.pyc
 
 analytic_tests/
 free_surface/
