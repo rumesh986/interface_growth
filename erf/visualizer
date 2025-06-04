@@ -92,6 +92,40 @@ def analyse_dt(viss):
 	ax.legend()
 	plt.savefig(f'imgs/{sys.argv[1]}_t_errors_{config.x_order}x{config.nx}_{config.t_order}t.png')
 
+def analyse_dxdt(viss):
+	ns = np.zeros(len(viss.keys()))
+	err_norms = np.zeros(len(viss.keys()))
+
+	config = None
+
+	for i, (k, v) in enumerate(viss.items()):
+		ns[i] = v.config.nx
+		err_norms[i] = v.get_total_error_norm()
+
+		if i == 0:
+			config = v.config
+	
+	xs = 1/ns
+
+	ref_xs = np.logspace(-5, -1)
+	ref_ys_1 = ref_xs * 1e-4
+	ref_ys_2 = np.square(ref_xs)
+
+	fig, ax = plt.subplots(1)
+
+	ax.scatter(xs, err_norms, label='actual')
+	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
+
+	plt.title(f'{sys.argv[1]} nx error analysis - X({config.x_order}), T({config.t_order})')
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.set_xlabel('dx')
+	ax.set_ylabel('normalized norm of error')
+	ax.legend()
+	plt.savefig(f'imgs/{sys.argv[1]}_x_errors_{config.x_order}x_{config.t_order}t.png')
+
+
 async def make_all(viss):
 	async def _make(vis):
 		vis.make_anim(
