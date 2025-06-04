@@ -172,22 +172,35 @@ int main(int argc, char **argv) {
 	uint t_steps = 100;
 	double dt = 0.0;
 	double t_shift = 0.0;
+	bool var_dt = false;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx);
 	CommandLineArgs::specify_command_line_flag("--tsteps", &t_steps);
 	CommandLineArgs::specify_command_line_flag("--dt", &dt);
 	CommandLineArgs::specify_command_line_flag("--tshift", &t_shift);
+	CommandLineArgs::specify_command_line_flag("--vardt");
 
 	CommandLineArgs::parse_and_assign();
+
+	var_dt = CommandLineArgs::command_line_flag_has_been_set("--vardt");
 
 	if (Nx == 0) {
 		cout << "Error: Nx not specified" << endl;
 		exit(1);
 	}
 
-	if (dt == 0.0) {
+	if (dt == 0.0 && !var_dt) {
 		cout << "Error: dt not specified" << endl;
 		exit(1);
+	}
+
+	if (var_dt) {
+		if (dt != 0.0) {
+			cout << "Error: dt has been specified with variable dt flag, check cmdline arguments" << endl;
+			exit(1);
+		}
+
+		dt = pow(((double)1/(double)Nx), 2);
 	}
 
 
