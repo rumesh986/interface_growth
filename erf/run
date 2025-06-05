@@ -70,9 +70,9 @@ function _standard {
 	nx=100
 	dt=0.0001
 	tshift=0.0
-	outfile=outfile.stdout
+	stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
-	_run $1 $nx $dt $2 $tshift $outfile
+	_run $1 $nx $dt $2 $tshift $stdoutfile
 
 	./visualizer $1 a
 }
