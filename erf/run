@@ -85,12 +85,12 @@ function _dx_analysis {
 	rm -rf RESLT/*
 	
 	pids=()
-	for X_ORDER in 2 # 3 4
+	for X_ORDER in 2 3 4
 	do
-		rm $1
+		make mostlyclean-compile
 		_build $1 $T_ORDER $X_ORDER
 
-		for nx in 5 10 50 80 100 500 800 1000 5000
+		for nx in 10 50 80 100 500 800 1000 5000
 		do
 			stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 			echo $stdoutfile
@@ -129,8 +129,8 @@ function _dt_analysis {
 
 		for dtp in -1 -2 -3 -4 -5
 		do
-			dt=$(echo "10.0 ^ $dtp | bc -l")
-			tsteps=$(echo "$2/$dt | bc")
+			dt=$(echo "10.0 ^ $dtp" | bc -l)
+			tsteps=$(echo "$2/$dt" | bc)
 			stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
 			echo $stdoutfile
