@@ -9,123 +9,162 @@ import matplotlib.pyplot as plt
 
 from visualizer import Visualizer
 
-def main():
-	viss = {}
+class Viss:
+	def __init__(self, prefix, resd, imgd, dxdt):
+		self.data = {}
+		for reslt in os.listdir(resd):
+			if not os.path.isdir(f'{resd}/{reslt}'):
+				continue
 
-	for reslt in os.listdir("RESLT"):
-		if not os.path.isdir(f'RESLT/{reslt}'):
-			continue
+			if not os.path.exists(f'{imgd}/{reslt}'):
+				os.mkdir(f'{imgd}{reslt}')
+			
+			print(f'Processing results in {resd}/{reslt}')
+			vis = Visualizer(f'{resd}/{reslt}', f'{imgd}/{reslt}', prefix, times='times.dat')
 
-		if not os.path.exists(f"imgs/{reslt}"):
-			os.mkdir(f'imgs/{reslt}')
+			if dxdt == 'x' or dxdt == 'b':
+				key = vis.config.x_order
+			elif dxdt == 't':
+				key = vis.config.t_order
 
-		print(f'Processing results in RESLT/{reslt}')
-		vis = Visualizer(f'RESLT/{reslt}', f'imgs/{reslt}', sys.argv[1], times='times.dat')
+			if key not in self.data.keys():
+				self.data[key] = []
+				
+			self.data[key].append(vis)
 
-		viss[reslt] = vis
+# def main():
+	# viss = {}
+
+	# for reslt in os.listdir("RESLT"):
+	# 	if not os.path.isdir(f'RESLT/{reslt}'):
+	# 		continue
+
+	# 	if not os.path.exists(f"imgs/{reslt}"):
+	# 		os.mkdir(f'imgs/{reslt}')
+
+	# 	print(f'Processing results in RESLT/{reslt}')
+	# 	vis = Visualizer(f'RESLT/{reslt}', f'imgs/{reslt}', sys.argv[1], times='times.dat')
+
+	# 	viss[reslt] = vis
+
+	# viss = Viss(sys.argv[1], 'RESLT', 'imgs')
 	
-	return viss
+	# return viss
 
 def analyse_dx(viss):
-	ns = np.zeros(len(viss.keys()))
-	err_norms = np.zeros(len(viss.keys()))
+	fig, ax = plt.subplots(1)
 
 	config = None
-
-	for i, (k, v) in enumerate(viss.items()):
-		ns[i] = v.config.nx
-		err_norms[i] = v.get_total_error_norm()
-
-		if i == 0:
-			config = v.config
+	data = {}
+	for order in viss.data.keys():
+		data[order] = {
+			'xs': np.zeros(len(viss.data[order])),
+			'err_norms': np.zeros(len(viss.data[order]))
+		}
 	
-	xs = 1/ns
+	for order, series in viss.data.items():
+		for i, vis in enumerate(series):
+			data[order]['xs'][i] = 1/vis.config.nx
+			data[order]['err_norms'][i] = vis.get_total_error_norm()
+
+			if i == 0:
+				config = vis.config
+		
+	for order, _ in data.items():
+		print(f'plotting {order} scatter')
+		ax.scatter(data[order]['xs'], data[order]['err_norms'], label=f'x_order={order}')
 
 	ref_xs = np.logspace(-5, -1)
 	ref_ys_1 = ref_xs * 1e-4
 	ref_ys_2 = np.square(ref_xs)
 
-	fig, ax = plt.subplots(1)
+	ax.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	ax.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
 
-	ax.scatter(xs, err_norms, label='actual')
-	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
-	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
-
-	plt.title(f'{sys.argv[1]} nx error analysis - X({config.x_order}), T({config.t_order})')
+	plt.title(f'{sys.argv[1]} dx error analysis T({config.t_order})')
 	ax.set_xscale('log')
 	ax.set_yscale('log')
 	ax.set_xlabel('dx')
-	ax.set_ylabel('normalized norm of error')
+	ax.set_ylabel('Normalized norm of errors')
 	ax.legend()
-	plt.savefig(f'imgs/{sys.argv[1]}_x_errors_{config.x_order}x_{config.t_order}t{config.dt}.png')
+	plt.savefig(f'imgs/{sys.argv[1]}_dx_errors.png')
 
 def analyse_dt(viss):
-	dts = np.zeros(len(viss.keys()))
-	err_norms = np.zeros(len(viss.keys()))
+	fig, ax = plt.subplots(1)
 
 	config = None
-
-	for i, (k, v) in enumerate(viss.items()):
-		dts[i] = v.config.dt
-		err_norms[i] = v.get_total_error_norm()
-
-		if i == 0:
-			config = v.config
+	data = {}
+	for order in viss.data.keys():
+		data[order] = {
+			'xs': np.zeros(len(viss.data[order])),
+			'err_norms': np.zeros(len(viss.data[order]))
+		}
 	
-	xs = dts
+	for order, series in viss.data.items():
+		for i, vis in enumerate(series):
+			data[order]['xs'][i] = vis.config.dt
+			data[order]['err_norms'][i] = vis.get_total_error_norm()
+
+			if i == 0:
+				config = vis.config
+		
+	for order, _ in data.items():
+		print(f'plotting {order} scatter')
+		ax.scatter(data[order]['xs'], data[order]['err_norms'], label=f't_order={order}')
 
 	ref_xs = np.logspace(-5, -1)
 	ref_ys_1 = ref_xs * 1e-4
 	ref_ys_2 = np.square(ref_xs)
 
-	fig, ax = plt.subplots(1)
+	ax.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	ax.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
 
-	ax.scatter(xs, err_norms, label='actual')
-	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
-	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
-
-	plt.title(f'{sys.argv[1]} dt error analysis - X({config.x_order}), T({config.t_order})')
-	ax.set_xscale('log')
-	ax.set_yscale('log')
-	ax.set_xlabel('dt')
-	ax.set_ylabel('normalized norm of error')
-	ax.legend()
-	plt.savefig(f'imgs/{sys.argv[1]}_t_errors_{config.x_order}x{config.nx}_{config.t_order}t.png')
-
-def analyse_dxdt(viss):
-	ns = np.zeros(len(viss.keys()))
-	err_norms = np.zeros(len(viss.keys()))
-
-	config = None
-
-	for i, (k, v) in enumerate(viss.items()):
-		ns[i] = v.config.nx
-		err_norms[i] = v.get_total_error_norm()
-
-		if i == 0:
-			config = v.config
-	
-	xs = 1/ns
-
-	ref_xs = np.logspace(-5, -1)
-	ref_ys_1 = ref_xs * 1e-4
-	ref_ys_2 = np.square(ref_xs)
-
-	fig, ax = plt.subplots(1)
-
-	ax.scatter(xs, err_norms, label='actual')
-	plt.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
-	plt.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
-
-	plt.title(f'{sys.argv[1]} nx error analysis - X({config.x_order}), T({config.t_order})')
+	plt.title(f'{sys.argv[1]} dx error analysis T({config.t_order})')
 	ax.set_xscale('log')
 	ax.set_yscale('log')
 	ax.set_xlabel('dx')
-	ax.set_ylabel('normalized norm of error')
+	ax.set_ylabel('Normalized norm of errors')
 	ax.legend()
-	plt.savefig(f'imgs/{sys.argv[1]}_x_errors_{config.x_order}x_{config.t_order}t.png')
+	plt.savefig(f'imgs/{sys.argv[1]}_dt_errors.png')
 
+def analyse_dxdt(viss):
+	fig, ax = plt.subplots(1)
 
+	config = None
+	data = {}
+	for order in viss.data.keys():
+		data[order] = {
+			'xs': np.zeros(len(viss.data[order])),
+			'err_norms': np.zeros(len(viss.data[order]))
+		}
+	
+	for order, series in viss.data.items():
+		for i, vis in enumerate(series):
+			data[order]['xs'][i] = 1/vis.config.nx
+			data[order]['err_norms'][i] = vis.get_total_error_norm()
+
+			if i == 0:
+				config = vis.config
+		
+	for order, _ in data.items():
+		print(f'plotting {order} scatter')
+		ax.scatter(data[order]['xs'], data[order]['err_norms'], label=f'x_order={order}')
+
+	ref_xs = np.logspace(-5, -1)
+	ref_ys_1 = ref_xs * 1e-4
+	ref_ys_2 = np.square(ref_xs)
+
+	ax.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
+	ax.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
+
+	plt.title(f'{sys.argv[1]} dx error analysis T({config.t_order})')
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.set_xlabel('dx')
+	ax.set_ylabel('Normalized norm of errors')
+	ax.legend()
+	plt.savefig(f'imgs/{sys.argv[1]}_dxdt_errors.png')
+	
 async def make_all(viss):
 	async def _make(vis):
 		vis.make_anim(
@@ -170,7 +209,7 @@ if __name__ == '__main__':
 	assert sum(c1 == c2 for c1 in "abxt" for c2 in sys.argv[2]) > 0
 	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	viss = main()
+	viss = Viss(sys.argv[1], 'RESLT', 'imgs', sys.argv[2])
 
 	funcs = {
 		'a': lambda x: asyncio.run(make_all(x)),
