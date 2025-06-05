@@ -1,8 +1,8 @@
 #include "includes.h"
 #include "unsteady_heat.h"
 
-#define T_ORDER 2
-#define X_ORDER 3
+// #define T_ORDER 2
+// #define X_ORDER 
 
 typedef void (*FluxFctPt)(const double &, const Vector<double>&, double &) ;
 
