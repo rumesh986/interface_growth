@@ -122,18 +122,22 @@ function _dt_analysis {
 	rm -rf RESLT/*
 	
 	pids=()
-	for T_ORDER in 1 2 # 4
+	for T_ORDER in 1 2 4
 	do
-		rm $1
+		make mostlyclean-compile
 		_build $1 $T_ORDER $X_ORDER
 
-		for dtp in -1 -2 -3 -4 -5
+
+		tshift=$(echo "($T_ORDER+1)*0.1" | bc)
+
+		for dtp in -1 -2 -3 -4
 		do
 			dt=$(echo "10.0 ^ $dtp" | bc -l)
 			tsteps=$(echo "$2/$dt" | bc)
+			# tsteps=$2
 			stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
-			echo $stdoutfile
+			echo $stdoutfile $tshift
 			_run $1 $nx $dt $tsteps $tshift $stdoutfile &
 			pids+="$! "
 		done

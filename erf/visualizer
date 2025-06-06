@@ -119,10 +119,10 @@ def analyse_dt(viss):
 	ax.plot(ref_xs, ref_ys_1, label='reference (linear)', ls='--')
 	ax.plot(ref_xs, ref_ys_2, label='reference (quadratic)', ls='--')
 
-	plt.title(f'{sys.argv[1]} dx error analysis T({config.t_order})')
+	plt.title(f'{sys.argv[1]} dt error analysis X({config.x_order})')
 	ax.set_xscale('log')
 	ax.set_yscale('log')
-	ax.set_xlabel('dx')
+	ax.set_xlabel('dt')
 	ax.set_ylabel('Normalized norm of errors')
 	ax.legend()
 	plt.savefig(f'imgs/{sys.argv[1]}_dt_errors.png')
