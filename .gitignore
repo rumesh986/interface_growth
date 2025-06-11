@@ -2,6 +2,7 @@
 **/imgs/**
 **/*.o
 **/*.pyc
+**/*.Po
 
 analytic_tests/
 free_surface/
