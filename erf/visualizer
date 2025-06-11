@@ -22,7 +22,9 @@ class Viss:
 			print(f'Processing results in {resd}/{reslt}')
 			vis = Visualizer(f'{resd}/{reslt}', f'{imgd}/{reslt}', prefix, times='times.dat')
 
-			if dxdt == 'x' or dxdt == 'b':
+			if dxdt == 'a':
+				key = 'a'
+			elif dxdt == 'x' or dxdt == 'b':
 				key = vis.config.x_order
 			elif dxdt == 't':
 				key = vis.config.t_order
@@ -201,7 +203,7 @@ async def make_all(viss):
 		vis.plot_error_norms()
 
 	async with asyncio.TaskGroup() as tg:
-		for vis in viss.values():
+		for vis in viss.data['a']:
 			tg.create_task(_make(vis))
 
 if __name__ == '__main__':
