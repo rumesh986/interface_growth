@@ -3,6 +3,8 @@
 
 #include "includes.h"
 #include "erf1.h"
+#include "erf2.h"
+#include "two_layer_mesh.h"
 
 template<class EL, class P> class Solver : public Problem {
 	private:
@@ -19,7 +21,7 @@ template<class EL, class P> class Solver : public Problem {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
 			mesh_pt() = new OneDMesh<EL>(problem.Nx, problem.Lx, time_stepper_pt());
-
+			// mesh_pt()->setup_boundary_element_info();
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
@@ -44,6 +46,60 @@ template<class EL, class P> class Solver : public Problem {
 					mesh_pt()->boundary_node_pt(b, n)->pin(0);
 				}
 			}
+		}
+
+		Solver(Erf2Problem problem, DocInfo info) : problem(problem), info(info) {
+			add_time_stepper_pt(new BDF<T_ORDER>);
+
+			// mesh_pt() = new OneDMesh<EL>(problem.Nx, problem.Lx, time_stepper_pt());
+			mesh_pt() = new TwoLayerMesh<EL>(problem.Nx1, problem.Nx2, - problem.Lx, 0.0, problem.Lx, time_stepper_pt());
+
+			for (uint b = 0; b < mesh_pt()->nboundary(); b++) {
+				printf("At boundary b = %u\n", b);
+
+				for (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+					printf("\tnode %u - x = %f\n", n, mesh_pt()->boundary_node_pt(b, n)->x(0));
+				}
+
+			}
+
+			for (uint e = 0; e < mesh_pt()->nelement(); e++)
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
+
+			for (auto iter = problem.flux_boundaries.begin(); iter != problem.flux_boundaries.end(); iter++) {
+				cout << "Creating flux elements at boundary " << iter->first << endl;
+				create_flux_elements(iter->first, iter->second);
+			}
+
+			for (auto iter = problem.pinned_boundaries.begin(); iter != problem.pinned_boundaries.end(); iter++) {
+				cout << "Assigning pinned boundary condition at " << iter->first << endl;
+				int nnode = mesh_pt()->nboundary_node(iter->first);
+				for (int n = 0; n < nnode; n++) {
+					mesh_pt()->boundary_node_pt(iter->first, n)->set_value(0, iter->second);
+					mesh_pt()->boundary_node_pt(iter->first, n)->pin(0);
+				}
+			}
+
+			for (uint i = 0; i < problem.analytical_boundaries.size(); i++) {
+				uint b = problem.analytical_boundaries[i];
+				for (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+					mesh_pt()->boundary_node_pt(b, n)->pin(0);
+				}
+			}
+
+
+			for (uint e = 0; e < problem.Nx1; e++) {
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp1;
+			}
+
+			for (uint e = problem.Nx1; e < problem.Nx2; e++) {
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp2;
+			}
+
+			for (uint e = 0; e < mesh_pt()->nelement(); e++)
+				printf("e = %u; kappa = %f\n", e, dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt());
+
+			cout << "Number of equations " << assign_eqn_numbers() << endl;
 		}
 
 		~Solver() {
@@ -125,7 +181,7 @@ template<class EL, class P> class Solver : public Problem {
 			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
 
-			for (uint e = 0; e < problem.Nx; e++) {
+			for (uint e = 0; e < mesh_pt()->nelement(); e++) {
 				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
 				el_pt->output(outfile, npts);
 			}
@@ -134,7 +190,7 @@ template<class EL, class P> class Solver : public Problem {
 
 			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (uint e = 0; e < problem.Nx; e++) {
+			for (uint e = 0; e < mesh_pt()->nelement(); e++) {
 				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
 				el_pt->output_fct(outfile, npts, time, problem.get_exact_u);
 			}
@@ -143,7 +199,7 @@ template<class EL, class P> class Solver : public Problem {
 			double error, norm;
 			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (uint e = 0; e < problem.Nx; e++) {
+			for (uint e = 0; e < mesh_pt()->nelement(); e++) {
 				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
 				el_pt->compute_error(outfile, &problem.get_exact_u, time, error, norm);
 			}
