@@ -42,7 +42,6 @@ int main(int argc, char **argv) {
 		dt = pow(((double)1/(double)Nx), 2);
 	}
 
-
 	char dname[256];
 	sprintf(dname, "RESLT/%dn%u_%dt%.2e", X_ORDER, Nx, T_ORDER, dt);
 	printf("Saving results to %s\n", dname);

@@ -21,7 +21,7 @@ template<class EL, class P> class Solver : public Problem {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
 			mesh_pt() = new OneDMesh<EL>(problem.Nx, problem.Lx, time_stepper_pt());
-			// mesh_pt()->setup_boundary_element_info();
+			mesh_pt()->setup_boundary_element_info();
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
@@ -46,6 +46,8 @@ template<class EL, class P> class Solver : public Problem {
 					mesh_pt()->boundary_node_pt(b, n)->pin(0);
 				}
 			}
+
+			assign_eqn_numbers();
 		}
 
 		Solver(Erf2Problem problem, DocInfo info) : problem(problem), info(info) {
