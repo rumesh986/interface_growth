@@ -4,9 +4,6 @@
 **/*.pyc
 **/*.Po
 
-**/Makefile
-**/Makefile.in
-
 analytic_tests/
 free_surface/
 heat_code/
