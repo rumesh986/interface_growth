@@ -18,13 +18,12 @@ class Erf2Problem {
 		};
 
 		unordered_map<uint, double> pinned_boundaries = {
-			// {0, -1.0}
+			{2, 0.0}
 		};
 
 		Vector<uint> analytical_boundaries = {
 			0,
-			1,
-			2
+			1
 		};
 
 		static constexpr double kappa1 = 1.0;

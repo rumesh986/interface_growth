@@ -183,7 +183,7 @@ async def make_all(viss):
 				}
 			},
 			ax_options = {
-				'ylim': [0.0, 2.0],
+				'ylim': [-2.0, 2.0],
 				'ylabel': 'Temperature-ish',
 				'xlabel': 'x'
 			}

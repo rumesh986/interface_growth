@@ -30,8 +30,8 @@ class Config:
 					self.t_order = int(v)
 				elif k == 't_steps':
 					self.t_steps = int(v)
-				else:
-					raise Exception('Unexpected Value')
+				# else:
+					# raise Exception('Unexpected Value')
 	
 	def toString(self):
 		print(f'nx={self.nx}')

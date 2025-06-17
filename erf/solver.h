@@ -53,7 +53,6 @@ template<class EL, class P> class Solver : public Problem {
 		Solver(Erf2Problem problem, DocInfo info) : problem(problem), info(info) {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
-			// mesh_pt() = new OneDMesh<EL>(problem.Nx, problem.Lx, time_stepper_pt());
 			mesh_pt() = new TwoLayerMesh<EL>(problem.Nx1, problem.Nx2, - problem.Lx, 0.0, problem.Lx, time_stepper_pt());
 
 			for (uint b = 0; b < mesh_pt()->nboundary(); b++) {
@@ -94,12 +93,12 @@ template<class EL, class P> class Solver : public Problem {
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp1;
 			}
 
-			for (uint e = problem.Nx1; e < problem.Nx2; e++) {
+			for (uint e = problem.Nx1; e < mesh_pt()->nelement(); e++) {
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp2;
 			}
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
-				printf("e = %u; kappa = %f\n", e, dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt());
+				printf("e = %u; kappa = %f\n", e, * dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt());
 
 			cout << "Number of equations " << assign_eqn_numbers() << endl;
 		}
