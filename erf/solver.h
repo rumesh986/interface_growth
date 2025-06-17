@@ -89,12 +89,13 @@ template<class EL, class P> class Solver : public Problem {
 			}
 
 
+			// beta_pt() expects a double*, but we define it as static const
 			for (uint e = 0; e < problem.Nx1; e++) {
-				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp1;
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = (double *) &problem.kappa1;
 			}
 
 			for (uint e = problem.Nx1; e < mesh_pt()->nelement(); e++) {
-				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = &problem.kp2;
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->beta_pt() = (double *) &problem.kappa2;
 			}
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
