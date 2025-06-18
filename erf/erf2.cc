@@ -12,12 +12,14 @@ int main(int argc, char **argv) {
 	double dt = 0.0;
 	double t_shift = 0.0;
 	bool var_dt = false;
+	uint write_freq = 1;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx);
 	CommandLineArgs::specify_command_line_flag("--tsteps", &t_steps);
 	CommandLineArgs::specify_command_line_flag("--dt", &dt);
 	CommandLineArgs::specify_command_line_flag("--tshift", &t_shift);
 	CommandLineArgs::specify_command_line_flag("--vardt");
+	CommandLineArgs::specify_command_line_flag("--write-freq", &write_freq);
 
 	CommandLineArgs::parse_and_assign();
 
@@ -87,10 +89,13 @@ int main(int argc, char **argv) {
 	fprintf(file, "t_shift=%e\n", problem_def.t_shift);
 	fprintf(file, "t_order=%d\n", T_ORDER);
 	fprintf(file, "t_steps=%d\n", problem_def.t_steps);
+	fprintf(file, "write_freq=%u\n", write_freq);
 	fclose(file);
 
 	for (uint t = 0; t < problem_def.t_steps; t++) {
 		problem.unsteady_newton_solve(problem_def.dt);
-		problem.doc_solution(t);
+
+		if (t % write_freq == 0)
+			problem.doc_solution(t);
 	}
 }

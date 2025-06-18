@@ -33,7 +33,8 @@ function _build {
 # $3 -> time step size (dt)
 # $4 -> number of time steps (t_steps)
 # $5 -> starting time (t_shift)
-# $6 -> output file (stdout redirect)
+# $6 -> write frequency
+# $7 -> output file (stdout redirect)
 function _run {
 	echo -e "Running $1 with nx=$2, dt=$3 for $4 steps in $BASHPID"
 
@@ -44,7 +45,7 @@ function _run {
 		dt="--dt $3"
 	fi
 
-	./$1 --nx $2 $dt --tsteps $4 --tshift $5 >> $6
+	./$1 --nx $2 $dt --tsteps $4 --tshift $5 --write-freq $6 >> $7
 	ret=$?
 
 	if [[ $ret != 0 ]]
@@ -74,7 +75,7 @@ function _standard {
 	tshift=0.0
 	stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
-	_run $1 $nx $dt $2 $tshift $stdoutfile
+	_run $1 $nx $dt $2 $tshift 1 $stdoutfile
 
 	./visualizer $1 a
 }
@@ -96,7 +97,7 @@ function _dx_analysis {
 		do
 			stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 			echo $stdoutfile
-			_run $1 $nx $dt $2 $tshift $stdoutfile &
+			_run $1 $nx $dt $2 $tshift 1 $stdoutfile &
 			pids+="$! "
 		done
 
@@ -132,15 +133,18 @@ function _dt_analysis {
 
 		tshift=$(echo "($T_ORDER+1)*0.1" | bc)
 
+		t1=$(echo "$2/0.1" | bc -l)
+
 		for dtp in -1 -2 -3 -4
 		do
 			dt=$(echo "10.0 ^ $dtp" | bc -l)
 			tsteps=$(echo "$2/$dt" | bc)
+			wf=$(echo "$tsteps/$t1" | bc)
 			# tsteps=$2
 			stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
 			echo $stdoutfile $tshift
-			_run $1 $nx $dt $tsteps $tshift $stdoutfile &
+			_run $1 $nx $dt $tsteps $tshift $wf $stdoutfile &
 			pids+="$! "
 		done
 

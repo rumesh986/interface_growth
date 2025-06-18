@@ -18,7 +18,7 @@ class Viss:
 				continue
 
 			if not os.path.exists(f'{imgd}/{reslt}'):
-				os.mkdir(f'{imgd}{reslt}')
+				os.mkdir(f'{imgd}/{reslt}')
 			
 			print(f'Processing results in {resd}/{reslt}')
 			vis = Visualizer(f'{resd}/{reslt}', f'{imgd}/{reslt}', prefix, times='times.dat')
