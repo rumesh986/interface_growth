@@ -2,6 +2,7 @@
 **/imgs/**
 **/*.o
 **/*.pyc
+**/*.Po
 
 analytic_tests/
 free_surface/
@@ -9,4 +10,4 @@ heat_code/
 heat2/
 two_fluid/
 
-erf/erf1
+erf/erf[0-9]

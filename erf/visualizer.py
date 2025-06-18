@@ -12,6 +12,7 @@ class Config:
 		self.t_shift = 0.0
 		self.t_order = 0
 		self.t_steps = 0
+		self.write_freq = 1
 
 
 		with open(file) as f:
@@ -30,8 +31,10 @@ class Config:
 					self.t_order = int(v)
 				elif k == 't_steps':
 					self.t_steps = int(v)
-				else:
-					raise Exception('Unexpected Value')
+				elif k == 'write_freq':
+					self.write_freq = int(v)
+				# else:
+					# raise Exception('Unexpected Value')
 	
 	def toString(self):
 		print(f'nx={self.nx}')
@@ -124,7 +127,7 @@ class Visualizer:
 				lines[k].set_data(x, y)
 
 		plt.legend(loc='upper left')
-		ani = anim.FuncAnimation(fig, update, self.config.t_steps)
+		ani = anim.FuncAnimation(fig, update, len(self.times))
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 
 	def make_diffs_anim(self, fname, prefixs, ax_options):
@@ -144,7 +147,7 @@ class Visualizer:
 			_, y2, _ = self.read_file(prefixs[1], n)
 			line.set_data(x, y1-y2)
 
-		ani = anim.FuncAnimation(fig, update, self.config.t_steps)
+		ani = anim.FuncAnimation(fig, update, len(self.times))
 		ani.save(f'{self.out_folder}/{self.prefix}-{fname}')
 	
 	def plot_errors(self):
@@ -152,8 +155,8 @@ class Visualizer:
 		x, _, data = self.read_file('error', 1)
 		node = np.argmax(np.fabs(data[:, 2])[1:]) + 1
 
-		errors = np.array([self.read_errors(i)[node] for i in range(self.config.t_steps)])
-		exact_vals = np.array([self.read_file('exact_soln', i)[1][node] for i in range(self.config.t_steps)])
+		errors = np.array([self.read_errors(i)[node] for i in range(len(self.times))])
+		exact_vals = np.array([self.read_file('exact_soln', i)[1][node] for i in range(len(self.times))])
 		abs_errors = np.fabs(errors)
 
 		mask = exact_vals != 0.0
@@ -176,7 +179,7 @@ class Visualizer:
 	def plot_error_norms(self):
 		plt.cla()
 		
-		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(self.config.t_steps)])
+		abs_error = np.array([np.linalg.norm(self.read_file('error', i)[2][:,2]) for i in range(len(self.times))])
 		abs_error /= len(self.read_file('error', 0)[2][:, 2])
 
 		plt.semilogy(abs_error, label='Error norms')
@@ -191,9 +194,9 @@ class Visualizer:
 	def get_total_error_norm(self):
 		plt.cla()
 
-		abs_error = np.zeros(self.config.t_steps)
+		abs_error = np.zeros(len(self.times))
 
-		for i in range(self.config.t_steps):
+		for i in range(len(self.times)):
 			# errors = self.read_file('error', i)[2][:, 2]
 			errors = self.read_errors(i)
 			abs_error[i] = np.linalg.norm(errors)/len(errors)

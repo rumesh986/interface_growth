@@ -88,7 +88,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
-noinst_PROGRAMS = erf1$(EXEEXT)
+noinst_PROGRAMS = erf1$(EXEEXT) erf2$(EXEEXT)
 subdir = user_drivers/rumesh/erf
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/configure.ac_scripts/automake_init_command_file \
@@ -102,7 +102,7 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
-am_erf1_OBJECTS = solver.$(OBJEXT)
+am_erf1_OBJECTS = erf1.$(OBJEXT)
 erf1_OBJECTS = $(am_erf1_OBJECTS)
 am__DEPENDENCIES_1 =
 erf1_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -110,6 +110,9 @@ AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+am_erf2_OBJECTS = erf2.$(OBJEXT)
+erf2_OBJECTS = $(am_erf2_OBJECTS)
+erf2_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -125,7 +128,7 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I. -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/solver.Po
+am__depfiles_remade = ./$(DEPDIR)/erf1.Po ./$(DEPDIR)/erf2.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -162,8 +165,8 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(erf1_SOURCES)
-DIST_SOURCES = $(erf1_SOURCES)
+SOURCES = $(erf1_SOURCES) $(erf2_SOURCES)
+DIST_SOURCES = $(erf1_SOURCES) $(erf2_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -384,7 +387,8 @@ top_srcdir = ../../..
 #---------------------------------------------------------------------------
 
 # Local sources that Joe's Poisson code depends on:
-erf1_SOURCES = solver.cc erf1.h
+erf1_SOURCES = erf1.cc erf1.h solver.h
+erf2_SOURCES = erf2.cc erf2.h solver.h two_layer_mesh.h
 
 # Required libraries: Only the "generic" and "poisson" libraries, 
 # which are accessible via the general library directory which 
@@ -412,6 +416,7 @@ erf1_SOURCES = solver.cc erf1.h
 #          Poisson elements which refer to objects from the generic
 #          library. 
 erf1_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
+erf2_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 all: all-am
 
 .SUFFIXES:
@@ -459,13 +464,18 @@ erf1$(EXEEXT): $(erf1_OBJECTS) $(erf1_DEPENDENCIES) $(EXTRA_erf1_DEPENDENCIES)
 	@rm -f erf1$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(erf1_OBJECTS) $(erf1_LDADD) $(LIBS)
 
+erf2$(EXEEXT): $(erf2_OBJECTS) $(erf2_DEPENDENCIES) $(EXTRA_erf2_DEPENDENCIES) 
+	@rm -f erf2$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(erf2_OBJECTS) $(erf2_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/solver.Po # am--include-marker
+include ./$(DEPDIR)/erf1.Po # am--include-marker
+include ./$(DEPDIR)/erf2.Po # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -624,7 +634,8 @@ clean-am: clean-generic clean-libtool clean-noinstPROGRAMS \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/solver.Po
+		-rm -f ./$(DEPDIR)/erf1.Po
+	-rm -f ./$(DEPDIR)/erf2.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -670,7 +681,8 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/solver.Po
+		-rm -f ./$(DEPDIR)/erf1.Po
+	-rm -f ./$(DEPDIR)/erf2.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

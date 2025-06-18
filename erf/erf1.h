@@ -1,10 +1,10 @@
-#include "includes.h"
+#ifndef __ERF1_H__
+#define __ERF1_H__
+
 #include "unsteady_heat.h"
 
 // #define T_ORDER 2
 // #define X_ORDER 
-
-typedef void (*FluxFctPt)(const double &, const Vector<double>&, double &) ;
 
 class Erf1Problem {
 	public:
@@ -49,3 +49,5 @@ class Erf1Problem {
 			flux = 0.0;
 		}
 };
+
+#endif

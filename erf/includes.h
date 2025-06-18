@@ -16,4 +16,6 @@ typedef const vecd cvecd;
 typedef const uint cuint;
 typedef const double cdouble;
 
+typedef void (*FluxFctPt)(const double &, const Vector<double>&, double &);
+
 #endif
