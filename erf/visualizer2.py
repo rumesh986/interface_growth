@@ -33,11 +33,14 @@ class _Config:
 					case 'write_freq': self.write_freq = int(v)
 					# case _: raise Exception(f"Unexpected key in config {k}")
 
+		self._title = f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
+
 	def __str__(self):
 		return f'{self.nx = }\n{self.x_order = }\n{self.dt = }\n{self.t_shift = }\n{self.t_order = }\n{self.t_steps = }\n{self.write_freq = }'
 	
+	@property
 	def title(self):
-		return f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
+		return self._title
  
 class _RunData:
 	def __init__(
@@ -65,7 +68,9 @@ class _RunData:
 		except FileNotFoundError:
 			raise Exception("Time information not availble")
 			
-
+	@property
+	def title(self):
+		return self.config.title
 
 	def _read_file(self, ftype, index):
 		file = f'{self.inp_folder}/{ftype}{index}.{self.ext}'
