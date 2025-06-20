@@ -62,6 +62,10 @@ class _RunData:
 		self.errorf = errorf
 		self.ext = ext
 
+		self._exact_solns = None
+		self._solns = None
+		self._errors = None
+
 		self.config = _Config(f'{self.inp_folder}/{configf}')
 		self.data = pd.DataFrame()
 
@@ -73,6 +77,43 @@ class _RunData:
 	@property
 	def title(self):
 		return self.config.title
+	
+	@property
+	def errors(self):
+		if not self._errors:
+			self._errors = self._read_series(self.errorf)
+		return self._errors
+	
+	@property
+	def solns(self):
+		if not self._solns:
+			self._solns = self._read_series(self.solnf)
+		return self._solns
+	
+	@property
+	def exact_solns(self):
+		if not self._exact_solns:
+			self._exact_solns = self._read_series(self.exact_solnf)
+		return self._exact_solns
+	
+	@property
+	def error_norms(self):
+		abs_errors = np.array([np.linalg.norm(x['error']) for x in self.errors])
+		abs_errors /= len(self.errors[0]['error'])
+
+		return abs_errors
+	
+	@property
+	def error_max(self):
+		node = np.argmax(np.fabs(self.errors[1]['error'][1:])) + 1
+		errors = np.array([df['error'][node] for df in self.errors])
+		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
+		mask = exact_vals != 0.0
+
+		abs_errors = np.fabs(errors)
+		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
+
+		return abs_errors, rel_errors, self.errors[0]['x'][node]
 
 	def _read_file(self, ftype, index):
 		file = f'{self.inp_folder}/{ftype}{index}.{self.ext}'
@@ -90,7 +131,7 @@ class _RunData:
 
 		return pd.DataFrame(data, columns=cols)
 
-	def read_series(self, ftype):
+	def _read_series(self, ftype):
 		data = []
 		for i, t in enumerate(self.times):
 			_data = self._read_file(ftype, i)
@@ -99,44 +140,6 @@ class _RunData:
 			data.append(_data)
 		
 		return data
-	
-	def get_errors(self, error_norms=True, error_max=True):
-		data = self.read_series(self.errorf)
-
-		norms_ret = None
-		max_ret = None
-		if error_norms:
-			norms_ret = self._get_error_norms(data)
-
-		if error_max:
-			max_ret = self._get_error_max(data)
-
-		return norms_ret, max_ret
-
-
-	def _get_error_norms(self, data):
-		plt.cla()
-
-		abs_errors = np.array([np.linalg.norm(x['error']) for x in data])
-		abs_errors /= len(data[0]['error'])
-
-		return abs_errors
-
-	def _get_error_max(self, data):
-		plt.cla()
-
-		node = np.argmax(np.fabs(data[1]['error'][1:])) + 1
-		
-		errors = np.array([df['error'][node] for df in data])
-
-		exact_solns = self.read_series(self.exact_solnf)
-		exact_vals = np.array([df['u'][node] for df in exact_solns])
-		mask = exact_vals != 0.0
-
-		abs_errors = np.fabs(errors)
-		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
-
-		return abs_errors, rel_errors, data[0]['x'][node]
 
 class Visualizer:
 	def __init__(self, resd, outd, prefix, dxdt):
@@ -176,7 +179,8 @@ class Visualizer:
 	def plot_errors(self, run):
 		plt.cla()
 
-		norm_err, (abs_max_err, rel_max_err, pos) = run.get_errors()
+		norm_err = run.error_norms
+		abs_max_err, rel_max_err, pos = run.error_max
 
 		fig, (norm_ax, max_ax) = plt.subplots(1,2)
 		fig.suptitle(f'Errors ({run.title})')
@@ -218,9 +222,9 @@ class Visualizer:
 			xycoords='axes fraction'
 		)
 
-		solns = run.read_series(run.solnf)
-		exact_solns = run.read_series(run.exact_solnf)
-		errors = run.read_series(run.errorf)
+		solns = run.solns
+		exact_solns = run.exact_solns
+		errors = run.errors
 
 		line_soln = prof_ax.plot(
 			solns[0]['x'], 
