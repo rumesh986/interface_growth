@@ -1,5 +1,9 @@
+import os
+import sys
+import asyncio
+
 import matplotlib.pyplot as plt
-import matplotlib.animation as anim
+from matplotlib.animation import FuncAnimation
 
 import numpy as np
 import pandas as pd
@@ -46,7 +50,6 @@ class _RunData:
 	def __init__(
 		self, 
 		inp_folder, 
-		prefix, 
 		solnf='soln', 
 		exact_solnf='exact_soln', 
 		errorf='error',
@@ -54,7 +57,6 @@ class _RunData:
 		ext='dat'
 	):
 		self.inp_folder = inp_folder
-		self.prefix = prefix
 		self.solnf = solnf
 		self.exact_solnf = exact_solnf
 		self.errorf = errorf
@@ -66,7 +68,7 @@ class _RunData:
 		try:
 			self.times = np.fromfile(f'{self.inp_folder}/times.{self.ext}', sep='\n')
 		except FileNotFoundError:
-			raise Exception("Time information not availble")
+			raise Exception("Time data not availble")
 			
 	@property
 	def title(self):
@@ -134,29 +136,150 @@ class _RunData:
 		abs_errors = np.fabs(errors)
 		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
 
-		return abs_errors, rel_errors
+		return abs_errors, rel_errors, data[0]['x'][node]
+
+class Visualizer:
+	def __init__(self, resd, outd, prefix, dxdt):
+		self.resd = resd
+		self.outd = outd
+		self.prefix = prefix
+		self.dxdt = dxdt
+
+		self._data = []
+		self._markers = ['+', 'O', '.', '*', 'x', 'D', '^', 'v']
+		self._linestyles = ['-', '--', ':']
+
+		plt.style.use('pltstyle.mplstyle')
+
+		for rundir in os.listdir(self.resd):
+			rund = f'{self.resd}/{rundir}'
+			if not os.path.isdir(rund):
+				continue
+			
+			if not os.path.exists(f'{self.outd}/{rundir}'):
+				os.mkdir(f'{self.outd}/{rundir}')
+
+			print(f'Processing results in {rund}')
+
+			self._data.append(_RunData(rund))
+		
+	
+	async def standard(self):
+		async def _make(run):
+			self.make_anims(run)
+			self.plot_errors(run)
+
+		async with asyncio.TaskGroup() as tg:
+			for run in self._data:
+				tg.create_task(_make(run))
+
+	def plot_errors(self, run):
+		plt.cla()
+
+		norm_err, (abs_max_err, rel_max_err, pos) = run.get_errors()
+
+		fig, (norm_ax, max_ax) = plt.subplots(1,2)
+		fig.suptitle(f'Errors ({run.title})')
+
+		norm_ax.semilogy(norm_err)
+		
+		norm_ax.set_xlabel('Timestep')
+		norm_ax.set_ylabel('Norm of Error at timestep')
+		norm_ax.set_title('L2 norm of errors')
+
+		max_ax.semilogy(abs_max_err, label='Absolute')
+		max_ax.semilogy(rel_max_err, label='Relative')
+		
+		max_ax.legend()
+		max_ax.set_xlabel('Timestep')
+		max_ax.set_ylabel('Error magnitude')
+		max_ax.set_title(f'Magnitude of errors at x={pos}')
+
+		plt.savefig('trial.png')
+
+	def make_anims(self, run):
+		def _update(n):
+			time_text.set_text(f't={run.times[n]}')
+
+			line_soln.set_data(solns[n]['x'], solns[n]['u'])
+			line_exact_soln.set_data(exact_solns[n]['x'], exact_solns[n]['u'])
+			line_diff.set_data(errors[n]['x'], errors[n]['error'])
+
+			diff_ax.set_ylim(errors[n]['error'].min() * 1.1, errors[n]['error'].max() * 1.1)
+
+		plt.cla()
+
+		fig, (diff_ax, prof_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		fig.suptitle(f'Profiles ({run.title})')
+
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}', 
+			xy=(0.8, 0.9), 
+			xycoords='axes fraction'
+		)
+
+		solns = run.read_series(run.solnf)
+		exact_solns = run.read_series(run.exact_solnf)
+		errors = run.read_series(run.errorf)
+
+		line_soln = prof_ax.plot(
+			solns[0]['x'], 
+			solns[0]['u'], 
+			label='Numerical', 
+			lw=5.0
+		)[0]
+		line_exact_soln = prof_ax.plot(
+			exact_solns[0]['x'], 
+			exact_solns[0]['u'], 
+			label='Analytical', 
+			linestyle='--', 
+			lw=5.0
+		)[0]
+		
+		line_diff = diff_ax.plot(
+			errors[0]['x'], 
+			errors[0]['error'], 
+		)[0]
+
+		prof_ax.legend(loc='upper left')
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_ylabel('Temperature-ish')
+		prof_ax.set_title('Temperature profile')
+
+		diff_ax.set_xlabel('x')
+		diff_ax.set_ylabel('Error')
+		diff_ax.set_title('Error in profile')
+		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save('trial.mp4')
 
 if __name__ =='__main__':
-	run = _RunData('RESLT/2n1000_4t1.00e-01', 'erf2')
+	vis = Visualizer('TRIALRESLT', 'TRIALIMG', 'erf2', 'a')
 
-	print(run.config)
-	rd = run.plot_errors()
+	asyncio.run(vis.standard())
+	
 
-	print(len(rd))
+	# run = _RunData('RESLT/2n1000_4t1.00e-01', 'erf2')
 
-	# timer1 = timeit.Timer(stmt='for i in range(100): run.read_file("error", i)', setup='run = _RunData("RESLT/2n1000_4t1.00e-01", "erf2")', globals=globals())
-	# print(timer1.timeit(100))
+	# print(run.config)
+	# rd = run.plot_errors()
 
-	vis = Visualizer("RESLT/2n1000_4t1.00e-01", "", "erf2", times="times.dat")
-	vd  = vis.plot_errors()
+	# print(len(rd))
 
-	print(rd)
-	print(vd)
+	# # timer1 = timeit.Timer(stmt='for i in range(100): run.read_file("error", i)', setup='run = _RunData("RESLT/2n1000_4t1.00e-01", "erf2")', globals=globals())
+	# # print(timer1.timeit(100))
 
-	if np.array_equal(rd, vd):
-		print("Were still golden")
-	else:
-		print("Damn got issues now")
+	# vis = Visualizer("RESLT/2n1000_4t1.00e-01", "", "erf2", times="times.dat")
+	# vd  = vis.plot_errors()
+
+	# print(rd)
+	# print(vd)
+
+	# if np.array_equal(rd, vd):
+	# 	print("Were still golden")
+	# else:
+	# 	print("Damn got issues now")
 
 
 	# for i in range(100):
