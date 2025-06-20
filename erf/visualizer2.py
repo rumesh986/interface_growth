@@ -114,6 +114,12 @@ class _RunData:
 		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
 
 		return abs_errors, rel_errors, self.errors[0]['x'][node]
+	
+	@property
+	def total_error_norm(self):
+		errors self.error_norms
+
+		return np.linalg.norm(errors) / len(errors)
 
 	def _read_file(self, ftype, index):
 		file = f'{self.inp_folder}/{ftype}{index}.{self.ext}'
