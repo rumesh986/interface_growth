@@ -117,7 +117,7 @@ class _RunData:
 	
 	@property
 	def total_error_norm(self):
-		errors self.error_norms
+		errors = self.error_norms
 
 		return np.linalg.norm(errors) / len(errors)
 
@@ -188,7 +188,7 @@ class Visualizer:
 		norm_err = run.error_norms
 		abs_max_err, rel_max_err, pos = run.error_max
 
-		fig, (norm_ax, max_ax) = plt.subplots(1,2)
+		fig, (norm_ax, max_ax) = plt.subplots(1,2, figsize=(10, 5))
 		fig.suptitle(f'Errors ({run.title})')
 
 		norm_ax.semilogy(norm_err)
@@ -263,11 +263,64 @@ class Visualizer:
 
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save('trial.mp4')
+	
+	def dx(self):
+		plt.cla()
+
+		data = pd.DataFrame(columns=['x_order', 'nx', 'error'])
+
+		for run in self._data:
+			data.loc[-1] = [run.config.x_order, run.config.nx, run.total_error_norm]
+		
+		print(data)
+		# fig, ax = plt.subplots(1)
+	
+	def dt(self):
+		plt.cla()
+
+		data = pd.DataFrame(columns=['t_order', 'dt', 'error'])
+
+		for i, run in enumerate(self._data):
+			data.loc[i] = [run.config.t_order, run.config.dt, run.total_error_norm]
+		
+		xs = np.logspace(-1, -5)
+		orders = data['t_order'].unique()
+		orders.sort()
+		for order in orders:
+			df = data.loc[data['t_order'] == order]
+			plt.scatter(df['dt'], df['error'], label=f'BDF {order}')
+			plt.plot(xs, xs ** order * 10 * df['error'].max(), label=f'Reference (order {order})', linestyle='--')
+
+		plt.xlabel('dt')
+		plt.ylabel('Normalized Error')
+		plt.xscale('log')
+		plt.yscale('log')
+		plt.ylim([data['error'].min() * 1e-1, data['error'].max() * 1e1])
+		plt.legend()
+		plt.title(f'{self.prefix} dt error analysis')
+
+		plt.savefig('trial_dt.png')
+	
+	def trial(self):
+		for run in self._data:
+			data = run.read_series(run.errorf)
+
+	def trial2(self):
+		for run in self._data:
+			data = run.errors
 
 if __name__ =='__main__':
-	vis = Visualizer('TRIALRESLT', 'TRIALIMG', 'erf2', 'a')
+	vis = Visualizer('RESLT', 'TRIALIMG', 'erf2', 'a')
 
-	asyncio.run(vis.standard())
+	# timer1 = timeit.Timer(stmt='vis.trial()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
+	# timer2 = timeit.Timer(stmt='vis.trial2()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
+
+	# print(f'timer1: {timer1.timeit(100)}')
+	# print(f'timer2: {timer2.timeit(100)}')
+
+	vis.dt()
+
+	# asyncio.run(vis.standard())
 	
 
 	# run = _RunData('RESLT/2n1000_4t1.00e-01', 'erf2')
@@ -293,7 +346,7 @@ if __name__ =='__main__':
 
 
 	# for i in range(100):
-	# 	rd = run.read_file('error', i)['error']
+	# 	rd = run.errors[i]['error']
 	# 	vd = vis.read_file('error', i)[2][:, 2]
 
 	# 	print(f'[{i}] {rd.shape} {vd.shape}')
