@@ -262,55 +262,63 @@ class Visualizer:
 		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
 
 		anim = FuncAnimation(fig, _update, len(run.times))
-		anim.save('trial.mp4')
-	
-	def dx(self):
-		plt.cla()
+		anim.save('trial.mp4')	
 
-		data = pd.DataFrame(columns=['x_order', 'nx', 'error'])
+	def plot_analysis(self):
+		data = pd.DataFrame(columns=['order', 'x', 'error'])
 
-		for run in self._data:
-			data.loc[-1] = [run.config.x_order, run.config.nx, run.total_error_norm]
-		
-		print(data)
-		# fig, ax = plt.subplots(1)
-	
-	def dt(self):
-		plt.cla()
-
-		data = pd.DataFrame(columns=['t_order', 'dt', 'error'])
+		match self.dxdt:
+			case 'x':
+				config = (lambda x: x.x_order, 1/x.nx)
+				xlabel = 'dx'
+				title = f'{self.prefix} dx error analysis'
+				fname = 'trial_dx.png'
+				label = 'order'
+			case 'b':
+				config = (lambda x: x.x_order, 1/x.nx)
+				xlabel = 'dx'
+				title = f'{self.prefix} dxdt error analysis'
+				fname = 'trial_dxdt.png'
+				label = 'order'
+			case 't':
+				config = lambda x: (x.t_order, x.dt)
+				xlabel = 'dt'
+				title = f'{self.prefix} dt error analysis'
+				fname = 'trial_dt.png'
+				label = 'BDF'
+			case _:
+				raise Exception("Unknown analysis type provided")
 
 		for i, run in enumerate(self._data):
-			data.loc[i] = [run.config.t_order, run.config.dt, run.total_error_norm]
-		
+			order, x = config(run.config)
+			data.loc[i] = [order, x, run.total_error_norm]
+
 		xs = np.logspace(-1, -5)
-		orders = data['t_order'].unique()
+		orders = data['order'].unique()
 		orders.sort()
+
+		fig, ax = plt.subplots(1, subplot_kw={
+			'xlabel': xlabel,
+			'ylabel': 'Normalized Error',
+			'xscale': 'log',
+			'yscale': 'log',
+			'ylim': [data['error'].min() * 1e-1, data['error'].max() * 1e1],
+			'title': title
+		})
+
 		for order in orders:
-			df = data.loc[data['t_order'] == order]
-			plt.scatter(df['dt'], df['error'], label=f'BDF {order}')
-			plt.plot(xs, xs ** order * 10 * df['error'].max(), label=f'Reference (order {order})', linestyle='--')
+			df = data.loc[data['order'] == order]
+			ax.scatter(df['x'], df['error'], label=f'{label} {order}')
 
-		plt.xlabel('dt')
-		plt.ylabel('Normalized Error')
-		plt.xscale('log')
-		plt.yscale('log')
-		plt.ylim([data['error'].min() * 1e-1, data['error'].max() * 1e1])
-		plt.legend()
-		plt.title(f'{self.prefix} dt error analysis')
+			max_point = df.loc[df['x'] == df['x'].max()]
+			ax.plot(xs, (xs / max_point['x'].iloc[0]) ** order * max_point['error'].iloc[0], label=f'Reference (order={order})', linestyle='--' )
+		
+		ax.legend(ncols=len(orders))
 
-		plt.savefig('trial_dt.png')
-	
-	def trial(self):
-		for run in self._data:
-			data = run.read_series(run.errorf)
-
-	def trial2(self):
-		for run in self._data:
-			data = run.errors
+		fig.savefig(fname)
 
 if __name__ =='__main__':
-	vis = Visualizer('RESLT', 'TRIALIMG', 'erf2', 'a')
+	vis = Visualizer('RESLT', 'TRIALIMG', 'erf2', 't')
 
 	# timer1 = timeit.Timer(stmt='vis.trial()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
 	# timer2 = timeit.Timer(stmt='vis.trial2()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
@@ -318,7 +326,7 @@ if __name__ =='__main__':
 	# print(f'timer1: {timer1.timeit(100)}')
 	# print(f'timer2: {timer2.timeit(100)}')
 
-	vis.dt()
+	vis.plot_analysis()
 
 	# asyncio.run(vis.standard())
 	
