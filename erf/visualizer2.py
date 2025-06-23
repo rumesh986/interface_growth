@@ -49,7 +49,8 @@ class _Config:
 class _RunData:
 	def __init__(
 		self, 
-		inp_folder, 
+		inp_folder,
+		out_folder,
 		solnf='soln', 
 		exact_solnf='exact_soln', 
 		errorf='error',
@@ -57,6 +58,7 @@ class _RunData:
 		ext='dat'
 	):
 		self.inp_folder = inp_folder
+		self.out_folder = out_folder
 		self.solnf = solnf
 		self.exact_solnf = exact_solnf
 		self.errorf = errorf
@@ -170,7 +172,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self._data.append(_RunData(rund))
+			self._data.append(_RunData(rund, f'{self.outd}/{rundir}'))
 		
 	
 	async def standard(self):
@@ -205,7 +207,7 @@ class Visualizer:
 		max_ax.set_ylabel('Error magnitude')
 		max_ax.set_title(f'Magnitude of errors at x={pos}')
 
-		plt.savefig('trial.png')
+		plt.savefig(f'{run.out_folder}/{self.prefix}-errors.png')
 
 	def make_anims(self, run):
 		def _update(n):
@@ -262,7 +264,7 @@ class Visualizer:
 		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
 
 		anim = FuncAnimation(fig, _update, len(run.times))
-		anim.save('trial.mp4')	
+		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
 
 	def plot_analysis(self):
 		data = pd.DataFrame(columns=['order', 'x', 'error'])
@@ -272,19 +274,19 @@ class Visualizer:
 				config = (lambda x: x.x_order, 1/x.nx)
 				xlabel = 'dx'
 				title = f'{self.prefix} dx error analysis'
-				fname = 'trial_dx.png'
+				fname = 'dx_errors'
 				label = 'order'
 			case 'b':
 				config = (lambda x: x.x_order, 1/x.nx)
 				xlabel = 'dx'
 				title = f'{self.prefix} dxdt error analysis'
-				fname = 'trial_dxdt.png'
+				fname = 'dxdt_errors'
 				label = 'order'
 			case 't':
 				config = lambda x: (x.t_order, x.dt)
 				xlabel = 'dt'
 				title = f'{self.prefix} dt error analysis'
-				fname = 'trial_dt.png'
+				fname = 'dt_errors'
 				label = 'BDF'
 			case _:
 				raise Exception("Unknown analysis type provided")
@@ -315,7 +317,7 @@ class Visualizer:
 		
 		ax.legend(ncols=len(orders))
 
-		fig.savefig(fname)
+		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
 
 if __name__ =='__main__':
 	vis = Visualizer('RESLT', 'TRIALIMG', 'erf2', 't')
