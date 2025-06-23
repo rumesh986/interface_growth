@@ -1,15 +1,12 @@
 import os
 import sys
-import asyncio
+from concurrent.futures import ProcessPoolExecutor
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 import numpy as np
 import pandas as pd
-
-import timeit
-from visualizer import Visualizer
 
 class _Config:
 	def __init__(self, file):
@@ -27,15 +24,12 @@ class _Config:
 
 				match k:
 					case 'nx': self.nx = int(v)
-					# case 'nx1': self.nx1 = int(v)
-					# case 'nx2': self.nx2 = int(v)
 					case 'x_order': self.x_order = int(v)
 					case 'dt': self.dt = float(v)
 					case 't_shift': self.t_shift = float(v)
 					case 't_order': self.t_order = int(v)
 					case 't_steps': self.t_steps = int(v)
 					case 'write_freq': self.write_freq = int(v)
-					# case _: raise Exception(f"Unexpected key in config {k}")
 
 		self._title = f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
 
@@ -174,15 +168,19 @@ class Visualizer:
 
 			self._data.append(_RunData(rund, f'{self.outd}/{rundir}'))
 		
-	
-	async def standard(self):
-		async def _make(run):
-			self.make_anims(run)
-			self.plot_errors(run)
+		for rtype in self.dxdt:
+			match rtype:
+				case 'a': self.standard()
+				case x if x in 'bxt': self.plot_analysis(x)
 
-		async with asyncio.TaskGroup() as tg:
-			for run in self._data:
-				tg.create_task(_make(run))
+	def _make(self, run):
+		self.make_anims(run)
+		self.plot_errors(run)
+
+	def standard(self):
+		with ProcessPoolExecutor(max_workers=10) as executor:
+			for run, thread in zip(self._data, executor.map(self._make, self._data)):
+				print(f'Standard processing for \n{run.config}')
 
 	def plot_errors(self, run):
 		plt.cla()
@@ -208,6 +206,7 @@ class Visualizer:
 		max_ax.set_title(f'Magnitude of errors at x={pos}')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-errors.png')
+		plt.close(fig)
 
 	def make_anims(self, run):
 		def _update(n):
@@ -265,11 +264,12 @@ class Visualizer:
 
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
+		plt.close(fig)
 
-	def plot_analysis(self):
+	def plot_analysis(self, rtype):
 		data = pd.DataFrame(columns=['order', 'x', 'error'])
 
-		match self.dxdt:
+		match rtype:
 			case 'x':
 				config = (lambda x: x.x_order, 1/x.nx)
 				xlabel = 'dx'
@@ -318,53 +318,11 @@ class Visualizer:
 		ax.legend(ncols=len(orders))
 
 		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
+		plt.close(fig)
 
 if __name__ =='__main__':
-	vis = Visualizer('RESLT', 'TRIALIMG', 'erf2', 't')
+	assert len(sys.argv) == 3
+	assert sum(c1 == c2 for c1 in "abxt" for c2 in sys.argv[2]) > 0
+	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	# timer1 = timeit.Timer(stmt='vis.trial()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
-	# timer2 = timeit.Timer(stmt='vis.trial2()', setup='vis = Visualizer("TRIALRESLT", "TRIALIMG", "erf2", "a")', globals=globals())
-
-	# print(f'timer1: {timer1.timeit(100)}')
-	# print(f'timer2: {timer2.timeit(100)}')
-
-	vis.plot_analysis()
-
-	# asyncio.run(vis.standard())
-	
-
-	# run = _RunData('RESLT/2n1000_4t1.00e-01', 'erf2')
-
-	# print(run.config)
-	# rd = run.plot_errors()
-
-	# print(len(rd))
-
-	# # timer1 = timeit.Timer(stmt='for i in range(100): run.read_file("error", i)', setup='run = _RunData("RESLT/2n1000_4t1.00e-01", "erf2")', globals=globals())
-	# # print(timer1.timeit(100))
-
-	# vis = Visualizer("RESLT/2n1000_4t1.00e-01", "", "erf2", times="times.dat")
-	# vd  = vis.plot_errors()
-
-	# print(rd)
-	# print(vd)
-
-	# if np.array_equal(rd, vd):
-	# 	print("Were still golden")
-	# else:
-	# 	print("Damn got issues now")
-
-
-	# for i in range(100):
-	# 	rd = run.errors[i]['error']
-	# 	vd = vis.read_file('error', i)[2][:, 2]
-
-	# 	print(f'[{i}] {rd.shape} {vd.shape}')
-
-	# 	if not np.array_equal(rd, vd):
-	# 		raise Exception(f'whoops {i}')
-			
-	# print("Its all good so far")
-
-	# timer2 = timeit.Timer(stmt='for i in range(100): run.read_file("error", i)', setup='run = Visualizer("RESLT/2n1000_4t1.00e-01", "", "erf2", times="times.dat")', globals=globals())
-	# print(timer2.timeit(100))
+	vis = Visualizer('RESLT', 'imgs', sys.argv[1], sys.argv[2])
