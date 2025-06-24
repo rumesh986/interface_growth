@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
-import subprocess
+import os
 import sys
+import subprocess
 
-# from visualizer import Visualizer
+from datetime import datetime
+from argparse import ArgumentParser
+
+from visualizer import Visualizer
 
 class Run:
 	def __init__(self, prog, nsteps, dxdt):
@@ -11,23 +15,114 @@ class Run:
 		self.nsteps = nsteps
 		self.dxdt = dxdt
 
-		print(f'{self.prog=} {self.nsteps=} {self.dxdt=}')
-	
-	def build(self, dir, x, t):
+		match self.dxdt:
+			case 'a': self.standard(2, 2, tsteps=self.nsteps)
+			case _: raise NotImplementedError("Hang on yo")
+
+	def _build(self, wdir, x, t):
 		with open("Makefile", "r") as f:
 			while line := f.readline():
 				if line.startswith("CXXFLAGS"):
 					flags = line.strip()
 		flags = f'{flags} -DX_ORDER={x} -DT_ORDER={t}'
-		print(flags)
 
-		with open("build.stdout", "w") as f:
-			subprocess.run(["make", self.prog, flags], check=True, stdout=f, stderr=subprocess.STDOUT)
-		
+		subprocess.run(["make", "mostlyclean-compile"])
 
+		with open(f"{wdir}/build_{x}_{t}.stdout", "w") as f:
+			subprocess.run(
+				["make", self.prog, flags], 
+				check=True, 
+				stderr=subprocess.STDOUT,
+				stdout=f
+			)
+
+		prog_name = f'{self.prog}_{x}_{t}'
+		os.rename(self.prog, f'{wdir}/{prog_name}')
+
+		return prog_name
+
+	def _run(self, rdir, prog, x, t, nx, dt, tsteps, tshift=None, write_freq=None, outfile=None):
+		owd = os.getcwd()
+		print(os.getcwd())
+		os.chdir(rdir)
+
+
+		nxargs = ('--nx', str(nx))
+		dtargs = ('--dt', str(dt)) if dt is not None else ('--vardt')
+		tstepsargs = ('--tsteps', str(tsteps))
+		tshiftargs = ('--tshift', str(tshift) if tshift is not None else "0.0")
+		write_freqargs = ('--write-freq', str(write_freq) if write_freq is not None else "1")
+
+		with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
+			subprocess.run(
+				[f'./{prog}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
+				check=True, 
+				stderr=subprocess.STDOUT, 
+				stdout=f
+			)
+	
+	def standard(self, x, t, nx=10, dt=0.1, tsteps=10, tshift=None, write_freq=None):
+		print(os.getcwd())
+		wdir = f'./test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+		os.mkdir(wdir)
+		os.mkdir(f'{wdir}/RESLT')
+		os.mkdir(f'{wdir}/imgs')
+
+		prog = self._build(wdir, x, t)
+
+		self._run(wdir, prog, x, t, nx, dt, tsteps, tshift=tshift, write_freq=write_freq)
+
+		vis = Visualizer('RESLT', 'imgs', self.prog, 'a')
+	
+	def dx(self, xs, t, nx=10, dt=0.1, tsteps=10):
+		pass
+
+
+def trial(args):
+	print('in trial')
+	print(args)
 
 if __name__ == '__main__':
-	assert len(sys.argv) == 4
+	parser = ArgumentParser()
 
-	run = Run(*sys.argv[1:])
-	run.build("", 2, -1)
+	parser.add_argument(
+		'prog',
+		type=str,
+		help="Name of program to run"
+	)
+
+	parser.add_argument('--xs',
+		nargs='+', 
+		type=int,
+		help="NNode per elements to simulate with, accepts multiple arguments to be in a list"
+	)
+
+	parser.add_argument('--ts',
+		nargs='+', 
+		type=int,
+		help="Order of timestepper to simulate with, accepts multiple in list"
+	)
+
+	parser.add_argument('--nx',
+		nargs='+', 
+		type=int,
+		help='Number of elements to simulate with, accepts multiple in list'
+	)
+
+	parser.add_argument('--dt',
+		nargs='+', 
+		type=float,
+		help='timesteps to simulate with, accepts multiple in list'
+	)
+
+	parser.add_argument('--tsteps', 
+		type=int,
+		help='Number of timesteps to simulate for, only single number'
+	)
+
+	args = parser.parse_args()
+	print(vars(args))
+	print(args.xs)
+	trial(args)
+
+	# run = Run(*sys.argv[1:])
