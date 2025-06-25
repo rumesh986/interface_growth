@@ -5,34 +5,43 @@ import subprocess
 
 from datetime import datetime
 from argparse import ArgumentParser
+from concurrent.futures import wait, ProcessPoolExecutor
 
 from visualizer import Visualizer
 
 class Run:
-	def __init__(self, prog, xs, ts, nxs, dts, tsteps, dxdt, **kwargs):
+	def __init__(self, prog, xs, ts, nxs, dts, tsteps, dxdt, nthreads, **kwargs):
 		self.prog = prog
-		self.xs = xs
-		self.ts = ts
-		self.nxs = nxs
-		self.dts = dts
+		self.xs = [xs] if isinstance(xs, int) else xs
+		self.ts = [ts] if isinstance(ts, int) else ts
+		self.nxs = [nxs] if isinstance(nxs, int) else nxs
+		self.dts = [dts] if isinstance(dts, float) else dts
 		self.tsteps = tsteps
 		self.dxdt = dxdt
+		self.nthreads = nthreads
 		self.kwargs = kwargs
-		self.exes = {}
+		self._exes = {}
 
 		self._od = os.getcwd()
 		self._wd = f'{self._od}/test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
 
 		os.mkdir(f'{self._wd}')
 		os.mkdir(f'{self._wd}/RESLT')
 		os.mkdir(f'{self._wd}/imgs')
 
-		# self._build()
+		print(f'__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
+
+
+		self._build()
 
 		os.chdir(self._wd)
 
-		print(f'__init__ {prog=} {xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
+		self._run_all()
 
+
+	# not parallelized as all processes will be writing to the same file in main directory
+	# unsure how to deal with this race condition yet
 	def _build(self):
 		with open("Makefile", "r") as f:
 			while line := f.readline():
@@ -54,7 +63,8 @@ class Run:
 
 				prog_name = f'{self.prog}_{x}_{t}'
 				os.rename(self.prog, f'{self._wd}/{prog_name}')
-				self.exes[(x, t)] = prog_name
+				self._exes[(x, t)] = prog_name
+
 
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None):
 		nxargs = ('--nx', str(nx))
@@ -62,14 +72,30 @@ class Run:
 		tstepsargs = ('--tsteps', str(tsteps))
 		tshiftargs = ('--tshift', str(tshift) if tshift is not None else "0.0")
 		write_freqargs = ('--write-freq', str(write_freq) if write_freq is not None else "1")
+		
+		print(f'running config ({x}, {t}) with {nx=} and {dt=}')
 
 		with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
 			subprocess.run(
-				[f'./{prog}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
+				[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
 				check=True,
 				stderr=subprocess.STDOUT,
 				stdout=f
 			)
+	
+	def _run_all(self):
+		futures = []
+		with ProcessPoolExecutor(max_workers=self.nthreads) as executor:
+			for x in self.xs:
+				for t in self.ts:
+					for nx in self.nxs:
+						for dt in self.dts:
+							futures.append(executor.submit(self._run_base, x, t, nx, dt, self.tsteps))
+		print(futures)
+		wait(futures)
+		print("Finished waiting for all configs")
+
+
 	
 	def standard(self, x, t, nx=10, dt=0.1, tsteps=10, tshift=None, write_freq=None):
 		prog = self._build(wdir, x, t)
@@ -141,6 +167,13 @@ if __name__ == '__main__':
 		dest='dxdt',
 		default='a',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt"
+	)
+
+	parser.add_argument('--nthreads',
+		type=int,
+		choices=range(1,os.cpu_count()),
+		default=1,
+		help='Number of processes that can be started'
 	)
 
 	args = parser.parse_args()
