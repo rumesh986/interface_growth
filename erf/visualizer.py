@@ -156,7 +156,7 @@ class Visualizer:
 		self._markers = ['+', 'O', '.', '*', 'x', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
-		plt.style.use('pltstyle.mplstyle')
+		plt.style.use('../../pltstyle.mplstyle')
 
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
