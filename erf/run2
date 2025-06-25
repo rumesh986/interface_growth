@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import subprocess
 
 from datetime import datetime
@@ -10,43 +9,54 @@ from argparse import ArgumentParser
 from visualizer import Visualizer
 
 class Run:
-	def __init__(self, prog, nsteps, dxdt):
+	def __init__(self, prog, xs, ts, nxs, dts, tsteps, dxdt, **kwargs):
 		self.prog = prog
-		self.nsteps = nsteps
+		self.xs = xs
+		self.ts = ts
+		self.nxs = nxs
+		self.dts = dts
+		self.tsteps = tsteps
 		self.dxdt = dxdt
+		self.kwargs = kwargs
+		self.exes = {}
 
-		match self.dxdt:
-			case 'a': self.standard(2, 2, tsteps=self.nsteps)
-			case _: raise NotImplementedError("Hang on yo")
+		self._od = os.getcwd()
+		self._wd = f'{self._od}/test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
 
-	def _build(self, wdir, x, t):
+		os.mkdir(f'{self._wd}')
+		os.mkdir(f'{self._wd}/RESLT')
+		os.mkdir(f'{self._wd}/imgs')
+
+		# self._build()
+
+		os.chdir(self._wd)
+
+		print(f'__init__ {prog=} {xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
+
+	def _build(self):
 		with open("Makefile", "r") as f:
 			while line := f.readline():
 				if line.startswith("CXXFLAGS"):
-					flags = line.strip()
-		flags = f'{flags} -DX_ORDER={x} -DT_ORDER={t}'
+					flags_base = line.strip()
 
-		subprocess.run(["make", "mostlyclean-compile"])
+		for x in self.xs:
+			for t in self.ts:
+				flags = f'{flags_base} -DX_ORDER={x} -DT_ORDER={t}'
+				subprocess.run(["make", "mostlyclean-compile"])
 
-		with open(f"{wdir}/build_{x}_{t}.stdout", "w") as f:
-			subprocess.run(
-				["make", self.prog, flags], 
-				check=True, 
-				stderr=subprocess.STDOUT,
-				stdout=f
-			)
+				with open(f"{self._wd}/build_{x}_{t}.stdout", "w") as f:
+					subprocess.run(
+						["make", self.prog, flags], 
+						check=True, 
+						stderr=subprocess.STDOUT,
+						stdout=f
+					)
 
-		prog_name = f'{self.prog}_{x}_{t}'
-		os.rename(self.prog, f'{wdir}/{prog_name}')
+				prog_name = f'{self.prog}_{x}_{t}'
+				os.rename(self.prog, f'{self._wd}/{prog_name}')
+				self.exes[(x, t)] = prog_name
 
-		return prog_name
-
-	def _run(self, rdir, prog, x, t, nx, dt, tsteps, tshift=None, write_freq=None, outfile=None):
-		owd = os.getcwd()
-		print(os.getcwd())
-		os.chdir(rdir)
-
-
+	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None):
 		nxargs = ('--nx', str(nx))
 		dtargs = ('--dt', str(dt)) if dt is not None else ('--vardt')
 		tstepsargs = ('--tsteps', str(tsteps))
@@ -56,18 +66,12 @@ class Run:
 		with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
 			subprocess.run(
 				[f'./{prog}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
-				check=True, 
-				stderr=subprocess.STDOUT, 
+				check=True,
+				stderr=subprocess.STDOUT,
 				stdout=f
 			)
 	
 	def standard(self, x, t, nx=10, dt=0.1, tsteps=10, tshift=None, write_freq=None):
-		print(os.getcwd())
-		wdir = f'./test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
-		os.mkdir(wdir)
-		os.mkdir(f'{wdir}/RESLT')
-		os.mkdir(f'{wdir}/imgs')
-
 		prog = self._build(wdir, x, t)
 
 		self._run(wdir, prog, x, t, nx, dt, tsteps, tshift=tshift, write_freq=write_freq)
@@ -78,9 +82,11 @@ class Run:
 		pass
 
 
-def trial(args):
+def trial(xs, ts, **kwargs):
 	print('in trial')
-	print(args)
+	print(xs)
+	print(ts)
+	print(kwargs)
 
 if __name__ == '__main__':
 	parser = ArgumentParser()
@@ -91,38 +97,51 @@ if __name__ == '__main__':
 		help="Name of program to run"
 	)
 
-	parser.add_argument('--xs',
+	parser.add_argument('--xs', '--x',
 		nargs='+', 
 		type=int,
+		dest='xs',
+		default=2,
 		help="NNode per elements to simulate with, accepts multiple arguments to be in a list"
 	)
 
-	parser.add_argument('--ts',
+	parser.add_argument('--ts', '--t',
 		nargs='+', 
 		type=int,
+		dest='ts',
+		default=1,
 		help="Order of timestepper to simulate with, accepts multiple in list"
 	)
 
-	parser.add_argument('--nx',
+	parser.add_argument('--nxs', '--nx',
 		nargs='+', 
 		type=int,
+		dest='nxs',
+		default=100,
 		help='Number of elements to simulate with, accepts multiple in list'
 	)
 
-	parser.add_argument('--dt',
+	parser.add_argument('--dts', '--dt',
 		nargs='+', 
 		type=float,
+		dest='dts',
+		default=1e-4,
 		help='timesteps to simulate with, accepts multiple in list'
 	)
 
 	parser.add_argument('--tsteps', 
 		type=int,
+		default=100,
 		help='Number of timesteps to simulate for, only single number'
 	)
 
-	args = parser.parse_args()
-	print(vars(args))
-	print(args.xs)
-	trial(args)
+	parser.add_argument('--type',
+		type=str,
+		choices=['a', 'x', 't', 'b', 'ax', 'at', 'ab'],
+		dest='dxdt',
+		default='a',
+		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt"
+	)
 
-	# run = Run(*sys.argv[1:])
+	args = parser.parse_args()
+	run = Run(**vars(args))
