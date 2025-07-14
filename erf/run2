@@ -39,6 +39,11 @@ class Run:
 
 		self._run_all()
 
+		# for mode in self.dxdt:
+		# 	match mode:
+		# 		case x if x in 'abxt': Visualizer(self.prog, x)
+		# 		case 'n': pass
+		Visualizer(self.prog, self.dxdt)
 
 	# not parallelized as all processes will be writing to the same file in main directory
 	# unsure how to deal with this race condition yet
@@ -65,7 +70,6 @@ class Run:
 				os.rename(self.prog, f'{self._wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
-
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None):
 		nxargs = ('--nx', str(nx))
 		dtargs = ('--dt', str(dt)) if dt is not None else ('--vardt')
@@ -91,22 +95,7 @@ class Run:
 					for nx in self.nxs:
 						for dt in self.dts:
 							futures.append(executor.submit(self._run_base, x, t, nx, dt, self.tsteps))
-		print(futures)
-		wait(futures)
-		print("Finished waiting for all configs")
-
-
-	
-	def standard(self, x, t, nx=10, dt=0.1, tsteps=10, tshift=None, write_freq=None):
-		prog = self._build(wdir, x, t)
-
-		self._run(wdir, prog, x, t, nx, dt, tsteps, tshift=tshift, write_freq=write_freq)
-
-		vis = Visualizer('RESLT', 'imgs', self.prog, 'a')
-	
-	def dx(self, xs, t, nx=10, dt=0.1, tsteps=10):
-		pass
-
+		print("Finished Running for all configs")
 
 def trial(xs, ts, **kwargs):
 	print('in trial')
@@ -165,14 +154,14 @@ if __name__ == '__main__':
 		type=str,
 		choices=['a', 'x', 't', 'b', 'ax', 'at', 'ab'],
 		dest='dxdt',
-		default='a',
+		default='bxt',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt"
 	)
 
 	parser.add_argument('--nthreads',
 		type=int,
 		choices=range(1,os.cpu_count()),
-		default=1,
+		default=os.cpu_count(),
 		help='Number of processes that can be started'
 	)
 
