@@ -45,7 +45,16 @@ template<class EL, class P> class Solver : public Problem {
 				}
 			}
 
-			assign_eqn_numbers();
+			for (int b = 0; b < mesh_pt()->nboundary(); b++) {
+				for  (int n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+					Node *node = mesh_pt()->boundary_node_pt(b, n);
+					printf("b %d n %d x %10.8f y %10.8f\n", b, n, node->x(0), node->x(1));
+				}
+			}
+
+			cout << "Number of equations " << assign_eqn_numbers() << endl;
+			// assign_eqn_numbers();
+			// printf("NDOFS: %d\n", mesh_pt()->ndof_types());
 		}
 
 		~Solver() {
@@ -88,6 +97,8 @@ template<class EL, class P> class Solver : public Problem {
 				UnsteadyHeatFluxElement<EL> *flux_elem = new UnsteadyHeatFluxElement<EL>(elem, face_index);
 				flux_elem->flux_fct_pt() = flux_ptr;
 				mesh_pt()->add_element_pt(flux_elem);
+
+				printf("at b=%d, e=%d, f_i=%d\n", b, e, face_index);
 			}
 		}
 

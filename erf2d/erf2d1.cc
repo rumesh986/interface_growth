@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::setup(argc, argv);
 
 	uint Nx = 0;
-	uint Ny = 1;
+	uint Ny = 3;
 	uint t_steps = 100;
 	double dt = 0.0;
 	double t_shift = 0.0;

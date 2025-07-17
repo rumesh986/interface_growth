@@ -15,7 +15,8 @@ class Erf2D1Problem {
 		double t_shift;
 
 		unordered_map<uint, FluxFctPt> flux_boundaries = {
-			//{1, get_flux}
+			// {0, get_flux},
+			// {2, get_flux}
 		};
 
 		// pin center to 0.0
@@ -25,10 +26,10 @@ class Erf2D1Problem {
 
 		// use analytical solution on substrate and liquid boundaries
 		Vector<uint> analytical_boundaries = {
-			// 0,
-			// 1,
-			// 2,
-			// 3
+			0,
+			1,
+			2,
+			3
 		};
 
 		static constexpr double kappa1 = 1.0;
