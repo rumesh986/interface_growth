@@ -1,11 +1,12 @@
 # Name of executables: The prefix "noinst" means the executables don't
 # have to be installed anywhere.
-noinst_PROGRAMS=erf2d1
+noinst_PROGRAMS=erf2d1 erf2d2
 
 #---------------------------------------------------------------------------
 
 # Local sources that Joe's Poisson code depends on:
 erf2d1_SOURCES = erf2d1.cc erf2d1.h solver.h
+erf2d2_SOURCES = erf2d2.cc erf2d2.h solver.h two_layer_mesh.h
 
 # Required libraries: Only the "generic" and "poisson" libraries, 
 # which are accessible via the general library directory which 
@@ -33,6 +34,7 @@ erf2d1_SOURCES = erf2d1.cc erf2d1.h solver.h
 #          Poisson elements which refer to objects from the generic
 #          library. 
 erf2d1_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
+erf2d2_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 
 #---------------------------------------------------------------------------
 
