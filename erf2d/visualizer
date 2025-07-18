@@ -248,12 +248,18 @@ class Visualizer:
 
 		artists = []
 
-		for t, time_ in enumerate(run.times):
+		for t, time in enumerate(run.times):
 			soln_artist = _plot_surface(soln_ax, run.solns[t], 'u')
 			exact_soln_artist = _plot_surface(exact_soln_ax, run.exact_solns[t], 'u')
 			error_artist = _plot_surface(error_ax, run.errors[t], 'error')
 
-			artists.append([soln_artist, exact_soln_artist, error_artist])
+			time_text = soln_ax.annotate(
+				f't={time}',
+				xy=(0.8, 0.9),
+				xycoords='axes fraction'
+			)
+
+			artists.append([soln_artist, exact_soln_artist, error_artist, time_text])
 		
 		soln_ax.set_xlabel('x')
 		soln_ax.set_ylabel('y')
