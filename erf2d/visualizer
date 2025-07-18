@@ -10,6 +10,8 @@ from matplotlib.animation import FuncAnimation, ArtistAnimation
 import numpy as np
 import pandas as pd
 
+# import cProfile
+
 class _Config:
 	def __init__(self, file):
 		self.nx = 0
@@ -179,6 +181,7 @@ class Visualizer:
 		try:
 			# self.make_anims(run)
 			self.plot_errors(run)
+			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			self.make_surf_anims(run)
 		except:
 			raise Exception(f"Crashing for some reason {run.config}")
@@ -217,15 +220,21 @@ class Visualizer:
 	def _reshape_2D_data(self, data, key):
 		xs = data['x'].unique()
 		ys = data['y'].unique()
-		u = np.zeros((len(xs), len(ys)))
-
-		for i, x in enumerate(xs):
-			d2 = data.loc[data['x'] == x]
-			for j, y in enumerate(ys):
-				u[i,j] = d2.loc[d2['y'] == y][key].iloc[0]
+		u = np.zeros((len(ys), len(xs)))
 		
-		return xs, ys, u.T
-
+		# the loop below has some odd pandas operations, this was done to optimize it
+		# pandas seems to be pretty slow and you can get a significant speedup by changing how you interact with it
+		for j, y in enumerate(ys):
+			# optimized way of filtering dataframe
+			mask1 = data['y'].values == y
+			d2 = pd.DataFrame(data.values[mask1], data.index[mask1], data.columns)
+			for i, x in enumerate(xs):
+				# access by index to avoid creating another dataframe
+				mask2 = d2['x'].values == x
+				index = mask2.nonzero()[0][0]
+				u[j,i] = d2[key].iloc[index]
+		
+		return xs, ys, u
 	
 	def make_surf_anims(self, run):
 		def _plot_surface(ax, data, key):
@@ -239,7 +248,7 @@ class Visualizer:
 
 		artists = []
 
-		for t, time in enumerate(run.times):
+		for t, time_ in enumerate(run.times):
 			soln_artist = _plot_surface(soln_ax, run.solns[t], 'u')
 			exact_soln_artist = _plot_surface(exact_soln_ax, run.exact_solns[t], 'u')
 			error_artist = _plot_surface(error_ax, run.errors[t], 'error')
@@ -260,7 +269,7 @@ class Visualizer:
 		error_ax.set_ylabel('y')
 		error_ax.set_zlabel('Error')
 		error_ax.set_title('Errors')
-		
+
 		anim = ArtistAnimation(fig, artists)
 		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
 
