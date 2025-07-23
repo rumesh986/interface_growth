@@ -18,7 +18,7 @@ function _error_exit {
 # $3 -> space scheme order (NNodes per element)
 function _build {
 	CXXFLAGS=$(cat Makefile | sed -rn s/^CXXFLAGS.*=\(.*\)/\\1/p)
-	make $1 CXXFLAGS="$CXXFLAGS -DT_ORDER=$2 -DX_ORDER=$3"
+	make $1 CXXFLAGS="$CXXFLAGS -DRUN_SCRIPT -DT_ORDER=$2 -DX_ORDER=$3"
 
 	if [[ $? != 0 ]]
 	then
@@ -61,7 +61,7 @@ function _run {
 # $1 -> name of program (Pass in $1 from cmdline args)
 # $2 -> number of steps (pass in $2 from cmdline args)
 function _standard {
-	T_ORDER=1
+	T_ORDER=2
 	X_ORDER=2
 
 	make mostlyclean-compile
@@ -70,7 +70,7 @@ function _standard {
 
 	rm -rf RESLT/*
 
-	nx=100
+	nx=10
 	dt=0.01
 	tshift=0.0
 	stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"

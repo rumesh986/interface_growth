@@ -231,7 +231,13 @@ class Visualizer:
 			for i, x in enumerate(xs):
 				# access by index to avoid creating another dataframe
 				mask2 = d2['x'].values == x
-				index = mask2.nonzero()[0][0]
+				# print(f'{j} {i} {mask2}')
+				try:
+					index = mask2.nonzero()[0][0]
+				except IndexError:
+					print(f"{j=} {i=}")
+					raise Exception("Its failing again")
+
 				u[j,i] = d2[key].iloc[index]
 		
 		return xs, ys, u
@@ -246,9 +252,14 @@ class Visualizer:
 
 		fig, (soln_ax, exact_soln_ax, error_ax) = plt.subplots(3, figsize=(8, 15), subplot_kw={'projection': '3d'})
 
+		soln_ax.view_init(elev=0, azim=-90, roll=0)
+		exact_soln_ax.view_init(elev=0, azim=-90, roll=0)
+		error_ax.view_init(elev=0, azim=-90, roll=0)
+
 		artists = []
 
 		for t, time in enumerate(run.times):
+			print(t)
 			soln_artist = _plot_surface(soln_ax, run.solns[t], 'u')
 			exact_soln_artist = _plot_surface(exact_soln_ax, run.exact_solns[t], 'u')
 			error_artist = _plot_surface(error_ax, run.errors[t], 'error')

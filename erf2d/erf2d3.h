@@ -1,10 +1,10 @@
-#ifndef __ERF2D2_H__
-#define __ERF2D2_H__
+#ifndef __ERF2D3_H__
+#define __ERF2D3_H__
 
 #include "includes.h"
 #include "unsteady_heat.h"
 
-class Erf2D2Problem {
+class Erf2D3Problem {
 	public:
 		static constexpr double Lx = 1.0;
 		static constexpr double Ly = 1.0;
@@ -15,6 +15,7 @@ class Erf2D2Problem {
 		double dt;
 		uint t_steps;
 		double t_shift;
+		static constexpr double vel = 0.0;
 
 		unordered_map<uint, FluxFctPt> flux_boundaries = {
 			// {0, get_flux},
@@ -40,7 +41,7 @@ class Erf2D2Problem {
 		static constexpr double Ts = -1.0;
 		static constexpr double Tfr = 1.0;
 
-		Erf2D2Problem(uint Nx1, uint Nx2, uint Ny, uint t_steps, double dt, double t_shift)
+		Erf2D3Problem(uint Nx1, uint Nx2, uint Ny, uint t_steps, double dt, double t_shift)
 			: Nx1(Nx1), Nx2(Nx2), Nx(Nx1+Nx2), Ny(Ny), dt(dt), t_steps(t_steps), t_shift(t_shift) {}
 		
 		// x: 2D vector, u: 1D vector
