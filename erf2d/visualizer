@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+from concurrent.futures import ProcessPoolExecutor
+
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, ArtistAnimation
+
+import numpy as np
+import pandas as pd
+
+# import cProfile
+
+class _Config:
+	def __init__(self, file):
+		self.nx = 0
+		self.x_order = 0
+		self.dt = 0.0
+		self.t_shift = 0.0
+		self.t_order = 0
+		self.t_steps = 0
+		self.write_freq = 1
+
+		with open(file) as f:
+			while line := f.readline():
+				k, v = line.split('=')
+
+				match k:
+					case 'nx': self.nx = int(v)
+					case 'x_order': self.x_order = int(v)
+					case 'dt': self.dt = float(v)
+					case 't_shift': self.t_shift = float(v)
+					case 't_order': self.t_order = int(v)
+					case 't_steps': self.t_steps = int(v)
+					case 'write_freq': self.write_freq = int(v)
+
+		self._title = f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
+
+	def __str__(self):
+		return f'{self.nx = }\n{self.x_order = }\n{self.dt = }\n{self.t_shift = }\n{self.t_order = }\n{self.t_steps = }\n{self.write_freq = }'
+	
+	@property
+	def title(self):
+		return self._title
+ 
+class _RunData:
+	def __init__(
+		self, 
+		inp_folder,
+		out_folder,
+		solnf='soln', 
+		exact_solnf='exact_soln', 
+		errorf='error',
+		configf='config',
+		ext='dat'
+	):
+		self.inp_folder = inp_folder
+		self.out_folder = out_folder
+		self.solnf = solnf
+		self.exact_solnf = exact_solnf
+		self.errorf = errorf
+		self.ext = ext
+
+		self._exact_solns = None
+		self._solns = None
+		self._errors = None
+
+		self.config = _Config(f'{self.inp_folder}/{configf}')
+		self.data = pd.DataFrame()
+
+		try:
+			self.times = np.fromfile(f'{self.inp_folder}/times.{self.ext}', sep='\n')
+		except FileNotFoundError:
+			raise Exception("Time data not availble")
+			
+	@property
+	def title(self):
+		return self.config.title
+	
+	@property
+	def errors(self):
+		if not self._errors:
+			self._errors = self._read_series(self.errorf)
+		return self._errors
+	
+	@property
+	def solns(self):
+		if not self._solns:
+			self._solns = self._read_series(self.solnf)
+		return self._solns
+	
+	@property
+	def exact_solns(self):
+		if not self._exact_solns:
+			self._exact_solns = self._read_series(self.exact_solnf)
+		return self._exact_solns
+	
+	@property
+	def error_norms(self):
+		abs_errors = np.array([np.linalg.norm(x['error']) for x in self.errors])
+		abs_errors /= len(self.errors[0]['error'])
+
+		return abs_errors
+	
+	@property
+	def error_max(self):
+		node = np.argmax(np.fabs(self.errors[1]['error'][1:])) + 1
+		errors = np.array([df['error'][node] for df in self.errors])
+		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
+		mask = exact_vals != 0.0
+
+		abs_errors = np.fabs(errors)
+		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
+
+		return abs_errors, rel_errors, self.errors[0]['x'][node]
+	
+	@property
+	def total_error_norm(self):
+		errors = self.error_norms
+
+		return np.linalg.norm(errors) / len(errors)
+
+	def _read_file(self, ftype, index):
+		file = f'{self.inp_folder}/{ftype}{index}.{self.ext}'
+
+		if ftype == self.errorf:
+			cols = ['x', 'y', 'norm', 'error']
+		else:
+			cols = ['x', 'y', 'u']
+
+		data = []
+		with open(file, 'r') as f:
+			while line := f.readline():
+				if not line.startswith('ZONE'):
+					data.append([float(x) for x in line.split()])
+
+		return pd.DataFrame(data, columns=cols)
+
+	def _read_series(self, ftype):
+		data = []
+		for i, t in enumerate(self.times):
+			_data = self._read_file(ftype, i)
+			_data['time'] = t
+
+			data.append(_data)
+		
+		return data
+
+class Visualizer:
+	def __init__(self, resd, outd, prefix, dxdt):
+		self.resd = resd
+		self.outd = outd
+		self.prefix = prefix
+		self.dxdt = dxdt
+
+		self._data = []
+		self._markers = ['+', 'O', '.', '*', 'x', 'D', '^', 'v']
+		self._linestyles = ['-', '--', ':']
+
+		plt.style.use('pltstyle.mplstyle')
+
+		for rundir in os.listdir(self.resd):
+			rund = f'{self.resd}/{rundir}'
+			if not os.path.isdir(rund):
+				continue
+			
+			if not os.path.exists(f'{self.outd}/{rundir}'):
+				os.mkdir(f'{self.outd}/{rundir}')
+
+			print(f'Processing results in {rund}')
+
+			self._data.append(_RunData(rund, f'{self.outd}/{rundir}'))
+		
+		for rtype in self.dxdt:
+			match rtype:
+				case 'a': self.standard()
+				case x if x in 'bxt': self.plot_analysis(x)
+
+	def _make(self, run):
+		try:
+			# self.make_anims(run)
+			self.plot_errors(run)
+			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
+			# self.make_surf_anims(run)
+			# self.make_results_surf(run)
+			self.make_surf_profile_anim(run)
+
+		except:
+			raise Exception(f"Crashing for some reason {run.config}")
+
+	def standard(self):
+		with ProcessPoolExecutor(max_workers=10) as executor:
+			for run, thread in zip(self._data, executor.map(self._make, self._data)):
+				print(f'Standard processing for \n{run.config}')
+
+	def plot_errors(self, run):
+		plt.cla()
+
+		norm_err = run.error_norms
+		abs_max_err, rel_max_err, pos = run.error_max
+
+		fig, (norm_ax, max_ax) = plt.subplots(1,2, figsize=(10, 5))
+		fig.suptitle(f'Errors ({run.title})')
+
+		norm_ax.semilogy(norm_err)
+		
+		norm_ax.set_xlabel('Timestep')
+		norm_ax.set_ylabel('Norm of Error at timestep')
+		norm_ax.set_title('L2 norm of errors')
+
+		max_ax.semilogy(abs_max_err, label='Absolute')
+		max_ax.semilogy(rel_max_err, label='Relative')
+		
+		max_ax.legend()
+		max_ax.set_xlabel('Timestep')
+		max_ax.set_ylabel('Error magnitude')
+		max_ax.set_title(f'Magnitude of errors at x={pos}')
+
+		plt.savefig(f'{run.out_folder}/{self.prefix}-errors.png')
+		plt.close(fig)
+
+	def _reshape_2D_data(self, data, key):
+		xs = data['x'].unique()
+		ys = data['y'].unique()
+		u = np.zeros((len(ys), len(xs)))
+		
+		# the loop below has some odd pandas operations, this was done to optimize it
+		# pandas seems to be pretty slow and you can get a significant speedup by changing how you interact with it
+		for j, y in enumerate(ys):
+			# optimized way of filtering dataframe
+			mask1 = data['y'].values == y
+			d2 = pd.DataFrame(data.values[mask1], data.index[mask1], data.columns)
+			for i, x in enumerate(xs):
+				# access by index to avoid creating another dataframe
+				mask2 = np.isclose(d2['x'].values, x)
+				# print(f'{j} {i} {mask2}')
+				try:
+					index = mask2.nonzero()[0][0]
+				except IndexError:
+					print(f"{j=} {i=}")
+					raise Exception("Its failing again")
+
+				u[j,i] = d2[key].iloc[index]
+		
+		return xs, ys, u
+	
+	def make_surf_anims(self, run):
+		def _plot_surface(ax, data, key):
+			xs, ys, us = self._reshape_2D_data(data, key)
+			X, Y = np.meshgrid(xs, ys)
+			return ax.plot_surface(X, Y, us, color='b')
+
+		plt.cla()
+
+		fig, (soln_ax, exact_soln_ax, error_ax) = plt.subplots(3, figsize=(8, 15), subplot_kw={'projection': '3d'})
+
+		soln_ax.view_init(elev=0, azim=-90, roll=0)
+		exact_soln_ax.view_init(elev=0, azim=-90, roll=0)
+		error_ax.view_init(elev=0, azim=-90, roll=0)
+
+		artists = []
+
+		for t, time in enumerate(run.times):
+			print(t)
+			soln_artist = _plot_surface(soln_ax, run.solns[t], 'u')
+			exact_soln_artist = _plot_surface(exact_soln_ax, run.exact_solns[t], 'u')
+			error_artist = _plot_surface(error_ax, run.errors[t], 'error')
+
+			time_text = soln_ax.annotate(
+				f't={time}',
+				xy=(0.8, 0.9),
+				xycoords='axes fraction'
+			)
+
+			artists.append([soln_artist, exact_soln_artist, error_artist, time_text])
+		
+		soln_ax.set_xlabel('x')
+		soln_ax.set_ylabel('y')
+		soln_ax.set_zlabel('Temperature-ish')
+		soln_ax.set_title('Simulation')
+
+		exact_soln_ax.set_xlabel('x')
+		exact_soln_ax.set_ylabel('y')
+		exact_soln_ax.set_zlabel('Temperature-ish')
+		exact_soln_ax.set_title('Analytical')
+
+		error_ax.set_xlabel('x')
+		error_ax.set_ylabel('y')
+		error_ax.set_zlabel('Error')
+		error_ax.set_title('Errors')
+
+		anim = ArtistAnimation(fig, artists)
+		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')
+
+	def make_results_surf(self, run):
+		plt.cla()
+
+		fig, ax = plt.subplots(1, subplot_kw={'projection': '3d'})	
+		ax.view_init(elev=0, azim=-90, roll=0)
+		artists = []
+		for t, time in enumerate(run.times):
+			xs, ys, us = self._reshape_2D_data(run.solns[t], 'u')
+			X, Y = np.meshgrid(xs, ys)
+			soln_artist = ax.plot_surface(X, Y, us, color='b')
+
+			time_text = ax.annotate(
+				f't={time}',
+				xy=(0.8, 0.9),
+				xycoords='axes fraction'
+			)
+
+			artists.append([soln_artist, time_text])
+		
+		ax.set_xlabel('x')
+		ax.set_ylabel('y')
+		ax.set_zlabel('Temperature-ish')
+		ax.set_title('simulation')
+
+		anim = ArtistAnimation(fig, artists)
+		anim.save(f'{run.out_folder}/{self.prefix}-soln.mp4')
+
+	def make_surf_profile_anim(self, run):
+		def _extract_data(data):
+			ys = data['y'].unique()
+			ref_y = ys[ys.shape[0] //2]
+
+			mask = np.isclose(data['y'].values, ref_y)
+
+			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
+
+		def _update(n):
+			time_text.set_text(f't={run.times[n]}')
+
+			data = _extract_data(run.solns[n])
+
+			line_soln.set_data(data['x'], data['u'])
+		
+		plt.cla()
+		
+		fig, prof_ax = plt.subplots(1)
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}',
+			xy=(0.8,0.9),
+			xycoords='axes fraction'
+		)
+
+		data = _extract_data(run.solns[0])
+		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		
+		prof_ax.legend(loc='upper left')
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_ylabel('Temperature-ish')
+		prof_ax.set_title('Temperature profile')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
+		plt.close(fig)
+
+
+	def make_anims(self, run):
+		def _update(n):
+			time_text.set_text(f't={run.times[n]}')
+
+			line_soln.set_data(solns[n]['x'], solns[n]['u'])
+			line_exact_soln.set_data(exact_solns[n]['x'], exact_solns[n]['u'])
+			line_diff.set_data(errors[n]['x'], errors[n]['error'])
+
+			diff_ax.set_ylim(errors[n]['error'].min() * 1.1, errors[n]['error'].max() * 1.1)
+
+		plt.cla()
+
+		fig, (diff_ax, prof_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		fig.suptitle(f'Profiles ({run.title})')
+
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}', 
+			xy=(0.8, 0.9), 
+			xycoords='axes fraction'
+		)
+
+		solns = run.solns
+		exact_solns = run.exact_solns
+		errors = run.errors
+
+		line_soln = prof_ax.plot(
+			solns[0]['x'], 
+			solns[0]['u'], 
+			label='Numerical', 
+			# lw=5.0
+		)[0]
+		line_exact_soln = prof_ax.plot(
+			exact_solns[0]['x'], 
+			exact_solns[0]['u'], 
+			label='Analytical', 
+			linestyle='--', 
+			# lw=5.0
+		)[0]
+		
+		line_diff = diff_ax.plot(
+			errors[0]['x'], 
+			errors[0]['error'], 
+		)[0]
+
+		prof_ax.legend(loc='upper left')
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_ylabel('Temperature-ish')
+		prof_ax.set_title('Temperature profile')
+
+		diff_ax.set_xlabel('x')
+		diff_ax.set_ylabel('Error')
+		diff_ax.set_title('Error in profile')
+		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
+		plt.close(fig)
+
+	def plot_analysis(self, rtype):
+		data = pd.DataFrame(columns=['order', 'x', 'error'])
+
+		match rtype:
+			case 'x':
+				config = lambda x: (x.x_order, 1/x.nx)
+				xlabel = 'dx'
+				title = f'{self.prefix} dx error analysis'
+				fname = 'dx_errors'
+				label = 'order'
+			case 'b':
+				config = lambda x: (x.x_order, 1/x.nx)
+				xlabel = 'dx'
+				title = f'{self.prefix} dxdt error analysis'
+				fname = 'dxdt_errors'
+				label = 'order'
+			case 't':
+				config = lambda x: (x.t_order, x.dt)
+				xlabel = 'dt'
+				title = f'{self.prefix} dt error analysis'
+				fname = 'dt_errors'
+				label = 'BDF'
+			case _:
+				raise Exception("Unknown analysis type provided")
+
+		for i, run in enumerate(self._data):
+			order, x = config(run.config)
+			data.loc[i] = [order, x, run.total_error_norm]
+
+		xs = np.logspace(-0.5, -5)
+		# xs = np.logspace(np.log(data['x'].max())-0.5, np.log(data['x'].min())+0.5)
+		orders = data['order'].unique()
+		orders.sort()
+
+		fig, ax = plt.subplots(1, subplot_kw={
+			'xlabel': xlabel,
+			'ylabel': 'Normalized Error',
+			'xscale': 'log',
+			'yscale': 'log',
+			'ylim': [data['error'].min() * 1e-1, data['error'].max() * 1e1],
+			'title': title
+		})
+
+		for order in orders:
+			df = data.loc[data['order'] == order]
+			ax.scatter(df['x'], df['error'], label=f'{label} {order}')
+
+			max_point = df.loc[df['x'] == df['x'].max()]
+			ax.plot(xs, (xs / max_point['x'].iloc[0]) ** order * max_point['error'].iloc[0], label=f'Reference (order={order})', linestyle='--' )
+		
+		ax.legend(ncols=len(orders))
+
+		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
+		plt.close(fig)
+
+if __name__ =='__main__':
+	assert len(sys.argv) == 3
+	assert sum(c1 == c2 for c1 in "abxt" for c2 in sys.argv[2]) > 0
+	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
+
+	vis = Visualizer('RESLT', 'imgs', sys.argv[1], sys.argv[2])
