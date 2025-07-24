@@ -230,7 +230,7 @@ class Visualizer:
 			d2 = pd.DataFrame(data.values[mask1], data.index[mask1], data.columns)
 			for i, x in enumerate(xs):
 				# access by index to avoid creating another dataframe
-				mask2 = d2['x'].values == x
+				mask2 = np.isclose(d2['x'].values, x)
 				# print(f'{j} {i} {mask2}')
 				try:
 					index = mask2.nonzero()[0][0]
