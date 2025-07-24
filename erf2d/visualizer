@@ -182,7 +182,10 @@ class Visualizer:
 			# self.make_anims(run)
 			self.plot_errors(run)
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
-			self.make_surf_anims(run)
+			# self.make_surf_anims(run)
+			# self.make_results_surf(run)
+			self.make_surf_profile_anim(run)
+
 		except:
 			raise Exception(f"Crashing for some reason {run.config}")
 
@@ -288,7 +291,72 @@ class Visualizer:
 		error_ax.set_title('Errors')
 
 		anim = ArtistAnimation(fig, artists)
-		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
+		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')
+
+	def make_results_surf(self, run):
+		plt.cla()
+
+		fig, ax = plt.subplots(1, subplot_kw={'projection': '3d'})	
+		ax.view_init(elev=0, azim=-90, roll=0)
+		artists = []
+		for t, time in enumerate(run.times):
+			xs, ys, us = self._reshape_2D_data(run.solns[t], 'u')
+			X, Y = np.meshgrid(xs, ys)
+			soln_artist = ax.plot_surface(X, Y, us, color='b')
+
+			time_text = ax.annotate(
+				f't={time}',
+				xy=(0.8, 0.9),
+				xycoords='axes fraction'
+			)
+
+			artists.append([soln_artist, time_text])
+		
+		ax.set_xlabel('x')
+		ax.set_ylabel('y')
+		ax.set_zlabel('Temperature-ish')
+		ax.set_title('simulation')
+
+		anim = ArtistAnimation(fig, artists)
+		anim.save(f'{run.out_folder}/{self.prefix}-soln.mp4')
+
+	def make_surf_profile_anim(self, run):
+		def _extract_data(data):
+			ys = data['y'].unique()
+			ref_y = ys[ys.shape[0] //2]
+
+			mask = np.isclose(data['y'].values, ref_y)
+
+			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
+
+		def _update(n):
+			time_text.set_text(f't={run.times[n]}')
+
+			data = _extract_data(run.solns[n])
+
+			line_soln.set_data(data['x'], data['u'])
+		
+		plt.cla()
+		
+		fig, prof_ax = plt.subplots(1)
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}',
+			xy=(0.8,0.9),
+			xycoords='axes fraction'
+		)
+
+		data = _extract_data(run.solns[0])
+		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		
+		prof_ax.legend(loc='upper left')
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_ylabel('Temperature-ish')
+		prof_ax.set_title('Temperature profile')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
+		plt.close(fig)
+
 
 	def make_anims(self, run):
 		def _update(n):
