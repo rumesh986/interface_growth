@@ -15,7 +15,7 @@ class Erf2D3Problem {
 		double dt;
 		uint t_steps;
 		double t_shift;
-		static constexpr double vel = 0.0;
+		static constexpr double vel = 1.0;
 
 		unordered_map<uint, FluxFctPt> flux_boundaries = {
 			// {0, get_flux},
@@ -49,8 +49,8 @@ class Erf2D3Problem {
 			double t0 = 0.0;
 			// double xi = x[0] / sqrt(t);
 			double kappa = (x[0] < 0) ? kappa1 : kappa2;
-			// double e = (x[0] < 0) ? 1 : sqrt(kappa1 / kappa2);
-			double e = 1;
+			double e = (x[0] < 0) ? 1 : sqrt(kappa1 / kappa2);
+			// double e = 1;
 
 			u[0] = t0 - (t0 - Ts) * e * erf(x[0] / (2 * sqrt(kappa * t)));
 		}

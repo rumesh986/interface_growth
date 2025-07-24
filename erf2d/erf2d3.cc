@@ -67,7 +67,6 @@ int main(int argc, char **argv) {
 	}
 
 	Ny = Nx;
-
 	
 	auto problem_def = Erf2D3Problem(Nx, Nx, Ny, t_steps, dt, t_shift);
 	
