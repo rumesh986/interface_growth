@@ -22,32 +22,40 @@ class Run:
 		self.kwargs = kwargs
 		self._exes = {}
 
-		self._od = os.getcwd()
-		self._wd = f'{self._od}/test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+		self.od = os.getcwd()
+		self.wd = f'{self.od}/test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
 		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
 
-		os.mkdir(f'{self._wd}')
-		os.mkdir(f'{self._wd}/RESLT')
-		os.mkdir(f'{self._wd}/imgs')
+		os.mkdir(f'{self.wd}')
+		os.mkdir(f'{self.wd}/RESLT')
+		os.mkdir(f'{self.wd}/imgs')
 
 		print(f'__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
+		# print(f'Running in directorys: {self.wd}')
 
+		# self.build()
 
-		self._build()
+		# os.chdir(self.wd)
 
-		os.chdir(self._wd)
+		# self.run_all()
 
-		self._run_all()
+		# _dxdt = ''
+		# if self.dxdt == 'bxt':
+		# 	if len(self.xs) > 1:
+		# 		_dxdt = f'{_dxdt}x'
+		# 	if len(self.ts) > 1:
+		# 		_dxdt = f'{_dxdt}t'
 
 		# for mode in self.dxdt:
 		# 	match mode:
 		# 		case x if x in 'abxt': Visualizer(self.prog, x)
 		# 		case 'n': pass
-		Visualizer(self.prog, self.dxdt)
+		# Visualizer(self.prog, _dxdt)
+		# os.chdir(self._od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
 	# unsure how to deal with this race condition yet
-	def _build(self):
+	def build(self):
 		with open("Makefile", "r") as f:
 			while line := f.readline():
 				if line.startswith("CXXFLAGS"):
@@ -58,7 +66,7 @@ class Run:
 				flags = f'{flags_base} -DX_ORDER={x} -DT_ORDER={t}'
 				subprocess.run(["make", "mostlyclean-compile"])
 
-				with open(f"{self._wd}/build_{x}_{t}.stdout", "w") as f:
+				with open(f"{self.wd}/build_{x}_{t}.stdout", "w") as f:
 					subprocess.run(
 						["make", self.prog, flags], 
 						check=True, 
@@ -67,7 +75,7 @@ class Run:
 					)
 
 				prog_name = f'{self.prog}_{x}_{t}'
-				os.rename(self.prog, f'{self._wd}/{prog_name}')
+				os.rename(self.prog, f'{self.wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None):
@@ -87,7 +95,7 @@ class Run:
 				stdout=f
 			)
 	
-	def _run_all(self):
+	def run_all(self):
 		futures = []
 		with ProcessPoolExecutor(max_workers=self.nthreads) as executor:
 			for x in self.xs:
@@ -95,6 +103,20 @@ class Run:
 					for nx in self.nxs:
 						for dt in self.dts:
 							futures.append(executor.submit(self._run_base, x, t, nx, dt, self.tsteps))
+		print("Finished Running for all configs")
+	
+	def run_dt(self):
+		max_dt = max(self.dts)
+		futures = []
+		with ProcessPoolExecutor(max_workers=self.nthreads) as executor:
+			for x in self.xs:
+				for t in self.ts:
+					tshift = (t+1) * max_dt
+					for nx in self.nxs:
+						for dt in self.dts:
+							tsteps = self.tsteps / dt
+							wf = max_dt / dt
+							futures.append(executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf))
 		print("Finished Running for all configs")
 
 def trial(xs, ts, **kwargs):
