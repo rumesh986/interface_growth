@@ -144,13 +144,19 @@ class _RunData:
 			data.append(_data)
 		
 		return data
+	
+	def create_outdir(self):
+		if not os.path.exists(self.out_folder):
+			os.mkdir(self.out_folder)
+
 
 class Visualizer:
-	def __init__(self, prefix, dxdt, resd = "RESLT", outd = 'imgs'):
+	def __init__(self, prefix, dxdt, resd = "RESLT", outd = 'imgs', interactive=False):
 		self.prefix = prefix
 		self.dxdt = dxdt
 		self.resd = resd
 		self.outd = outd
+		self.interactive = interactive
 
 		self._data = []
 		self._markers = ['+', 'o', '.', '*', 'x', 'D', '^', 'v']
@@ -163,23 +169,28 @@ class Visualizer:
 			if not os.path.isdir(rund):
 				continue
 			
-			if not os.path.exists(f'{self.outd}/{rundir}'):
-				os.mkdir(f'{self.outd}/{rundir}')
-
 			print(f'Processing results in {rund}')
 
 			self._data.append(_RunData(rund, f'{self.outd}/{rundir}'))
 		
+		if 'a' in self.dxdt:
+			for data in self._data:
+				data.create_outdir()
+			# for rundir in os.listdir(self.resd):
+			# 	if not os.path.exists(f'{self.outd}/{rundir}'):
+			# 		os.mkdir(f'{self.outd}/{rundir}')
+
+		
+		# self.prepare_pd()
+
+		# for rtype in self.dxdt:
+		# 	match rtype:
+		# 		case 'a': self.standard()
+		# 		case x if x in 'xt': self.plot_analysis(x)
+		# 		case 'n': pass
+
+	def prepare_pd(self):
 		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
-		self._prepare_pd()
-
-		for rtype in self.dxdt:
-			match rtype:
-				case 'a': self.standard()
-				case x if x in 'xt': self.plot_analysis(x)
-				case 'n': pass
-
-	def _prepare_pd(self):
 		config = lambda x: (x.x_order, x.t_order, 1/x.nx, x.dt)
 
 		for i, run in enumerate(self._data):
@@ -343,6 +354,10 @@ class Visualizer:
 		ax.legend(ncols=ref_orders.shape[0])
 
 		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
+
+		if self.interactive:
+			plt.show()
+
 		plt.close(fig)
 
 if __name__ =='__main__':
