@@ -5,6 +5,7 @@
 #include "erf2d1.h"
 #include "erf2d2.h"
 #include "erf2d3.h"
+#include "erf2d4.h"
 #include "two_layer_mesh.h"
 
 #ifndef RUN_SCRIPT
@@ -69,7 +70,7 @@ template<class EL, class P> class Solver : public Problem {
 			mesh_pt() = new TwoLayer2DMesh<EL>(problem.Nx1, problem.Nx2, problem.Ny, -problem.Lx, 0.0, problem.Lx, 0.0, problem.Ly, time_stepper_pt());
 			mesh_pt()->setup_boundary_element_info();
 
-			printf("Initial count of elements: %u\n", mesh_pt()->nelement());
+			printf("Initial count of elements: %lu\n", mesh_pt()->nelement());
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
@@ -88,15 +89,15 @@ template<class EL, class P> class Solver : public Problem {
 				}
 			}
 
-			for (int i = 0; i < problem.analytical_boundaries.size(); i++) {
+			for (uint i = 0; i < problem.analytical_boundaries.size(); i++) {
 				uint b = problem.analytical_boundaries[i];
 				for (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
 					mesh_pt()->boundary_node_pt(b, n)->pin(0);
 				}
 			}
 
-			for (int b = 0; b < mesh_pt()->nboundary(); b++) {
-				for  (int n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+			for (uint b = 0; b < mesh_pt()->nboundary(); b++) {
+				for  (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
 					printf("before\n");
 					Node *node = mesh_pt()->boundary_node_pt(b, n);
 					printf("b %d n %d x %10.8f y %10.8f\n", b, n, node->x(0), node->x(1));
@@ -169,6 +170,60 @@ template<class EL, class P> class Solver : public Problem {
 			cout << "Number of equations " << assign_eqn_numbers() << endl;
 		}
 
+		Solver(Erf2D4Problem problem, DocInfo info) : problem(problem), info(info) {
+			add_time_stepper_pt(new BDF<T_ORDER>);
+
+			TwoPhaseDomain *domain = new TwoPhaseDomain(-problem.Lx, 0.0, problem.Lx, problem.vel, problem.Nx1, problem.Nx2, problem.Ny, time_pt());
+
+			mesh_pt() = new RefineableTwoLayer2DMesh<EL>(problem.Nx1, problem.Nx2, problem.Ny, -problem.Lx, 0.0, problem.Lx, 0.0, problem.Ly, domain, time_stepper_pt());
+			mesh_pt()->setup_boundary_element_info();
+
+			printf("Initial count of elements: %lu\n", mesh_pt()->nelement());
+
+			for (uint e = 0; e < mesh_pt()->nelement(); e++)
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
+
+			for (auto iter = problem.flux_boundaries.begin(); iter != problem.flux_boundaries.end(); iter++) {
+				cout << "Creating flux elements at boundary " << iter->first << endl;
+				create_flux_elements(iter->first, iter->second);
+			}
+
+			// create_flux_elements(4, [problem](const double &t, const Vector<double> &x, double &flux) {return problem.get_flux(t, x, flux);});
+			// create_flux_elements(4, problem.get_flux);
+
+			for (auto iter = problem.pinned_boundaries.begin(); iter != problem.pinned_boundaries.end(); iter++) {
+				cout << "Assigning pinned boundary condition at " << iter->first << endl;
+				uint nnode = mesh_pt()->nboundary_node(iter->first);
+				for (uint n = 0; n < nnode; n++) {
+					printf("Setting b%u n%u to %8.6f\n", iter->first, n, iter->second);
+					mesh_pt()->boundary_node_pt(iter->first, n)->set_value(0, iter->second);
+					mesh_pt()->boundary_node_pt(iter->first, n)->pin(0);
+				}
+			}
+
+			for (uint i = 0; i < problem.analytical_boundaries.size(); i++) {
+				uint b = problem.analytical_boundaries[i];
+				for (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+					mesh_pt()->boundary_node_pt(b, n)->pin(0);
+				}
+			}
+
+			// beta_pt() expects a double*, but we define it as static const
+			for (uint yi = 0; yi < problem.Ny; yi++) {
+				for (uint e = 0; e < problem.Nx1; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(yi * problem.Nx + e));
+					elem->beta_pt() = (double *) &problem.kappa1;
+				}
+	
+				for (uint e = problem.Nx1; e < problem.Nx; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(yi * problem.Nx + e));
+					elem->beta_pt() = (double *) &problem.kappa2;
+				}
+			}
+
+			cout << "Number of equations " << assign_eqn_numbers() << endl;
+		}
+
 		~Solver() {
 			delete mesh_pt();
 		}
@@ -178,6 +233,38 @@ template<class EL, class P> class Solver : public Problem {
 
 		void actions_before_implicit_timestep() {
 			if (typeid(P) == typeid(Erf2D3Problem)) {
+				mesh_pt()->node_update();
+			}
+			if (typeid(P) == typeid(Erf2D4Problem)) {
+				// Vector<double> x(2);
+				// Vector<double> flux(2);
+
+				// uint nelems = mesh_pt()->nboundary_element(4);
+
+				// double total_flux = 0.0;
+
+				// for (uint e = 0; e < nelems; e++) {
+				// 	EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+				// 	for (uint n = 0; n < elem->nnode(); n++) {
+				// 		Node *node = elem->node_pt(n);
+				// 		x[0] = node->x(0);
+				// 		x[1] = node->x(1);
+
+				// 		elem->get_flux(x, flux);
+				// 		total_flux += flux[0];
+
+				// 		printf("e=%u n=%u x0=%8.6f x1=%8.6f flux0=%8.6f flux1=%8.6f\n", e, n, x[0], x[1], flux[0], flux[1]);
+				// 	}
+				// }
+
+				// printf("Attempting to modify total flux to %8.6f\n", total_flux / nelems);
+
+				// printf("Current value = %8.6f\n", *(problem.flux_pt));
+
+				// *(problem.flux_pt) = total_flux / nelems;
+
+				// printf("Modified flux t0 %8.6f\n", problem.flux_pt);
+
 				mesh_pt()->node_update();
 			}
 
@@ -202,8 +289,15 @@ template<class EL, class P> class Solver : public Problem {
 		void create_flux_elements(uint b, FluxFctPt &flux_ptr) {
 			uint n_elems = mesh_pt()->nboundary_element(b);
 
+			// printf("nelems at boundary %u = %u\n", b, n_elems);
+
 			for (uint e = 0; e < n_elems; e++) {
 				EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(b, e));
+
+				// for (uint n = 0; n < elem->nnode(); n++) {
+				// 	printf("e=%u n=%u x0=%8.6f x1=%8.6f\n", e, n, elem->node_pt(n)->x(0), elem->node_pt(n)->x(1));
+				// }
+
 				int face_index = mesh_pt()->face_index_at_boundary(b, e);
 
 				UnsteadyHeatFluxElement<EL> *flux_elem = new UnsteadyHeatFluxElement<EL>(elem, face_index);
@@ -241,7 +335,7 @@ template<class EL, class P> class Solver : public Problem {
 			}
 
 			// reset boundary value at interface as it doesnt match analytical soln anymore
-			if (typeid(P) == typeid(Erf2D3Problem)) {
+			if (typeid(P) == typeid(Erf2D3Problem) || typeid(P) == typeid(Erf2D4Problem)) {
 				mesh_pt()->boundary_node_pt(4,1)->set_value(0,0.0);
 			}
 
@@ -287,6 +381,13 @@ template<class EL, class P> class Solver : public Problem {
 			outfile.open(filename, ios::app);
 			outfile << time << endl;
 			outfile.close();
+
+			if (typeid(P) == typeid(Erf2D3Problem) || typeid(P) == typeid(Erf2D4Problem)) {
+				sprintf(filename, "%s/interface.dat", info.directory().c_str());
+				outfile.open(filename, ios::app);
+				outfile << problem.vel * time_pt()->time() << endl;
+				outfile.close();
+			}
 
 			info.number()++;
 		}
