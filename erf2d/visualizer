@@ -73,6 +73,9 @@ class _RunData:
 			self.times = np.fromfile(f'{self.inp_folder}/times.{self.ext}', sep='\n')
 		except FileNotFoundError:
 			raise Exception("Time data not availble")
+		
+		if os.path.exists(f'{self.inp_folder}/interface.{self.ext}'):
+			self.interface = np.fromfile(f'{self.inp_folder}/interface.{self.ext}', sep='\n')
 			
 	@property
 	def title(self):
@@ -335,6 +338,8 @@ class Visualizer:
 			data = _extract_data(run.solns[n])
 
 			line_soln.set_data(data['x'], data['u'])
+
+			line_interface.set_xdata(run.interface[n])
 		
 		plt.cla()
 		
@@ -347,7 +352,9 @@ class Visualizer:
 
 		data = _extract_data(run.solns[0])
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
-		
+		line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
+
 		prof_ax.legend(loc='upper left')
 		prof_ax.set_ylim([-1.5, 1.5])
 		prof_ax.set_ylabel('Temperature-ish')
