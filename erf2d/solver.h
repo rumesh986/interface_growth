@@ -6,6 +6,7 @@
 #include "erf2d2.h"
 #include "erf2d3.h"
 #include "erf2d4.h"
+#include "erf2d5.h"
 #include "two_layer_mesh.h"
 
 #ifndef RUN_SCRIPT
@@ -224,6 +225,57 @@ template<class EL, class P> class Solver : public Problem {
 			cout << "Number of equations " << assign_eqn_numbers() << endl;
 		}
 
+		Solver(Erf2D5Problem problem, DocInfo info) : problem(problem), info(info) {
+			add_time_stepper_pt(new BDF<T_ORDER>);
+
+			TwoPhaseDomain *domain = new TwoPhaseDomain(0.0, problem.vel*problem.t_shift, problem.Lx, problem.vel, problem.Nx1, problem.Nx2, problem.Ny, time_pt());
+
+			mesh_pt() = new RefineableTwoLayer2DMesh<EL>(problem.Nx1, problem.Nx2, problem.Ny, 0.0, problem.vel*problem.t_shift, problem.Lx, 0.0, problem.Ly, domain, time_stepper_pt());
+			mesh_pt()->setup_boundary_element_info();
+
+			printf("Initial count of elements: %lu\n", mesh_pt()->nelement());
+
+			for (uint e = 0; e < mesh_pt()->nelement(); e++)
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = problem.get_source;
+
+			for (auto iter = problem.flux_boundaries.begin(); iter != problem.flux_boundaries.end(); iter++) {
+				cout << "Creating flux elements at boundary " << iter->first << endl;
+				create_flux_elements(iter->first, iter->second);
+			}
+
+			for (auto iter = problem.pinned_boundaries.begin(); iter != problem.pinned_boundaries.end(); iter++) {
+				cout << "Assigning pinned boundary condition at " << iter->first << endl;
+				uint nnode = mesh_pt()->nboundary_node(iter->first);
+				for (uint n = 0; n < nnode; n++) {
+					printf("Setting b%u n%u to %8.6f\n", iter->first, n, iter->second);
+					mesh_pt()->boundary_node_pt(iter->first, n)->set_value(0, iter->second);
+					mesh_pt()->boundary_node_pt(iter->first, n)->pin(0);
+				}
+			}
+
+			for (uint i = 0; i < problem.analytical_boundaries.size(); i++) {
+				uint b = problem.analytical_boundaries[i];
+				for (uint n = 0; n < mesh_pt()->nboundary_node(b); n++) {
+					mesh_pt()->boundary_node_pt(b, n)->pin(0);
+				}
+			}
+
+			// beta_pt() expects a double*, but we define it as static const
+			for (uint yi = 0; yi < problem.Ny; yi++) {
+				for (uint e = 0; e < problem.Nx1; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(yi * problem.Nx + e));
+					elem->beta_pt() = (double *) &problem.kappa1;
+				}
+	
+				for (uint e = problem.Nx1; e < problem.Nx; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(yi * problem.Nx + e));
+					elem->beta_pt() = (double *) &problem.kappa2;
+				}
+			}
+
+			cout << "Number of equations " << assign_eqn_numbers() << endl;
+		}
+
 		~Solver() {
 			delete mesh_pt();
 		}
@@ -236,36 +288,23 @@ template<class EL, class P> class Solver : public Problem {
 				mesh_pt()->node_update();
 			}
 			if (typeid(P) == typeid(Erf2D4Problem)) {
+				mesh_pt()->node_update();
+			}
+			if (typeid(P) == typeid(Erf2D5Problem)) {
+				mesh_pt()->node_update();
+
 				// Vector<double> x(2);
-				// Vector<double> flux(2);
+				// Vector<double> u(1);
 
-				// uint nelems = mesh_pt()->nboundary_element(4);
+				// for (uint yi = 0; yi < problem.Ny; yi++) {
+				// 	for (uint xi = problem.Nx1; xi < problem.Nx; xi++) {
+				// 		uint e = yi  * problem.Nx + xi;
 
-				// double total_flux = 0.0;
-
-				// for (uint e = 0; e < nelems; e++) {
-				// 	EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-				// 	for (uint n = 0; n < elem->nnode(); n++) {
-				// 		Node *node = elem->node_pt(n);
-				// 		x[0] = node->x(0);
-				// 		x[1] = node->x(1);
-
-				// 		elem->get_flux(x, flux);
-				// 		total_flux += flux[0];
-
-				// 		printf("e=%u n=%u x0=%8.6f x1=%8.6f flux0=%8.6f flux1=%8.6f\n", e, n, x[0], x[1], flux[0], flux[1]);
+				// 		EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+				// 		for (uint n = 0; n < elem->nnode(); n++)
+				// 			elem->node_pt(n)->set_value(0, problem.Tm);
 				// 	}
 				// }
-
-				// printf("Attempting to modify total flux to %8.6f\n", total_flux / nelems);
-
-				// printf("Current value = %8.6f\n", *(problem.flux_pt));
-
-				// *(problem.flux_pt) = total_flux / nelems;
-
-				// printf("Modified flux t0 %8.6f\n", problem.flux_pt);
-
-				mesh_pt()->node_update();
 			}
 
 			double cur_t = time_pt()->time();
@@ -284,7 +323,22 @@ template<class EL, class P> class Solver : public Problem {
 			}
 		}
 
-		void actions_after_implicit_timestep() {};
+		void actions_after_implicit_timestep() {
+			if (typeid(P) == typeid(Erf2D5Problem)) {
+				Vector<double> x(2);
+				Vector<double> u(1);
+
+				for (uint yi = 0; yi < problem.Ny; yi++) {
+					for (uint xi = problem.Nx1; xi < problem.Nx; xi++) {
+						uint e = yi  * problem.Nx + xi;
+
+						EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+						for (uint n = 0; n < elem->nnode(); n++)
+							elem->node_pt(n)->set_value(0, problem.Tm);
+					}
+				}
+			}
+		};
 
 		void create_flux_elements(uint b, FluxFctPt &flux_ptr) {
 			uint n_elems = mesh_pt()->nboundary_element(b);
@@ -335,7 +389,7 @@ template<class EL, class P> class Solver : public Problem {
 			}
 
 			// reset boundary value at interface as it doesnt match analytical soln anymore
-			if (typeid(P) == typeid(Erf2D3Problem) || typeid(P) == typeid(Erf2D4Problem)) {
+			if (typeid(P) == typeid(Erf2D3Problem)) {
 				mesh_pt()->boundary_node_pt(4,1)->set_value(0,0.0);
 			}
 
@@ -382,12 +436,21 @@ template<class EL, class P> class Solver : public Problem {
 			outfile << time << endl;
 			outfile.close();
 
-			if (typeid(P) == typeid(Erf2D3Problem) || typeid(P) == typeid(Erf2D4Problem)) {
+			if (typeid(P) == typeid(Erf2D3Problem) 
+			|| typeid(P) == typeid(Erf2D4Problem)) {
 				sprintf(filename, "%s/interface.dat", info.directory().c_str());
 				outfile.open(filename, ios::app);
 				outfile << problem.vel * time_pt()->time() << endl;
 				outfile.close();
 			}
+
+			if (typeid(P) == typeid(Erf2D5Problem)) {
+				sprintf(filename, "%s/interface.dat", info.directory().c_str());
+				outfile.open(filename, ios::app);
+				outfile << problem.vel * time_pt()->time() << endl;
+				outfile.close();
+			}
+
 
 			info.number()++;
 		}

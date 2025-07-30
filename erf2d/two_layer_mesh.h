@@ -122,6 +122,10 @@ class TwoPhaseDomain : public Domain {
 
 		}
 
+		void get_interface(const double &t, Vector<double> &x) {
+			x[0] = x1 + vel * t;
+		}
+
 		void doc_domain(DocInfo info, char *label) {
 			char filename[100];
 			ofstream outfile;
@@ -154,22 +158,22 @@ template<class EL> class RefineableTwoLayer2DMesh : public virtual RefineableRec
 
 			this->domain = domain;
 
-			printf("Looping through current elements\n");
+			// printf("Looping through current elements\n");
 			Vector<double> s_fraction(2);
 
-			for (uint e = 0; e < this->nelement(); e++) {
-				FiniteElement *elem = this->finite_element_pt(e);
-				for (uint n = 0; n < elem->nnode(); n++) {
-					printf("e=%u n=%u ", e, n);
+			// for (uint e = 0; e < this->nelement(); e++) {
+			// 	FiniteElement *elem = this->finite_element_pt(e);
+			// 	for (uint n = 0; n < elem->nnode(); n++) {
+			// 		printf("e=%u n=%u ", e, n);
 
-					elem->local_fraction_of_node(n, s_fraction);
+			// 		elem->local_fraction_of_node(n, s_fraction);
 
-					for (uint i = 0; i < elem->nnode_1d(); i++) {
-						printf("x%u=%10.8f s_frac=%10.8f ", i, elem->node_pt(n)->x(i), s_fraction[i]);
-					}
-					printf("\n");
-				}
-			}
+			// 		for (uint i = 0; i < elem->nnode_1d(); i++) {
+			// 			printf("x%u=%10.8f s_frac=%10.8f ", i, elem->node_pt(n)->x(i), s_fraction[i]);
+			// 		}
+			// 		printf("\n");
+			// 	}
+			// }
 
 			// modified from fish_mesh.template.cc
 			Vector<double> s(2);
@@ -202,7 +206,8 @@ template<class EL> class RefineableTwoLayer2DMesh : public virtual RefineableRec
 			}
 
 			this->set_nboundary(5);
-			printf("Back to regular bit for adding boundary\n");
+			// printf("Back to regular bit for adding boundary\n");
+
 			for (uint e = 0; e < ny; e++) {
 				EL *elem = dynamic_cast<EL *>(this->finite_element_pt(nx1*(1+e) + nx2*e));
 				uint nnode_1d = elem->nnode_1d();

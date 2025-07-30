@@ -336,8 +336,10 @@ class Visualizer:
 			time_text.set_text(f't={run.times[n]}')
 
 			data = _extract_data(run.solns[n])
+			exact_data = _extract_data(run.exact_solns[n])
 
 			line_soln.set_data(data['x'], data['u'])
+			line_exact.set_data(exact_data['x'], exact_data['u'])
 
 			line_interface.set_xdata(run.interface[n])
 		
@@ -351,7 +353,11 @@ class Visualizer:
 		)
 
 		data = _extract_data(run.solns[0])
+		exact_data = _extract_data(run.exact_solns[0])
+
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical')[0]
+
 		line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
 
