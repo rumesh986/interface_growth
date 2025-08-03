@@ -39,7 +39,7 @@ template<class EL> class TwoLayer2DMesh : public virtual RectangularQuadMesh<EL>
 class TwoPhaseDomain : public Domain {
 	private:
 		const double x0;
-		const double x1;
+		double x1;
 		const double x2;
 		const double vel;
 
@@ -81,7 +81,7 @@ class TwoPhaseDomain : public Domain {
 			double time = time_pt->time(t);
 
 			// interface location
-			const double x_int = x1 + vel * time;
+			const double x_int = (vel > 0.0) ? x1 + vel * time : x1;
 
 			const unsigned int yi = macro_i / nx;
 			const unsigned int xi = macro_i % nx;
@@ -119,11 +119,22 @@ class TwoPhaseDomain : public Domain {
 					printf("Invalid direction given in TwoPhaseDomain");
 					return;
 			}
+		}
 
+		double get_interface() {
+			return x1;
+		}
+
+		void get_interface(Vector<double> &x) {
+			x[0] = x1;
 		}
 
 		void get_interface(const double &t, Vector<double> &x) {
-			x[0] = x1 + vel * t;
+			x[0] = (vel > 0.0) ? x1 + vel * t : x1;
+		}
+
+		void set_interface(double x) {
+			x1 = x;
 		}
 
 		void doc_domain(DocInfo info, char *label) {
