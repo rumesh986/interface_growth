@@ -25,7 +25,7 @@ template<class EL> class TwoLayer2DMesh : public virtual RectangularQuadMesh<EL>
 				EL *elem = dynamic_cast<EL *>(this->finite_element_pt(nx1*(1+e) + nx2*e));
 				int nnode = elem->nnode_1d();
 				for (int n = 0; n < nnode; n++) {
-					Node *node = elem->node_pt((nnode-1)*n);
+					Node *node = elem->node_pt(nnode*n);
 
 					this->convert_to_boundary_node(node);
 					this->add_boundary_node(4, node);
@@ -169,24 +169,8 @@ template<class EL> class RefineableTwoLayer2DMesh : public virtual RefineableRec
 
 			this->domain = domain;
 
-			// printf("Looping through current elements\n");
-			Vector<double> s_fraction(2);
-
-			// for (uint e = 0; e < this->nelement(); e++) {
-			// 	FiniteElement *elem = this->finite_element_pt(e);
-			// 	for (uint n = 0; n < elem->nnode(); n++) {
-			// 		printf("e=%u n=%u ", e, n);
-
-			// 		elem->local_fraction_of_node(n, s_fraction);
-
-			// 		for (uint i = 0; i < elem->nnode_1d(); i++) {
-			// 			printf("x%u=%10.8f s_frac=%10.8f ", i, elem->node_pt(n)->x(i), s_fraction[i]);
-			// 		}
-			// 		printf("\n");
-			// 	}
-			// }
-
 			// modified from fish_mesh.template.cc
+			Vector<double> s_fraction(2);
 			Vector<double> s(2);
     		Vector<double> r(2);
 
@@ -204,10 +188,10 @@ template<class EL> class RefineableTwoLayer2DMesh : public virtual RefineableRec
 					for (uint n = 0; n < elem->nnode(); n++) {
 						Node *node = elem->node_pt(n);
 						elem->local_fraction_of_node(n, s_fraction);
-
+						
 						s[0] = -1.0 + 2.0 * s_fraction[0];
 						s[1] = -1.0 + 2.0 * s_fraction[1];
-
+						
 						domain->macro_element_pt(e_loc)->macro_map(s, r);
 						
 						node->x(0) = r[0];
@@ -217,13 +201,12 @@ template<class EL> class RefineableTwoLayer2DMesh : public virtual RefineableRec
 			}
 
 			this->set_nboundary(5);
-			// printf("Back to regular bit for adding boundary\n");
 
 			for (uint e = 0; e < ny; e++) {
 				EL *elem = dynamic_cast<EL *>(this->finite_element_pt(nx1*(1+e) + nx2*e));
 				uint nnode_1d = elem->nnode_1d();
 				for (uint n = 0; n < nnode_1d; n++) {
-					Node *node = elem->node_pt((nnode_1d-1)*n);
+					Node *node = elem->node_pt(nnode_1d*n);
 
 					this->convert_to_boundary_node(node);
 					this->add_boundary_node(4, node);
