@@ -89,7 +89,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = erf2d1$(EXEEXT) erf2d2$(EXEEXT) erf2d3$(EXEEXT) \
-	erf2d4$(EXEEXT) erf2d5$(EXEEXT) erf2d6$(EXEEXT)
+	erf2d4$(EXEEXT) erf2d5$(EXEEXT) erf2d6$(EXEEXT) \
+	erf2d7$(EXEEXT)
 subdir = user_drivers/rumesh/erf2d
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/configure.ac_scripts/automake_init_command_file \
@@ -126,6 +127,9 @@ erf2d5_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_erf2d6_OBJECTS = erf2d6.$(OBJEXT)
 erf2d6_OBJECTS = $(am_erf2d6_OBJECTS)
 erf2d6_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am_erf2d7_OBJECTS = erf2d7.$(OBJEXT)
+erf2d7_OBJECTS = $(am_erf2d7_OBJECTS)
+erf2d7_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -143,7 +147,8 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/erf2d1.Po ./$(DEPDIR)/erf2d2.Po \
 	./$(DEPDIR)/erf2d3.Po ./$(DEPDIR)/erf2d4.Po \
-	./$(DEPDIR)/erf2d5.Po ./$(DEPDIR)/erf2d6.Po
+	./$(DEPDIR)/erf2d5.Po ./$(DEPDIR)/erf2d6.Po \
+	./$(DEPDIR)/erf2d7.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -181,9 +186,11 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(erf2d1_SOURCES) $(erf2d2_SOURCES) $(erf2d3_SOURCES) \
-	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES)
+	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES) \
+	$(erf2d7_SOURCES)
 DIST_SOURCES = $(erf2d1_SOURCES) $(erf2d2_SOURCES) $(erf2d3_SOURCES) \
-	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES)
+	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES) \
+	$(erf2d7_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -409,7 +416,8 @@ erf2d2_SOURCES = erf2d2.cc erf2d2.h solver.h two_layer_mesh.h
 erf2d3_SOURCES = erf2d3.cc erf2d3.h solver.h two_layer_mesh.h
 erf2d4_SOURCES = erf2d4.cc erf2d4.h solver.h two_layer_mesh.h
 erf2d5_SOURCES = erf2d5.cc erf2d5.h solver.h two_layer_mesh.h
-erf2d6_SOURCES = erf2d6.cc erf2d6.h two_layer_mesh.h
+erf2d6_SOURCES = erf2d6.cc two_layer_mesh.h
+erf2d7_SOURCES = erf2d7.cc two_layer_mesh.h
 
 # Required libraries: Only the "generic" and "poisson" libraries, 
 # which are accessible via the general library directory which 
@@ -442,6 +450,7 @@ erf2d3_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d4_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d5_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d6_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
+erf2d7_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 all: all-am
 
 .SUFFIXES:
@@ -509,6 +518,10 @@ erf2d6$(EXEEXT): $(erf2d6_OBJECTS) $(erf2d6_DEPENDENCIES) $(EXTRA_erf2d6_DEPENDE
 	@rm -f erf2d6$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(erf2d6_OBJECTS) $(erf2d6_LDADD) $(LIBS)
 
+erf2d7$(EXEEXT): $(erf2d7_OBJECTS) $(erf2d7_DEPENDENCIES) $(EXTRA_erf2d7_DEPENDENCIES) 
+	@rm -f erf2d7$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(erf2d7_OBJECTS) $(erf2d7_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -521,6 +534,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erf2d4.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erf2d5.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erf2d6.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erf2d7.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -685,6 +699,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/erf2d4.Po
 	-rm -f ./$(DEPDIR)/erf2d5.Po
 	-rm -f ./$(DEPDIR)/erf2d6.Po
+	-rm -f ./$(DEPDIR)/erf2d7.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -736,6 +751,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/erf2d4.Po
 	-rm -f ./$(DEPDIR)/erf2d5.Po
 	-rm -f ./$(DEPDIR)/erf2d6.Po
+	-rm -f ./$(DEPDIR)/erf2d7.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

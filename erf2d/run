@@ -27,6 +27,17 @@ function _build {
 	fi
 }
 
+function _debug {
+	CXXFLAGS=$(cat Makefile | sed -rn s/^CXXFLAGS.*=\(.*\)/\\1/p)
+	make $1 CXXFLAGS="$CXXFLAGS -DRUN_SCRIPT -DT_ORDER=$2 -DX_ORDER=$3 -g"
+
+	if [[ $? != 0 ]]
+	then
+		echo "Make failed [$@]"
+		exit 1
+	fi
+}
+
 # run single configuration
 # $1 -> name of program (Pass in $1 from cmdline args)
 # $2 -> number of nodes (nx)
@@ -70,8 +81,8 @@ function _standard {
 
 	rm -rf RESLT/*
 
-	nx=10
-	dt=0.01
+	nx=100
+	dt=0.001
 	tshift=0.0
 	stdoutfile="RESLT/${X_ORDER}x${nx}_${T_ORDER}t${dt}.stdout"
 
@@ -216,6 +227,7 @@ function _main {
 		"t") _dt_analysis $@ ;;
 		"b" | "xt") _dxdt_analysis $@ ;;
 		"c") _build $1 2 2 ;;
+		"d") _debug $1 2 2 ;;
 		*) echo "Unknown profile" ;;
 	esac
 }
