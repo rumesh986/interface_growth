@@ -356,7 +356,7 @@ class Visualizer:
 		exact_data = _extract_data(run.exact_solns[0])
 
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
-		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical')[0]
+		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
 
 		line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
