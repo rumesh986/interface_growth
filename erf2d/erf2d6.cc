@@ -1,3 +1,8 @@
+
+// moving interface 
+// interface moves by calculating instantaneous mesh velocity from flux
+// right phase pinned to melting temperature
+
 #include <filesystem>
 
 #include "includes.h"

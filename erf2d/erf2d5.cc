@@ -1,3 +1,8 @@
+
+// moving interface 
+// interface moves with prescribed velocity
+// right phase pinned to melting temperature
+
 #include <filesystem>
 
 #include "includes.h"
