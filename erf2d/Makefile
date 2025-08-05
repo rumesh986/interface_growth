@@ -90,7 +90,7 @@ build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
 noinst_PROGRAMS = erf2d1$(EXEEXT) erf2d2$(EXEEXT) erf2d3$(EXEEXT) \
 	erf2d4$(EXEEXT) erf2d5$(EXEEXT) erf2d6$(EXEEXT) \
-	erf2d7$(EXEEXT)
+	erf2d7$(EXEEXT) erf2d3p1$(EXEEXT)
 subdir = user_drivers/rumesh/erf2d
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/configure.ac_scripts/automake_init_command_file \
@@ -118,6 +118,9 @@ erf2d2_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_erf2d3_OBJECTS = erf2d3.$(OBJEXT)
 erf2d3_OBJECTS = $(am_erf2d3_OBJECTS)
 erf2d3_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am_erf2d3p1_OBJECTS = erf2d3p1.$(OBJEXT)
+erf2d3p1_OBJECTS = $(am_erf2d3p1_OBJECTS)
+erf2d3p1_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_erf2d4_OBJECTS = erf2d4.$(OBJEXT)
 erf2d4_OBJECTS = $(am_erf2d4_OBJECTS)
 erf2d4_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -146,9 +149,9 @@ DEFAULT_INCLUDES = -I. -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/erf2d1.Po ./$(DEPDIR)/erf2d2.Po \
-	./$(DEPDIR)/erf2d3.Po ./$(DEPDIR)/erf2d4.Po \
-	./$(DEPDIR)/erf2d5.Po ./$(DEPDIR)/erf2d6.Po \
-	./$(DEPDIR)/erf2d7.Po
+	./$(DEPDIR)/erf2d3.Po ./$(DEPDIR)/erf2d3p1.Po \
+	./$(DEPDIR)/erf2d4.Po ./$(DEPDIR)/erf2d5.Po \
+	./$(DEPDIR)/erf2d6.Po ./$(DEPDIR)/erf2d7.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -186,11 +189,11 @@ am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(erf2d1_SOURCES) $(erf2d2_SOURCES) $(erf2d3_SOURCES) \
-	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES) \
-	$(erf2d7_SOURCES)
+	$(erf2d3p1_SOURCES) $(erf2d4_SOURCES) $(erf2d5_SOURCES) \
+	$(erf2d6_SOURCES) $(erf2d7_SOURCES)
 DIST_SOURCES = $(erf2d1_SOURCES) $(erf2d2_SOURCES) $(erf2d3_SOURCES) \
-	$(erf2d4_SOURCES) $(erf2d5_SOURCES) $(erf2d6_SOURCES) \
-	$(erf2d7_SOURCES)
+	$(erf2d3p1_SOURCES) $(erf2d4_SOURCES) $(erf2d5_SOURCES) \
+	$(erf2d6_SOURCES) $(erf2d7_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -418,6 +421,7 @@ erf2d4_SOURCES = erf2d4.cc erf2d4.h solver.h two_layer_mesh.h
 erf2d5_SOURCES = erf2d5.cc erf2d5.h solver.h two_layer_mesh.h
 erf2d6_SOURCES = erf2d6.cc two_layer_mesh.h
 erf2d7_SOURCES = erf2d7.cc two_layer_mesh.h
+erf2d3p1_SOURCES = erf2d3p1.cc two_layer_mesh.h three_layer_mesh.h
 
 # Required libraries: Only the "generic" and "poisson" libraries, 
 # which are accessible via the general library directory which 
@@ -451,6 +455,7 @@ erf2d4_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $
 erf2d5_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d6_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d7_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
+erf2d3p1_LDADD = -L${exec_prefix}/lib -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 all: all-am
 
 .SUFFIXES:
@@ -506,6 +511,10 @@ erf2d3$(EXEEXT): $(erf2d3_OBJECTS) $(erf2d3_DEPENDENCIES) $(EXTRA_erf2d3_DEPENDE
 	@rm -f erf2d3$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(erf2d3_OBJECTS) $(erf2d3_LDADD) $(LIBS)
 
+erf2d3p1$(EXEEXT): $(erf2d3p1_OBJECTS) $(erf2d3p1_DEPENDENCIES) $(EXTRA_erf2d3p1_DEPENDENCIES) 
+	@rm -f erf2d3p1$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(erf2d3p1_OBJECTS) $(erf2d3p1_LDADD) $(LIBS)
+
 erf2d4$(EXEEXT): $(erf2d4_OBJECTS) $(erf2d4_DEPENDENCIES) $(EXTRA_erf2d4_DEPENDENCIES) 
 	@rm -f erf2d4$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(erf2d4_OBJECTS) $(erf2d4_LDADD) $(LIBS)
@@ -531,6 +540,7 @@ distclean-compile:
 include ./$(DEPDIR)/erf2d1.Po # am--include-marker
 include ./$(DEPDIR)/erf2d2.Po # am--include-marker
 include ./$(DEPDIR)/erf2d3.Po # am--include-marker
+include ./$(DEPDIR)/erf2d3p1.Po # am--include-marker
 include ./$(DEPDIR)/erf2d4.Po # am--include-marker
 include ./$(DEPDIR)/erf2d5.Po # am--include-marker
 include ./$(DEPDIR)/erf2d6.Po # am--include-marker
@@ -696,6 +706,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/erf2d1.Po
 	-rm -f ./$(DEPDIR)/erf2d2.Po
 	-rm -f ./$(DEPDIR)/erf2d3.Po
+	-rm -f ./$(DEPDIR)/erf2d3p1.Po
 	-rm -f ./$(DEPDIR)/erf2d4.Po
 	-rm -f ./$(DEPDIR)/erf2d5.Po
 	-rm -f ./$(DEPDIR)/erf2d6.Po
@@ -748,6 +759,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/erf2d1.Po
 	-rm -f ./$(DEPDIR)/erf2d2.Po
 	-rm -f ./$(DEPDIR)/erf2d3.Po
+	-rm -f ./$(DEPDIR)/erf2d3p1.Po
 	-rm -f ./$(DEPDIR)/erf2d4.Po
 	-rm -f ./$(DEPDIR)/erf2d5.Po
 	-rm -f ./$(DEPDIR)/erf2d6.Po
