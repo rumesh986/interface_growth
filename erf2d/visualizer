@@ -74,6 +74,7 @@ class _RunData:
 		except FileNotFoundError:
 			raise Exception("Time data not availble")
 		
+		self.interface = None
 		if os.path.exists(f'{self.inp_folder}/interface.{self.ext}'):
 			self.interface = np.fromfile(f'{self.inp_folder}/interface.{self.ext}', sep='\n')
 			
@@ -341,7 +342,8 @@ class Visualizer:
 			line_soln.set_data(data['x'], data['u'])
 			line_exact.set_data(exact_data['x'], exact_data['u'])
 
-			line_interface.set_xdata(run.interface[n])
+			if run.interface is not None:
+				line_interface.set_xdata(run.interface[n])
 		
 		plt.cla()
 		
@@ -358,7 +360,9 @@ class Visualizer:
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
 		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
 
-		line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		if run.interface is not None:
+			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
 
 		prof_ax.legend(loc='upper left')
