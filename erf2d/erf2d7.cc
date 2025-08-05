@@ -22,8 +22,8 @@ static const double Tfr = 1.0;
 
 static const double alpha = 10.0;
 
-static const double x0 = 0.0;
-static const double x1 = 0.1;
+static const double x0 = -1.0;
+static const double x1 = 0.0;
 static const double x2 = 1.0;
 
 static const double y_0 = 0.0;
@@ -68,19 +68,16 @@ class Erf2D6Problem : public Problem {
 
 			// pin boundary 1 (right)
 			for (uint n = 0; n < mesh_pt()->nboundary_node(1); n++) {
-				// mesh_pt()->boundary_node_pt(1, n)->set_value(0, Tfr);
 				mesh_pt()->boundary_node_pt(1, n)->pin(0);
 			}
 
 			// pin boundary 3 (left)
 			for (uint n = 0; n < mesh_pt()->nboundary_node(3); n++) {
-				// mesh_pt()->boundary_node_pt(3, n)->set_value(0, Ts);
 				mesh_pt()->boundary_node_pt(3, n)->pin(0);
 			}
 
 			// pin boundary 4 (interface)
 			for (uint n = 0; n < mesh_pt()->nboundary_node(4); n++) {
-				// mesh_pt()->boundary_node_pt(4, n)->set_value(0, Tm);
 				mesh_pt()->boundary_node_pt(4, n)->pin(0);
 			}
 
@@ -122,20 +119,11 @@ class Erf2D6Problem : public Problem {
 
 			uint nelems = mesh_pt()->nboundary_element(4);
 			for (uint e = 0; e < nelems; e++) {
-				printf("boundary 4 e=%u fi=%d\n", e, mesh_pt()->face_index_at_boundary(4, e));
 				if (mesh_pt()->face_index_at_boundary(4, e) < 0)
 					continue;
 
 				dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e))->get_flux(s, flux);
 				tot_flux += flux[0];
-
-				EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-				for (uint n = 0; n < elem->nnode(); n++) {
-					Node *node = elem->node_pt(n);
-					printf("\tNode n=%u x0=%8.6f x1=%8.6f\n", n, node->x(0), node->x(1));
-				}
-
-				printf("boundary 4 e=%u s0=%8.6f s1=%8.6f flux0=%8.6f flux1=%8.6f\n", e, s[0], s[1], flux[0], flux[1]);
 			}
 
 			double new_x1 = domain->get_interface() +  tot_flux/alpha * dt;
@@ -187,6 +175,7 @@ class Erf2D6Problem : public Problem {
 			}
 
 			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
+			// for (int t = 0; t < 1; t++) {
 				double cur_t = time_pt()->time((uint) t);
 				printf("[% 2d] Setting initial condition at t = %10.8f\n", t, cur_t);
 
@@ -198,6 +187,8 @@ class Erf2D6Problem : public Problem {
 					mesh_pt()->node_pt(n)->set_value(t, 0, u[0]);
 				}
 			}
+
+			// mesh_pt()->assign_initial_values_impulsive();
 
 			time_pt()->time() = t_shift;
 		};
@@ -248,16 +239,6 @@ class Erf2D6Problem : public Problem {
 			outfile.close();
 
 			info.number()++;
-
-			// EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(Nx1-2));
-			// for (uint n = 0; n < elem->nnode(); n++) {
-			// 	printf("node %u x=%8.6f y=%8.6f beta=%8.6f\n", n, elem->node_pt(n)->x(0), elem->node_pt(n)->value(0), *(elem->beta_pt()));
-			// }
-
-			// elem = dynamic_cast<EL *>(mesh_pt()->element_pt(Nx1-1));
-			// for (uint n = 0; n < elem->nnode(); n++) {
-			// 	printf("node %u x=%8.6f y=%8.6f beta=%8.6f\n", n, elem->node_pt(n)->x(0), elem->node_pt(n)->value(0), *(elem->beta_pt()));
-			// }
 		}
 
 };
