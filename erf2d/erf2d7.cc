@@ -20,7 +20,7 @@ static const double Ts = -1.0;
 static const double Tm = 0.0;
 static const double Tfr = 1.0;
 
-static const double alpha = 10.0;
+static const double alpha = 1.0;
 
 static const double x0 = -1.0;
 static const double x1 = 0.0;
@@ -126,7 +126,7 @@ class Erf2D6Problem : public Problem {
 				tot_flux += flux[0];
 			}
 
-			double new_x1 = domain->get_interface() +  tot_flux/alpha * dt;
+			double new_x1 = domain->get_interface() +  tot_flux/(alpha*Ny) * dt;
 
 			domain->set_interface(new_x1);
 			mesh_pt()->node_update();
