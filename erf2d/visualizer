@@ -189,6 +189,8 @@ class Visualizer:
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
 			self.make_surf_profile_anim(run)
+			if (run.interface is not None):
+				self.plot_interface(run)
 
 		except:
 			raise Exception(f"Crashing for some reason {run.config}")
@@ -223,6 +225,25 @@ class Visualizer:
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-errors.png')
 		plt.close(fig)
+	
+	def plot_interface(self, run):
+		plt.cla()
+
+		a = 0.1
+		b = 0.001
+
+		x_ref = np.linspace(run.times[0], run.times[-1])
+		y_ref = a * np.sqrt(x_ref) + b
+
+		plt.plot(run.times, run.interface, label='Interface position')
+		plt.plot(x_ref, y_ref, ls='--', label=f'$y={a}\sqrt{{t}} + {b}$')
+
+		plt.legend()
+		plt.xlabel('time')
+		plt.ylabel('interface posiion (x)')
+		plt.title('Interface position with time')
+
+		plt.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
 	def _reshape_2D_data(self, data, key):
 		xs = data['x'].unique()
