@@ -29,7 +29,7 @@ function _build {
 
 function _debug {
 	CXXFLAGS=$(cat Makefile | sed -rn s/^CXXFLAGS.*=\(.*\)/\\1/p)
-	make $1 CXXFLAGS="$CXXFLAGS -DRUN_SCRIPT -DT_ORDER=$2 -DX_ORDER=$3 -g"
+	make $1 CXXFLAGS="-Wall -O0 -DRUN_SCRIPT -DT_ORDER=$2 -DX_ORDER=$3 -g"
 
 	if [[ $? != 0 ]]
 	then
