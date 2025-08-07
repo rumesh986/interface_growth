@@ -122,11 +122,12 @@ class TwoPhaseDomain : public Domain {
 		}
 
 		double get_interface() {
-			return x1;
+			double time = time_pt->time(0);
+			return (vel > 0.0) ? x1 + vel * time : x1;
 		}
 
 		void get_interface(Vector<double> &x) {
-			x[0] = x1;
+			x[0] = get_interface();
 		}
 
 		void get_interface(const double &t, Vector<double> &x) {
