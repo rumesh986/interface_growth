@@ -9,6 +9,7 @@ from matplotlib.animation import FuncAnimation, ArtistAnimation
 
 import numpy as np
 import pandas as pd
+import scipy.optimize as scopt
 
 # import cProfile
 
@@ -227,20 +228,22 @@ class Visualizer:
 		plt.close(fig)
 	
 	def plot_interface(self, run):
+		def f(x, a, b):
+			return np.sqrt(x * a) + b
+
 		plt.cla()
 
-		a = 0.1
-		b = 0.001
+		optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 
 		x_ref = np.linspace(run.times[0], run.times[-1])
-		y_ref = a * np.sqrt(x_ref) + b
+		y_ref = f(x_ref, optimal[0], optimal[1])
 
 		plt.plot(run.times, run.interface, label='Interface position')
-		plt.plot(x_ref, y_ref, ls='--', label=f'$y={a}\sqrt{{t}} + {b}$')
+		plt.plot(x_ref, y_ref, ls='--', label=f'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
 
 		plt.legend()
 		plt.xlabel('time')
-		plt.ylabel('interface posiion (x)')
+		plt.ylabel('interface posiion h(t)')
 		plt.title('Interface position with time')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
