@@ -1,5 +1,6 @@
 **/RESLT*/**
 **/imgs/**
+**/runs/**
 **/*.o
 **/*.pyc
 **/*.Po
@@ -11,8 +12,5 @@ heat2/
 two_fluid/
 
 erf/erf[0-9]
+erf/runs/
 erf2d/erf2d[0-9]
-
-
-
-test_runs/

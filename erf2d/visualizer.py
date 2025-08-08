@@ -152,35 +152,50 @@ class _RunData:
 		
 		return data
 
+	def create_outdir(self):
+		if not os.path.exists(self.out_folder):
+			os.mkdir(self.out_folder)
+
 class Visualizer:
-	def __init__(self, resd, outd, prefix, dxdt):
-		self.resd = resd
-		self.outd = outd
+	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', interactive=False):
 		self.prefix = prefix
 		self.dxdt = dxdt
+		self.resd = resd
+		self.outd = outd
+		self.interactive = interactive
 
-		self._data = []
+		self.runs = []
 		self._markers = ['+', 'O', '.', '*', 'x', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
-		plt.style.use('pltstyle.mplstyle')
+		plt.style.use('../../pltstyle.mplstyle')
 
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
 			if not os.path.isdir(rund):
 				continue
-			
-			if not os.path.exists(f'{self.outd}/{rundir}'):
-				os.mkdir(f'{self.outd}/{rundir}')
 
 			print(f'Processing results in {rund}')
 
-			self._data.append(_RunData(rund, f'{self.outd}/{rundir}'))
+			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}'))
 		
-		for rtype in self.dxdt:
-			match rtype:
-				case 'a': self.standard()
-				case x if x in 'bxt': self.plot_analysis(x)
+		if 'a' in self.dxdt:
+			for run in self.runs:
+				run.create_outdir()
+		
+		if not self.interactive:
+			for rtype in self.dxdt:
+				match rtype:
+					case 'a': self.standard()
+					case x if x in 'bxt': self.plot_analysis(x)
+
+	def prepare_pd(self):
+		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
+		config = lambda inp: (inp.x_order, inp.t_order, 1/inp.nx, inp.dt)
+
+		for i, run in enumerate(self.runs):
+			x_order, t_order, dx, dt = config(run.config)
+			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
 
 	def _make(self, run):
 		try:
@@ -198,7 +213,7 @@ class Visualizer:
 
 	def standard(self):
 		with ProcessPoolExecutor(max_workers=10) as executor:
-			for run, thread in zip(self._data, executor.map(self._make, self._data)):
+			for run, thread in zip(self.runs, executor.map(self._make, self.runs)):
 				print(f'Standard processing for \n{run.config}')
 
 	def plot_errors(self, run):
@@ -428,14 +443,12 @@ class Visualizer:
 			solns[0]['x'], 
 			solns[0]['u'], 
 			label='Numerical', 
-			# lw=5.0
 		)[0]
 		line_exact_soln = prof_ax.plot(
 			exact_solns[0]['x'], 
 			exact_solns[0]['u'], 
 			label='Analytical', 
 			linestyle='--', 
-			# lw=5.0
 		)[0]
 		
 		line_diff = diff_ax.plot(
@@ -458,58 +471,69 @@ class Visualizer:
 		plt.close(fig)
 
 	def plot_analysis(self, rtype):
-		data = pd.DataFrame(columns=['order', 'x', 'error'])
-
 		match rtype:
 			case 'x':
-				config = lambda x: (x.x_order, 1/x.nx)
 				xlabel = 'dx'
 				title = f'{self.prefix} dx error analysis'
 				fname = 'dx_errors'
 				label = 'order'
+				ref_order = 'x_order'
 			case 'b':
-				config = lambda x: (x.x_order, 1/x.nx)
 				xlabel = 'dx'
 				title = f'{self.prefix} dxdt error analysis'
 				fname = 'dxdt_errors'
 				label = 'order'
+				ref_order = 'x_order'
 			case 't':
-				config = lambda x: (x.t_order, x.dt)
 				xlabel = 'dt'
 				title = f'{self.prefix} dt error analysis'
 				fname = 'dt_errors'
 				label = 'BDF'
+				ref_order = 't_order'
 			case _:
 				raise Exception("Unknown analysis type provided")
 
-		for i, run in enumerate(self._data):
-			order, x = config(run.config)
-			data.loc[i] = [order, x, run.total_error_norm]
+		xs = np.logspace(-1, -5)
+		x_orders = self._pd['x_order'].unique()
+		x_orders.sort()
 
-		xs = np.logspace(-0.5, -5)
-		# xs = np.logspace(np.log(data['x'].max())-0.5, np.log(data['x'].min())+0.5)
-		orders = data['order'].unique()
-		orders.sort()
+		t_orders = self._pd['t_order'].unique()
+		t_orders.sort()
 
 		fig, ax = plt.subplots(1, subplot_kw={
 			'xlabel': xlabel,
 			'ylabel': 'Normalized Error',
 			'xscale': 'log',
 			'yscale': 'log',
-			'ylim': [data['error'].min() * 1e-1, data['error'].max() * 1e1],
+			'ylim': [self._pd['error'].min() * 1e-1, self._pd['error'].max() * 1e1],
 			'title': title
 		})
 
-		for order in orders:
-			df = data.loc[data['order'] == order]
-			ax.scatter(df['x'], df['error'], label=f'{label} {order}')
+		marker_i = 0
+		for x in x_orders:
+			for t in t_orders:
+				df = self._pd.loc[self._pd['x_order'] == x]
+				df = df.loc[df['t_order'] == t]
 
-			max_point = df.loc[df['x'] == df['x'].max()]
-			ax.plot(xs, (xs / max_point['x'].iloc[0]) ** order * max_point['error'].iloc[0], label=f'Reference (order={order})', linestyle='--' )
-		
-		ax.legend(ncols=len(orders))
+				ax.scatter(df[xlabel], df['error'], label=f'X({x}) T({t})', marker=self._markers[marker_i % len(self._markers)])
+				marker_i += 1
+
+		ref_orders = self._pd[ref_order].unique()
+		ref_orders.sort()
+
+		for x in ref_orders:
+			df = self._pd.loc[self._pd[ref_order] == x]
+
+			max_point = df.loc[df['error'] == df['error'].max()]
+			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=f'Reference (order={x})', linestyle='--', marker='')
+
+		ax.legend(ncols=ref_orders.shape[0])
 
 		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
+
+		if self.interactive:
+			plt.show()
+
 		plt.close(fig)
 
 if __name__ =='__main__':
