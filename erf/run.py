@@ -114,7 +114,7 @@ class Run:
 					tshift = (t+1) * max_dt
 					for nx in self.nxs:
 						for dt in self.dts:
-							tsteps = self.tsteps / dt 
+							tsteps = self.tsteps / dt
 							wf = max_dt / dt
 							futures.append(executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf))
 		print("Finished Running for all configs")
