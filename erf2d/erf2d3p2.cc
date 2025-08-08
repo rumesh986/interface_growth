@@ -62,13 +62,13 @@ class Erf2D3P2Problem : public Problem {
 		DocInfo info;
 	public:
 		Erf2D3P2Problem(
-			uint nx,
-			uint ny,
+			uint Nx,
+			uint Ny,
 			uint t_steps,
 			double dt,
 			double t_shift,
 			DocInfo info
-		) : nx1(nx), nx2(nx), nx3(nx), nx(3*nx), ny(ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
+		) : nx1(Nx), nx2(Nx), nx3(Nx), nx(nx1+nx2+nx3), ny(Ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
 			x2 = x2 + vel * t_shift;

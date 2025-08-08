@@ -3,6 +3,7 @@
 **/*.o
 **/*.pyc
 **/*.Po
+**/*.Tpo
 
 analytic_tests/
 free_surface/
