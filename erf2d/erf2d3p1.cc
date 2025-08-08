@@ -23,7 +23,7 @@ static const double alpha = 10.0;
 
 static const double x0 = -1.0;
 static const double x1 = 0.0;
-static const double x2 = 0.3;
+static const double x2 = 0.1;
 static const double x3 = 1.0;
 
 static const double y_0 = 0.0;
@@ -60,17 +60,17 @@ class Erf2D3P1Problem : public Problem {
 		DocInfo info;
 	public:
 		Erf2D3P1Problem(
-			uint nx,
-			uint ny,
+			uint Nx,
+			uint Ny,
 			uint t_steps,
 			double dt,
 			double t_shift,
 			DocInfo info
-		) : nx1(nx), nx2(nx), nx3(nx), nx(3*nx), ny(ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
+		) : nx1(Nx), nx2(Nx), nx3(Nx), nx(nx1+nx2+nx3), ny(Ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
 			mesh_pt() = new ThreePhase2DMesh<EL>(nx1, nx2, nx3, ny, x0, x1, x2, x3, y_0, y_1, time_stepper_pt());
-			
+			mesh_pt()->setup_boundary_element_info();
 			// mesh_pt() = new RefineableThreePhase2DMesh<EL>(nx1, nx2, nx3, ny, x0, x1, x2, x3, y_0, y_1, vel, time_pt(), time_stepper_pt());
 			// mesh_pt()->setup_boundary_element_info();
 			// domain = dynamic_cast<RefineableThreePhase2DMesh<EL>>(mesh_pt())->domain;
@@ -86,16 +86,47 @@ class Erf2D3P1Problem : public Problem {
 					mesh_pt()->boundary_node_pt(b, n)->pin_all();
 			}
 
+			// for (unsigned int yi = 0; yi < ny; yi++) {
+			// 	for (unsigned int xi = 0; xi < nx1; xi++)
+			// 		dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D1;
+				
+			// 	for (unsigned int xi = nx1; xi < nx1+nx2; xi++)
+			// 		dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D2;
+				
+			// 	for (unsigned int xi = nx1+nx2; xi < nx1+nx2+nx3; xi++)
+			// 		dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D3;
+			// }
+
 			for (unsigned int yi = 0; yi < ny; yi++) {
-				for (unsigned int xi = 0; xi < nx1; xi++)
+				for (unsigned int xi = 0; xi < nx1; xi++) {
 					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D1;
+					// printf("yi=%2u xi=%2u beta=%4.2f D=%4.3f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D1);
+				}
 				
-				for (unsigned int xi = nx1; xi < nx1+nx2; xi++)
+				for (unsigned int xi = nx1; xi < nx1+nx2; xi++) {
 					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D2;
+					// printf("yi=%2u xi=%2u beta=%4.2f D=%4.3f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D2);
+				}
 				
-				for (unsigned int xi = nx1+nx2; xi < nx1+nx2+nx3; xi++)
+				for (unsigned int xi = nx1+nx2; xi < nx1+nx2+nx3; xi++) {
 					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt() = (double *) &D3;
+					// printf("yi=%2u xi=%2u beta=%4.2f D=%4.3f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D3);
+					// cout << typeid(EL).name() << " " << typeid(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))).name() << endl;
+				}
 			}
+			
+			printf("Finished setting up betas\n");
+
+			// for (unsigned int yi = 0; yi < ny; yi++) {
+			// 	for (unsigned int xi = 0; xi < nx1; xi++)
+			// 		printf("yi=%2u xi=%2u beta=%4.2f D=%4.2f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D1);
+					
+			// 	for (unsigned int xi = nx1; xi < nx1+nx2; xi++)
+			// 		printf("yi=%2u xi=%2u beta=%4.2f D=%4.2f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D2);
+					
+			// 	for (unsigned int xi = nx1+nx2; xi < nx; xi++)
+			// 		printf("yi=%2u xi=%2u beta=%4.2f D=%4.2f\n", yi, xi, *(dynamic_cast<EL *>(mesh_pt()->element_pt(yi*nx + xi))->beta_pt()), D3);
+			// }
 
 			assign_eqn_numbers();
 			linear_solver_pt()->disable_doc_time();
