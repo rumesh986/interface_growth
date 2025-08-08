@@ -23,7 +23,7 @@ class Run:
 		self._exes = {}
 
 		self.od = os.getcwd()
-		self.wd = f'{self.od}/test_runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+		self.wd = f'{self.od}/runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
 		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
 
 		os.mkdir(f'{self.wd}')
@@ -114,7 +114,7 @@ class Run:
 					tshift = (t+1) * max_dt
 					for nx in self.nxs:
 						for dt in self.dts:
-							tsteps = self.tsteps / dt
+							tsteps = self.tsteps / dt 
 							wf = max_dt / dt
 							futures.append(executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf))
 		print("Finished Running for all configs")
