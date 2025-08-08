@@ -21,7 +21,7 @@ static const double Ts = -1.0;
 static const double Tm = 0.0;
 static const double Tfr = 1.0;
 
-static const double alpha = 10.0;
+static const double alpha = 1.0;
 
 static const double x0 = -1.0;
 static const double x1 = 0.0;
@@ -139,9 +139,8 @@ class Erf2D6Problem : public Problem {
 			}
 
 			// take average of total flux across the y direction
-			// because 1D?
+			// to spread the flux across all the elements
 			double new_x1 = domain->get_interface() +  tot_flux/(alpha*Ny) * dt;
-			// inst_vel = tot_flux / alpha;
 
 			domain->set_interface(new_x1);
 			mesh_pt()->node_update();
@@ -190,18 +189,6 @@ class Erf2D6Problem : public Problem {
 					->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
 			}
 
-			// for (unsigned int t = 1; t <= time_stepper_pt()->nprev_values(); t++) {
-			// 	// get position of zeroth node in boundary 4 (interface)
-			// 	mesh_pt()->boundary_node_pt(4, 0)->position(x);
-				
-			// 	double cur_t = time_pt()->time(t);
-			// 	dhdt(cur_t, x, v);
-
-			// 	// set new position
-			// 	double new_x1 = domain->get_interface() +  v[0] * dt;
-			// 	domain->set_interface(new_x1);
-			// }
-
 			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
 				double cur_t = time_pt()->time((uint) t);
 				dhdt(cur_t, x, v);
@@ -209,8 +196,7 @@ class Erf2D6Problem : public Problem {
 				domain->set_interface(new_x1);
 				printf("Setting interface at t=%8.6f to %8.6f (v=%8.6f)\n", cur_t, new_x1, v[0]);
 			}
-
-
+			
 			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
 			// for (int t = 0; t < 1; t++) {
 				double cur_t = time_pt()->time((uint) t);
@@ -224,8 +210,6 @@ class Erf2D6Problem : public Problem {
 					mesh_pt()->node_pt(n)->set_value(t, 0, u[0]);
 				}
 			}
-
-			// mesh_pt()->assign_initial_values_impulsive();
 
 			time_pt()->time() = t_shift;
 		};
