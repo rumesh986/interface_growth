@@ -4,6 +4,7 @@
 **/*.o
 **/*.pyc
 **/*.Po
+**/*.Tpo
 
 analytic_tests/
 free_surface/
@@ -14,3 +15,4 @@ two_fluid/
 erf/erf[0-9]
 erf/runs/
 erf2d/erf2d[0-9]
+erf2d/erf2d3p[0-9]
