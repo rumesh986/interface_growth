@@ -31,7 +31,7 @@ static const double y_1 = 1.0;
 
 static const double vel = 1.0;
 
-TwoPhaseDomain *domain;
+ThreePhaseDomain *domain;
 
 const Vector<unsigned int> analytical_boundaries = {
 	1,

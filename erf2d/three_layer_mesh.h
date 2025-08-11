@@ -57,11 +57,113 @@ template<class EL> class ThreePhase2DMesh : public virtual RectangularQuadMesh<E
 		}
 };
 
+class ThreePhaseDomain : public Domain {
+	private:
+		const double x0;
+		const double x1;
+		double x2;
+		const double x3;
+
+		const unsigned int nx1;
+		const unsigned int nx2;
+		const unsigned int nx3;
+		const unsigned int nx;
+		const unsigned int ny;
+		const unsigned int nmacro;
+
+		Time *time_pt;
+	
+	public:
+		ThreePhaseDomain(
+			const double x0,
+			const double x1,
+			const double x2,
+			const double x3,
+			const unsigned int nx1,
+			const unsigned int nx2,
+			const unsigned int nx3,
+			const unsigned int ny,
+			Time *time_pt
+		) : x0(x0), x1(x1), x2(x2), x3(x3), nx1(nx1), nx2(nx2), nx3(nx3), nx(nx1+nx2+nx3), ny(ny), nmacro(nx*ny), time_pt(time_pt) {
+			Macro_element_pt.resize(nmacro);
+
+			for (unsigned int i = 0; i < nmacro; i++)
+				Macro_element_pt[i] = new QMacroElement<2>(this, i);
+		}
+
+		// zeta is a 1D vector with values between -1 and 1
+		void macro_element_boundary(const unsigned &t, const unsigned &macro_i, const unsigned &dir_i, const Vector<double> &zeta, Vector<double> &r) {
+			if (macro_i >= nmacro) {
+				printf("Invalid Macro index given in TwoPhaseDomain");
+				return;
+			}
+
+			using namespace QuadTreeNames;
+
+			const unsigned int yi = macro_i / nx;
+			const unsigned int xi = macro_i % nx;
+
+			const double dx1 = ((double)(x1 - x0)) / (double) nx1;
+			const double dx2 = ((double)(x2 - x1)) / (double) nx2;
+			const double dx3 = ((double)(x3 - x2)) / (double) nx3;
+			const double dy = 1.0 / (double) ny;
+
+			double start, end;
+
+			if (xi < nx1) {
+				// substrate phase
+				start = x0 + ((double) (xi)) * dx1;
+				end = x0 + ((double) (xi + 1)) * dx1;
+			} else if (xi < nx1+nx2) {
+				// growing solid phase
+				start = x1 + ((double) (xi - nx1)) * dx2;
+				end = x1 + ((double) (xi - nx1 + 1)) * dx2;
+			} else {
+				// shrinking liquid phase
+				start = x2 + ((double) (xi - nx1 - nx2)) * dx3;
+				end = x2 + ((double) (xi - nx1 - nx2 + 1)) * dx3;
+			}
+			
+			double trans_x = 0.5 * (zeta[0] + 1.0);
+			double x = trans_x  * (end - start) + start;
+
+			switch (dir_i) {
+				case N:	
+					r[0] = x;
+					r[1] = (((double) yi) + 1) * dy;
+					break;
+				case E:	
+					r[0] = end;
+					r[1] = (trans_x + ((double) yi)) * dy;
+					break;
+				case S:	
+					r[0] = x;
+					r[1] = ((double) yi) * dy;
+					break;
+				case W:	
+					r[0] = start;
+					r[1] = (trans_x + ((double) yi)) * dy;
+					break;
+				default: 
+					printf("Invalid direction given in ThreePhaseDomain");
+					return;
+			}
+		}
+
+		double get_interface() {
+			return x2;
+		}
+
+		void set_interface(double x) {
+			x2 = x;
+		} 
+};
+
 template<class EL> class RefineableThreePhase2DMesh 
 	: public virtual RefineableRectangularQuadMesh<EL>,
 	  public virtual ThreePhase2DMesh<EL> {
 		public:
-			TwoPhaseDomain *domain;
+			ThreePhaseDomain *domain;
 
 			RefineableThreePhase2DMesh(
 				const unsigned int &nx1,
@@ -83,7 +185,7 @@ template<class EL> class RefineableThreePhase2DMesh
 				ThreePhase2DMesh<EL>(nx1, nx2, nx3, ny, x0, x1, x2, x3, y0, y1, ts_pt) {
 
 					printf("In refineable mesh constructor\n");
-					domain = new TwoPhaseDomain(x0, x2, x3, vel, nx1+nx2, nx3, ny, time_pt);
+					domain = new ThreePhaseDomain(x0, x1, x2, x3, nx1, nx2, nx3, ny, time_pt);
 
 					// modified from two_layer_mesh.cc (refineabletwolayermesh)
 					Vector<double> s_fraction(2);
@@ -118,6 +220,5 @@ template<class EL> class RefineableThreePhase2DMesh
 					}
 				}
 };
-
 
 #endif
