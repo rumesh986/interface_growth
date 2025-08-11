@@ -269,7 +269,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::setup(argc, argv);
 
 	uint Nx = 0;
-	uint Ny = 3;
+	uint Ny = 10;
 	uint t_steps = 100;
 	double dt = 0.0;
 	double t_shift = 0.0;
@@ -277,7 +277,7 @@ int main(int argc, char **argv) {
 	uint write_freq = 1;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx);
-	CommandLineArgs::specify_command_line_flag("--ny", &Nx);
+	CommandLineArgs::specify_command_line_flag("--ny", &Ny);
 	CommandLineArgs::specify_command_line_flag("--tsteps", &t_steps);
 	CommandLineArgs::specify_command_line_flag("--dt", &dt);
 	CommandLineArgs::specify_command_line_flag("--tshift", &t_shift);
@@ -327,7 +327,7 @@ int main(int argc, char **argv) {
 		t_shift = (T_ORDER + 1) * dt;
 	}
 
-	Ny = Nx;
+	// Ny = Nx;
 
 	auto problem = Erf2D6Problem<RefineableQUnsteadyHeatElement<2,X_ORDER>>(Nx, Ny, t_steps, dt, t_shift, info);
 
