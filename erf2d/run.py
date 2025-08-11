@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import subprocess
 
 from datetime import datetime
@@ -28,7 +29,10 @@ class Run:
 		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
 
 		if self.debug:
+			print("Working in debug directory")
 			self.wd = f'{self.od}/runs/debug/'
+			shutil.rmtree(f'{self.wd}/RESLT/')
+			os.mkdir(f'{self.wd}/RESLT')
 		else:
 			self.wd = f'{self.od}/runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
 			os.mkdir(f'{self.wd}')
