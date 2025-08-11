@@ -23,6 +23,8 @@ class _Config:
 		self.t_steps = 0
 		self.write_freq = 1
 
+		self.fixed_pos = []
+
 		with open(file) as f:
 			while line := f.readline():
 				k, v = line.split('=')
@@ -35,6 +37,7 @@ class _Config:
 					case 't_order': self.t_order = int(v)
 					case 't_steps': self.t_steps = int(v)
 					case 'write_freq': self.write_freq = int(v)
+					case x if x.startswith('x'): self.fixed_pos.append(float(v))
 
 		self._title = f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
 
@@ -401,6 +404,9 @@ class Visualizer:
 
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		
+		for pos in run.config.fixed_pos:
+			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
 
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
 
