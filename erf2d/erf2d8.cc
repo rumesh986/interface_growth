@@ -194,6 +194,7 @@ class Erf2D6Problem : public Problem {
 				dhdt(cur_t, x, v);
 				double new_x1 = domain->get_interface() + v[0] * dt;
 				domain->set_interface(new_x1);
+				mesh_pt()->node_update();
 				printf("Setting interface at t=%8.6f to %8.6f (v=%8.6f)\n", cur_t, new_x1, v[0]);
 			}
 			

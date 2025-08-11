@@ -140,7 +140,7 @@ class TwoPhaseDomain : public Domain {
 
 		void doc_domain(DocInfo info, char *label) {
 			char filename[100];
-			ofstream outfile;
+			std::ofstream outfile;
 
 			sprintf(filename, "%s/domain-%s_%i.dat", info.directory().c_str(), label, info.number());
 			outfile.open(filename);
