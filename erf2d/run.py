@@ -24,12 +24,16 @@ class Run:
 		self._exes = {}
 
 		self.od = os.getcwd()
-		self.wd = f'{self.od}/runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+
 		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
 
-		os.mkdir(f'{self.wd}')
-		os.mkdir(f'{self.wd}/RESLT')
-		os.mkdir(f'{self.wd}/imgs')
+		if self.debug:
+			self.wd = f'{self.od}/runs/debug/'
+		else:
+			self.wd = f'{self.od}/runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
+			os.mkdir(f'{self.wd}')
+			os.mkdir(f'{self.wd}/RESLT')
+			os.mkdir(f'{self.wd}/imgs')
 
 		print(f'__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 		# print(f'Running in directorys: {self.wd}')
