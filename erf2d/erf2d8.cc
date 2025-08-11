@@ -36,8 +36,6 @@ static const double vel = 0.0;
 
 unsigned int num_y = 0;
 
-double inst_vel = 0.0;
-
 TwoPhaseDomain *domain;
 
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
@@ -248,7 +246,9 @@ class Erf2D6Problem : public Problem {
 			}
 			outfile.close();
 
-			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | vel = %8.6f\n", timestep, time_pt()->time(), error, domain->get_interface(), inst_vel);
+			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
+
+			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | gamma = %8.6f\n", timestep, time_pt()->time(), error, domain->get_interface(), gamma);
 
 			sprintf(filename, "%s/times.dat", info.directory().c_str());
 			outfile.open(filename, ios::app);
