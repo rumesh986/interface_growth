@@ -128,7 +128,8 @@ class Erf2D6Problem : public Problem {
 
 			uint nelems = mesh_pt()->nboundary_element(4);
 			for (uint e = 0; e < nelems; e++) {
-				if (mesh_pt()->face_index_at_boundary(4, e) < 0)
+				// only work with flux moving towards the right
+				if (mesh_pt()->face_index_at_boundary(4, e) != 1)
 					continue;
 
 				dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e))->get_flux(s, flux);
@@ -190,13 +191,15 @@ class Erf2D6Problem : public Problem {
 			printf("nprev_values = %u\n", time_stepper_pt()->nprev_values());
 			printf("t_shift=%8.6f\n\n", t_shift);
 
+			double prev_time = 0.0;
+
 			int step = 0;
 			for (int t = time_stepper_pt()->nprev_values()-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
 				
 				// update interface position
 				dhdt(time, x, v);
-				double new_h = domain->get_interface() + v[0] * dt;
+				double new_h = domain->get_interface() + v[0] * (time - prev_time);
 				domain->set_interface(new_h);
 				mesh_pt()->node_update();
 
@@ -210,7 +213,7 @@ class Erf2D6Problem : public Problem {
 				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f)\n", step, time, new_h, v[0]);
 				doc_solution(step, time);
 				step++;
-
+				prev_time = time;
 			}
 
 			time_pt()->time() = t_shift;
@@ -227,33 +230,19 @@ class Erf2D6Problem : public Problem {
 			char filename[100];
 			ofstream outfile;
 
-			// double time = time_pt()->time();// + problem.t_shift;
-
 			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			// for (uint e = 0; e < Nx*Ny; e++) {
-			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-			// 	el_pt->output(outfile, npts);
-			// }
 			mesh_pt()->output(outfile, npts);
 			outfile.close();
 
 			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			// for (uint e = 0; e < Nx*Ny; e++) {
-			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-			// 	el_pt->output_fct(outfile, npts, time, get_exact_u);
-			// }
 			mesh_pt()->output_fct(outfile, npts, time, get_exact_u);
 			outfile.close();
 
 			double error, norm;
 			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			// for (uint e = 0; e < Nx*Ny; e++) {
-			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-			// 	el_pt->compute_error(outfile, get_exact_u, time, error, norm);
-			// }
 			mesh_pt()->compute_error(outfile, get_exact_u, time, error, norm);
 			outfile.close();
 
@@ -335,7 +324,7 @@ int main(int argc, char **argv) {
 	cout << "Output directory: " << info.directory() << endl;
 
 	if (t_shift == 0.0) {
-		t_shift = (T_ORDER + 1) * dt;
+		t_shift = T_ORDER * dt;
 	}
 
 	// Ny = Nx;
