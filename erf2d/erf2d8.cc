@@ -231,27 +231,30 @@ class Erf2D6Problem : public Problem {
 
 			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (uint e = 0; e < Nx; e++) {
-				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-				el_pt->output(outfile, npts);
-			}
+			// for (uint e = 0; e < Nx*Ny; e++) {
+			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+			// 	el_pt->output(outfile, npts);
+			// }
+			mesh_pt()->output(outfile, npts);
 			outfile.close();
 
 			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (uint e = 0; e < Nx; e++) {
-				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-				el_pt->output_fct(outfile, npts, time, get_exact_u);
-			}
+			// for (uint e = 0; e < Nx*Ny; e++) {
+			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+			// 	el_pt->output_fct(outfile, npts, time, get_exact_u);
+			// }
+			mesh_pt()->output_fct(outfile, npts, time, get_exact_u);
 			outfile.close();
 
 			double error, norm;
 			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (uint e = 0; e < Nx; e++) {
-				EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-				el_pt->compute_error(outfile, get_exact_u, time, error, norm);
-			}
+			// for (uint e = 0; e < Nx*Ny; e++) {
+			// 	EL * el_pt = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+			// 	el_pt->compute_error(outfile, get_exact_u, time, error, norm);
+			// }
+			mesh_pt()->compute_error(outfile, get_exact_u, time, error, norm);
 			outfile.close();
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
