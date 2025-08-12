@@ -168,7 +168,7 @@ class Visualizer:
 		self.interactive = interactive
 
 		self.runs = []
-		self._markers = ['+', 'O', '.', '*', 'x', 'D', '^', 'v']
+		self._markers = ['+', 'o', '.', '*', 'x', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
 		plt.style.use('../../pltstyle.mplstyle')
@@ -244,6 +244,10 @@ class Visualizer:
 		max_ax.set_title(f'Magnitude of errors at x={pos}')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-errors.png')
+
+		if self.interactive:
+			plt.show()
+			
 		plt.close(fig)
 	
 	def plot_interface(self, run):
@@ -266,6 +270,11 @@ class Visualizer:
 		plt.title('Interface position with time')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
+
+		if self.interactive:
+			plt.show()
+		
+		plt.close()
 
 	def _reshape_2D_data(self, data, key):
 		xs = data['x'].unique()
