@@ -24,7 +24,7 @@ static const double Tfr = 1.0;
 static const double alpha = 1.0;
 
 static const double x0 = -1.0;
-static const double x1 = 0.0;
+static const double x1 = 0.0; // h0
 static const double x2 = 1.0;
 
 static const double y_0 = 0.0;
@@ -50,7 +50,6 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
 	double h = domain->get_interface();
 	v[0] = 2*(Tm-Ts)/(alpha * sqrt(Pi*D1*t) * (1 + erf(h/(2*sqrt(D1*t))))) * exp(-1 * h*h/(4*D1*t));
-	printf("t=%8.6f h=%8.6f v=%8.6f\n", t, h, v[0]);
 }
 
 template<class EL>
@@ -187,39 +186,48 @@ class Erf2D6Problem : public Problem {
 					->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
 			}
 
-			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
-				double cur_t = time_pt()->time((uint) t);
-				dhdt(cur_t, x, v);
-				double new_x1 = domain->get_interface() + v[0] * dt;
-				domain->set_interface(new_x1);
+			printf("Setting Initial conditions\n");
+			printf("nprev_values = %u\n", time_stepper_pt()->nprev_values());
+			printf("t_shift=%8.6f\n\n", t_shift);
+
+			int step = 0;
+			for (int t = time_stepper_pt()->nprev_values()-1; t >= 0; t--) {
+				double time = time_pt()->time((uint) t);
+				
+				// update interface position
+				dhdt(time, x, v);
+				double new_h = domain->get_interface() + v[0] * dt;
+				domain->set_interface(new_h);
 				mesh_pt()->node_update();
-				printf("Setting interface at t=%8.6f to %8.6f (v=%8.6f)\n", cur_t, new_x1, v[0]);
-			}
-			
-			for (int t = time_stepper_pt()->nprev_values(); t >= 0; t--) {
-			// for (int t = 0; t < 1; t++) {
-				double cur_t = time_pt()->time((uint) t);
-				printf("[% 2d] Setting initial condition at t = %10.8f\n", t, cur_t);
 
+				// set initial values
 				for (unsigned long int n = 0; n < nnode; n++) {
-					x[0] = mesh_pt()->node_pt(n)->x(t, 0);
-					x[1] = mesh_pt()->node_pt(n)->x(t, 1);
-
-					get_exact_u(cur_t, x, u);
+					mesh_pt()->node_pt(n)->position(x);
+					get_exact_u(time, x, u);
 					mesh_pt()->node_pt(n)->set_value(t, 0, u[0]);
 				}
+
+				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f)\n", step, time, new_h, v[0]);
+				doc_solution(step, time);
+				step++;
+
 			}
 
 			time_pt()->time() = t_shift;
 		};
 
 		void doc_solution(uint timestep) {
+			double time = time_pt()->time();
+			doc_solution(timestep, time);
+		}
+ 
+		void doc_solution(uint timestep, double time) {
 			cuint npts = 5;
 
 			char filename[100];
 			ofstream outfile;
 
-			double time = time_pt()->time();// + problem.t_shift;
+			// double time = time_pt()->time();// + problem.t_shift;
 
 			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
@@ -248,7 +256,7 @@ class Erf2D6Problem : public Problem {
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
 
-			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | gamma = %8.6f\n", timestep, time_pt()->time(), error, domain->get_interface(), gamma);
+			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | gamma = %8.6f\n", timestep, time, error, domain->get_interface(), gamma);
 
 			sprintf(filename, "%s/times.dat", info.directory().c_str());
 			outfile.open(filename, ios::app);
@@ -334,7 +342,7 @@ int main(int argc, char **argv) {
 	problem.initialise_dt(dt);
 	problem.set_initial_conditions();
 
-	problem.doc_solution(0);
+	// problem.doc_solution(0);
 
 	char config_fname[256];
 	sprintf(config_fname, "%s/config", dname);
@@ -351,11 +359,13 @@ int main(int argc, char **argv) {
 	fprintf(file, "write_freq=%u\n", write_freq);
 	fclose(file);
 
+	int prev_steps = problem.time_stepper_pt()->nprev_values();
+
 	for (uint t = 0; t < t_steps; t++) {
 		problem.unsteady_newton_solve(dt);
 
 		if (t % write_freq == 0)
-			problem.doc_solution(t);
+			problem.doc_solution(t + prev_steps);
 
 		double x_int = domain->get_interface();
 
