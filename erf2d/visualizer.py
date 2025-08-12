@@ -187,6 +187,7 @@ class Visualizer:
 				run.create_outdir()
 		
 		if not self.interactive:
+			self.prepare_pd()
 			for rtype in self.dxdt:
 				match rtype:
 					case 'a': self.standard()
@@ -547,4 +548,4 @@ if __name__ =='__main__':
 	assert sum(c1 == c2 for c1 in "abxt" for c2 in sys.argv[2]) > 0
 	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	vis = Visualizer('RESLT', 'imgs', sys.argv[1], sys.argv[2])
+	vis = Visualizer(sys.argv[1], sys.argv[2])

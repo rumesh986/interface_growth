@@ -67,9 +67,9 @@ class Run:
 		for x in self.xs:
 			for t in self.ts:
 				if self.debug:
-					flags = f'-Wall -O0 -g -DX_ORDER={x} -DT_ORDER={t}'
+					flags = f'-Wall -O0 -g -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 				else:
-					flags = f'{flags_base} -DX_ORDER={x} -DT_ORDER={t}'
+					flags = f'{flags_base} -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 
 				subprocess.run(["make", "mostlyclean-compile"])
 
