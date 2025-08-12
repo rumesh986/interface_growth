@@ -382,8 +382,14 @@ class Visualizer:
 			data = _extract_data(run.solns[n])
 			exact_data = _extract_data(run.exact_solns[n])
 
-			line_soln.set_data(data['x'], data['u'])
-			line_exact.set_data(exact_data['x'], exact_data['u'])
+			# account for repeated points 
+			# 	avoids a line crossing the plot unnecessarily
+			num_points = len(data['x'])
+			if len(data['x']) != len(data['x'].unique()):
+				num_points //= 2
+
+			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
+			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
 
 			if run.interface is not None:
 				line_interface.set_xdata(run.interface[n])
