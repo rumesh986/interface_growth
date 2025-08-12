@@ -73,13 +73,19 @@ class Run:
 
 				subprocess.run(["make", "mostlyclean-compile"])
 
-				with open(f"{self.wd}/build_{x}_{t}.stdout", "w") as f:
-					subprocess.run(
-						["make", self.prog, flags], 
-						check=True, 
-						stderr=subprocess.STDOUT,
-						stdout=f
-					)
+				try:
+					with open(f"{self.wd}/build_{x}_{t}.stdout", "w") as f:
+						subprocess.run(
+							["make", self.prog, flags], 
+							check=True, 
+							stderr=subprocess.STDOUT,
+							stdout=f
+						)
+				except subprocess.CalledProcessError as err:
+					print(f"Build failed with X={x} T={t}")
+					with open(f"{self.wd}/build_{x}_{t}.stdout", "r") as f:
+						print(f.read())
+					raise
 
 				prog_name = f'{self.prog}_{x}_{t}'
 				os.rename(self.prog, f'{self.wd}/{prog_name}')
