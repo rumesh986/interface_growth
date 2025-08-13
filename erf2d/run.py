@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import time
 import shutil
 import subprocess
 
@@ -26,8 +27,6 @@ class Run:
 
 		self.od = os.getcwd()
 
-		# self._wd = f'/home/u5665436/repo/oomph-lib/user_drivers/rumesh/erf/test_runs/25-06-2025_15:11:05'
-
 		if self.debug:
 			print("Working in debug directory")
 			self.wd = f'{self.od}/runs/debug/'
@@ -47,12 +46,10 @@ class Run:
 
 			os.chdir(self.wd)
 
-			if 't' in self.dxdt:
-				self.run_dt()
-			else:
-				self.run_all()
+			self.run()
 
 			print(self.dxdt)
+			
 			Visualizer(self.prog, self.dxdt)
 			os.chdir(self.od)
 
@@ -67,7 +64,7 @@ class Run:
 		for x in self.xs:
 			for t in self.ts:
 				if self.debug:
-					flags = f'-Wall -O0 -g -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
+					flags = f'CXXFLAGS=-Wall -O0 -g -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 				else:
 					flags = f'{flags_base} -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 
@@ -81,7 +78,7 @@ class Run:
 							stderr=subprocess.STDOUT,
 							stdout=f
 						)
-				except subprocess.CalledProcessError as err:
+				except subprocess.CalledProcessError:
 					print(f"Build failed with X={x} T={t}")
 					with open(f"{self.wd}/build_{x}_{t}.stdout", "r") as f:
 						print(f.read())
@@ -91,46 +88,73 @@ class Run:
 				os.rename(self.prog, f'{self.wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
-	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None):
+	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None, **kwargs):
 		nxargs = ('--nx', str(nx))
 		dtargs = ('--dt', str(dt)) if dt is not None else ('--vardt')
 		tstepsargs = ('--tsteps', str(tsteps))
 		tshiftargs = ('--tshift', str(tshift) if tshift is not None else "0.0")
 		write_freqargs = ('--write-freq', str(write_freq) if write_freq is not None else "1")
 		
-		print(f'running config ({x}, {t}) with {nx=} and {dt=}')
+		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
-		with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
-			subprocess.run(
-				[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
-				check=True,
-				stderr=subprocess.STDOUT,
-				stdout=f
-			)
+		try:
+			with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
+				subprocess.run(
+					[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
+					check=True,
+					stderr=subprocess.STDOUT,
+					stdout=f
+				)
+		except subprocess.CalledProcessError as e:
+			print(f"Run failed with {x=} {t=}")
+			with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'r') as f:
+				print(f.read())
+			raise
 	
-	def run_all(self):
-		futures = []
-		with ProcessPoolExecutor(max_workers=self.nthreads) as executor:
-			for x in self.xs:
-				for t in self.ts:
-					for nx in self.nxs:
-						for dt in self.dts:
-							futures.append(executor.submit(self._run_base, x, t, nx, dt, self.tsteps))
-		print("Finished Running for all configs")
-	
-	def run_dt(self):
-		max_dt = max(self.dts)
-		futures = []
-		with ProcessPoolExecutor(max_workers=self.nthreads) as executor:
-			for x in self.xs:
-				for t in self.ts:
-					tshift = (t+1) * max_dt
-					for nx in self.nxs:
-						for dt in self.dts:
-							tsteps = self.tsteps / dt
-							wf = max_dt / dt
-							futures.append(executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf))
-		print("Finished Running for all configs")
+	def run(self, **kwargs):
+		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
+		if (num_workers > self.nthreads):
+			num_workers = self.nthreads
+		
+		futures = {}
+		tshift = None
+		wf = None
+		with ProcessPoolExecutor(max_workers=num_workers) as executor:
+			if 't' in self.dxdt:
+				max_dt = max(self.dts)
+				tshift = (max(self.ts) + 1) * max_dt
+				for x in self.xs:
+					for t in self.ts:
+						for nx in self.nxs:
+							for dt in self.dts:
+								tsteps = self.tsteps / dt
+								wf = max_dt / dt
+								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf)
+			else:
+				for x in self.xs:
+					for t in self.ts:
+						for nx in self.nxs:
+							for dt in self.dts:
+								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf)
+			
+			while True:
+				if len(futures.items()) == 0:
+					break
+				
+				dellist = []
+				for key, future in futures.items():
+					x, t, nx, dt = key
+					if future.done():
+						print(f"Completed config {x=}, {t=}, {nx=} and {dt=}")
+						if future.exception() is None:
+							dellist.append(key)
+						else:
+							raise future.exception()
+
+				for key in dellist:
+					del futures[key]
+
+				time.sleep(1)
 
 def trial(xs, ts, **kwargs):
 	print('in trial')
