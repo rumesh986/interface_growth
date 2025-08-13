@@ -72,6 +72,8 @@ class Erf2D6Problem : public Problem {
 			mesh_pt() = new RefineableTwoLayer2DMesh<EL>(Nx1, Nx2, Ny, x0, x1, x2, y_0, y_1, domain, time_stepper_pt());
 			mesh_pt()->setup_boundary_element_info();
 
+			printf("nnode 1d: %u\n", dynamic_cast<EL *>(mesh_pt()->element_pt(0))->nnode_1d());
+
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = get_source;
 
@@ -181,11 +183,9 @@ class Erf2D6Problem : public Problem {
 			Vector<double> u(1);
 			Vector<double> v(1);
 
-			for (unsigned long int n = 0; n < nnode; n++) {
-				mesh_pt()->node_pt(n)
-					->position_time_stepper_pt()
-					->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
-			}
+			// set positions of nodes in past history values
+			for (unsigned long int n = 0; n < nnode; n++)
+				time_stepper_pt()->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
 
 			printf("Setting Initial conditions\n");
 			printf("nprev_values = %u\n", time_stepper_pt()->nprev_values());
