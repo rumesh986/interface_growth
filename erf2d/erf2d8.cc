@@ -38,6 +38,21 @@ unsigned int num_y = 0;
 
 TwoPhaseDomain *domain;
 
+Vector<unsigned int> analytical_boundaries = {
+	1, // right side
+	3, // left side
+	4  // interface
+};
+
+void no_flux_fct(const double &t, const Vector<double> &x, double &flux) {
+	flux = 0.0;
+}
+
+unordered_map<unsigned int, FluxFctPt> neumann_boundaries = {
+	{0, no_flux_fct},
+	{2, no_flux_fct}
+};
+
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	double h = domain->get_interface();
 	if (x[0] < h) {
@@ -77,19 +92,16 @@ class Erf2D6Problem : public Problem {
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = get_source;
 
-			// pin boundary 1 (right)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(1); n++) {
-				mesh_pt()->boundary_node_pt(1, n)->pin(0);
+			// pin analytical boundaries
+			for (unsigned int b : analytical_boundaries) {
+				unsigned long int nnode = mesh_pt()->nboundary_node(b);
+				for (unsigned int n = 0; n < nnode; n++)
+					mesh_pt()->boundary_node_pt(b, n)->pin_all();
 			}
 
-			// pin boundary 3 (left)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(3); n++) {
-				mesh_pt()->boundary_node_pt(3, n)->pin(0);
-			}
-
-			// pin boundary 4 (interface)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(4); n++) {
-				mesh_pt()->boundary_node_pt(4, n)->pin(0);
+			// set neumann boundaries
+			for (auto iter : neumann_boundaries) {
+				create_flux_elements(iter.first, iter.second);
 			}
 
 			for (uint yi = 0; yi < Ny; yi++) {
@@ -151,25 +163,13 @@ class Erf2D6Problem : public Problem {
 
 			double cur_t = time_pt()->time();
 
-			// set boundary 1 (right)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(1); n++) {
-				x[0] = mesh_pt()->boundary_node_pt(1, n)->x(0);
+			for (unsigned long int b : analytical_boundaries) {
+				unsigned long int nnode = mesh_pt()->nboundary_node(b);
+				for (unsigned int n = 0; n < nnode; n++) {
+					mesh_pt()->boundary_node_pt(b, n)->position(x);
 				get_exact_u(cur_t, x, u);
-				mesh_pt()->boundary_node_pt(1, n)->set_value(0, u[0]);
+					mesh_pt()->boundary_node_pt(b, n)->set_value(0, u[0]);
 			}
-
-			// set boundary 3 (left)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(3); n++) {
-				x[0] = mesh_pt()->boundary_node_pt(3, n)->x(0);
-				get_exact_u(cur_t, x, u);
-				mesh_pt()->boundary_node_pt(3, n)->set_value(0, u[0]);
-			}
-
-			// set boundary 4 (interface)
-			for (uint n = 0; n < mesh_pt()->nboundary_node(4); n++) {
-				x[0] = mesh_pt()->boundary_node_pt(4, n)->x(0);
-				get_exact_u(cur_t, x, u);
-				mesh_pt()->boundary_node_pt(4, n)->set_value(0, u[0]);
 			}
 		}
 
@@ -219,6 +219,17 @@ class Erf2D6Problem : public Problem {
 			time_pt()->time() = t_shift;
 		};
 
+		void create_flux_elements(unsigned int b, FluxFctPt &flux_pt) {
+			unsigned int nelems = mesh_pt()->nboundary_element(b);
+			for (unsigned int e = 0; e < nelems; e++) {
+				EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(b, e));
+				int face_i = mesh_pt()->face_index_at_boundary(b, e);
+				UnsteadyHeatFluxElement<EL> *flux_elem = new UnsteadyHeatFluxElement<EL>(elem, face_i);
+				flux_elem->flux_fct_pt() = flux_pt;
+				mesh_pt()->add_element_pt(flux_elem);
+			}
+		}
+
 		void doc_solution(uint timestep) {
 			double time = time_pt()->time();
 			doc_solution(timestep, time);
@@ -237,13 +248,15 @@ class Erf2D6Problem : public Problem {
 
 			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			mesh_pt()->output_fct(outfile, npts, time, get_exact_u);
+			for (unsigned int e = 0; e < Nx*Ny; e++)
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->output_fct(outfile, npts, time, get_exact_u);
 			outfile.close();
 
 			double error, norm;
 			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			mesh_pt()->compute_error(outfile, get_exact_u, time, error, norm);
+			for (unsigned int e = 0; e < Nx*Ny; e++)
+				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->compute_error(outfile, get_exact_u, time, error, norm);
 			outfile.close();
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
