@@ -153,7 +153,14 @@ class Erf2D6Problem : public Problem {
 
 			// take average of total flux across the y direction
 			// to spread the flux across all the elements
-			double new_x1 = domain->get_interface() +  tot_flux/(alpha*Ny) * dt;
+			double v = tot_flux / (alpha*Ny*Nx);
+			double new_x1 = domain->get_interface() + v * dt;
+
+			char filename[512];
+			sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
+			FILE *file = fopen(filename, "a");
+			fprintf(file, "%8.6f %8.6f %8.6f\n", time_pt()->time(), new_x1, v);
+			fclose(file);
 
 			domain->set_interface(new_x1);
 			mesh_pt()->node_update();
@@ -203,7 +210,7 @@ class Erf2D6Problem : public Problem {
 			}
 
 			// use arbitrarily small starting point?
-			double prev_time = dt;
+			// double prev_time = dt;
 
 			int step = 0;
 			doc_solution(step, time_pt()->time(tsteps), tsteps);
@@ -229,7 +236,7 @@ class Erf2D6Problem : public Problem {
 
 				// take average of total flux across the y direction
 				// to spread the flux across all the elements
-				v[0] = tot_flux / (alpha*Ny);
+				v[0] = tot_flux / (alpha*Ny*Nx1);
 				double new_h = domain->get_interface() + v[0] * dt;
 				
 				domain->set_interface(new_h);
@@ -249,10 +256,10 @@ class Erf2D6Problem : public Problem {
 					// printf("[%6.4f] x=% 6.4f u=% 6.4f actual=%6.4f\n", time, x[0], u[0], mesh_pt()->node_pt(n)->value(t, 0));
 				}
 
-				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f)\n", step, time, new_h, v[0]);
+				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f, flux=%8.6f)\n", step, time, new_h, v[0], tot_flux);
 				doc_solution(step, time, t);
 				step++;
-				prev_time = time;
+				// prev_time = time;
 			}
 
 			time_pt()->time() = t_shift;
