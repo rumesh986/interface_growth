@@ -30,8 +30,6 @@ static const double x2 = 1.0;
 static const double y_0 = 0.0;
 static const double y_1 = 1.0;
 
-// static const double Lx = 1.0;
-// static const double Ly = 1.0;
 static const double vel = 0.0;
 
 unsigned int num_y = 0;
@@ -60,6 +58,10 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	} else {
 		u[0] = Tfr - (Tfr-Tm)/(1-erf(h/(2*sqrt(D2*t)))) * (1 - erf(x[0]/(2*sqrt(D2*t))));
 	}
+}
+
+void get_initial_u(const Vector<double> &x, Vector<double> &u) {
+	u[0] = (x[0] < x1) ? Ts : Tfr;
 }
 
 void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
@@ -143,11 +145,10 @@ class Erf2D6Problem : public Problem {
 			uint nelems = mesh_pt()->nboundary_element(4);
 			for (uint e = 0; e < nelems; e++) {
 				// only work with flux moving towards the right
-				if (mesh_pt()->face_index_at_boundary(4, e) != 1)
-					continue;
-
+				if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
 				dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e))->get_flux(s, flux);
 				tot_flux += flux[0];
+			}
 			}
 
 			// take average of total flux across the y direction
@@ -183,35 +184,73 @@ class Erf2D6Problem : public Problem {
 			Vector<double> u(1);
 			Vector<double> v(1);
 
+			Vector<double> s(2);
+			Vector<double> flux(2);
+
 			// set positions of nodes in past history values
 			for (unsigned long int n = 0; n < nnode; n++)
 				time_stepper_pt()->assign_initial_positions_impulsive(mesh_pt()->node_pt(n));
 
 			printf("Setting Initial conditions\n");
-			printf("nprev_values = %u\n", time_stepper_pt()->nprev_values());
-			printf("t_shift=%8.6f\n\n", t_shift);
 
-			double prev_time = 0.0;
+			unsigned int tsteps = time_stepper_pt()->nprev_values();
+
+			// set initial values
+			for (unsigned long int n = 0; n < nnode; n++) {
+				mesh_pt()->node_pt(n)->position(tsteps, x);
+				get_initial_u(x, u);
+				mesh_pt()->node_pt(n)->set_value(tsteps, 0, u[0]);
+			}
+
+			// use arbitrarily small starting point?
+			double prev_time = dt;
 
 			int step = 0;
-			for (int t = time_stepper_pt()->nprev_values()-1; t >= 0; t--) {
+			doc_solution(step, time_pt()->time(tsteps), tsteps);
+			step++;
+
+			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
 				
-				// update interface position
-				dhdt(time, x, v);
-				double new_h = domain->get_interface() + v[0] * (time - prev_time);
+				// calculate flux from position in previous timestep
+				s[0] = 1.0;
+				s[1] = 0.0;
+
+				double tot_flux = 0.0;
+				uint nelems = mesh_pt()->nboundary_element(4);
+				for (uint e = 0; e < nelems; e++) {
+					// only work with flux moving towards the right
+					if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
+						EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+						get_flux_ic(t+1, elem, s, flux);
+						tot_flux += flux[0];
+					}
+				}
+
+				// take average of total flux across the y direction
+				// to spread the flux across all the elements
+				v[0] = tot_flux / (alpha*Ny);
+				double new_h = domain->get_interface() + v[0] * dt;
+				
 				domain->set_interface(new_h);
 				mesh_pt()->node_update();
 
+				char filename[512];
+				sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
+				FILE *file = fopen(filename, "a");
+				fprintf(file, "%8.6f %8.6f %8.6f\n", time, new_h, v[0]);
+				fclose(file);
+
 				// set initial values
 				for (unsigned long int n = 0; n < nnode; n++) {
-					mesh_pt()->node_pt(n)->position(x);
+					mesh_pt()->node_pt(n)->position(t, x);
 					get_exact_u(time, x, u);
 					mesh_pt()->node_pt(n)->set_value(t, 0, u[0]);
+					// printf("[%6.4f] x=% 6.4f u=% 6.4f actual=%6.4f\n", time, x[0], u[0], mesh_pt()->node_pt(n)->value(t, 0));
 				}
 
 				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f)\n", step, time, new_h, v[0]);
-				doc_solution(step, time);
+				doc_solution(step, time, t);
 				step++;
 				prev_time = time;
 			}
@@ -232,10 +271,10 @@ class Erf2D6Problem : public Problem {
 
 		void doc_solution(uint timestep) {
 			double time = time_pt()->time();
-			doc_solution(timestep, time);
+			doc_solution(timestep, time, 0);
 		}
  
-		void doc_solution(uint timestep, double time) {
+		void doc_solution(uint timestep, double time, const unsigned int &history_t) {
 			cuint npts = 5;
 
 			char filename[100];
@@ -243,7 +282,12 @@ class Erf2D6Problem : public Problem {
 
 			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			mesh_pt()->output(outfile, npts);
+			if (history_t == 0) {
+				for (unsigned int e = 0; e < Nx*Ny; e++)
+					dynamic_cast<EL *>(mesh_pt()->element_pt(e))->output(outfile, npts);
+			} else {
+				doc_primary(history_t, outfile, npts);
+			}
 			outfile.close();
 
 			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
@@ -276,6 +320,68 @@ class Erf2D6Problem : public Problem {
 			info.number()++;
 		}
 
+	// modified from UnsteadyHeatEquations::output in unsteady_heat_elements.cc
+	void doc_primary(const unsigned int &t, std::ostream& outfile, const unsigned int &nplot)
+	{
+		// Vector of local coordinates
+		Vector<double> s(2);
+
+		for (unsigned long int e = 0; e < Nx*Ny; e++) {
+			// printf("Writing elem %lu\n", e);
+			EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+			// Tecplot header info
+			outfile << elem->tecplot_zone_string(nplot);
+	
+			// Loop over plot points
+			unsigned num_plot_points = elem->nplot_points(nplot);
+			for (unsigned iplot = 0; iplot < num_plot_points; iplot++)
+			{
+				// Get local coordinates of plot point
+				elem->get_s_plot(iplot, nplot, s);
+	
+				for (unsigned i = 0; i < 2; i++)
+				{
+				outfile << elem->interpolated_x(t, s, i) << " ";
+				}
+				outfile << elem->interpolated_u_ust_heat(t, s) << std::endl;
+			}
+	
+			// Write tecplot footer (e.g. FE connectivity lists)
+			elem->write_tecplot_zone_footer(outfile, nplot);
+		}
+	}
+
+	// modified from UnsteadyHeatEquations::get_flux from unsteady_heat_elements.h
+	void get_flux_ic(const unsigned int &t, EL * elem, const Vector<double>& s, Vector<double>& flux) const {
+      // Find out how many nodes there are in the element
+      unsigned n_node = elem->nnode();
+
+      // Find the index at which the variable is stored
+      unsigned u_nodal_index = elem->u_index_ust_heat();
+
+      // Set up memory for the shape and test functions
+      Shape psi(n_node);
+      DShape dpsidx(n_node, 2);
+
+      // Call the derivatives of the shape and test functions
+      elem->dshape_eulerian(s, psi, dpsidx);
+
+      // Initialise to zero
+      for (unsigned j = 0; j < 2; j++)
+      {
+        flux[j] = 0.0;
+      }
+
+      // Loop over nodes
+      for (unsigned l = 0; l < n_node; l++)
+      {
+        // Loop over derivative directions
+        for (unsigned j = 0; j < 2; j++)
+        {
+          flux[j] += elem->nodal_value(t, l, u_nodal_index) * dpsidx(l, j);
+        }
+      }
+    }
 };
 
 int main(int argc, char **argv) {
@@ -364,7 +470,7 @@ int main(int argc, char **argv) {
 	fprintf(file, "write_freq=%u\n", write_freq);
 	fclose(file);
 
-	int prev_steps = problem.time_stepper_pt()->nprev_values();
+	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;
 
 	for (uint t = 0; t < t_steps; t++) {
 		problem.unsteady_newton_solve(dt);
