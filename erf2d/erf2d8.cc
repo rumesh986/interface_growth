@@ -61,7 +61,10 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 }
 
 void get_initial_u(const Vector<double> &x, Vector<double> &u) {
-	u[0] = (x[0] < x1) ? Ts : Tfr;
+	// u[0] = (x[0] < x1) ? Ts : Tfr;
+	if (x[0] < x1) u[0] = Ts;
+	else if (x[0] == x1) u[0] = Tm;
+	else u[0] = Tfr;
 }
 
 void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
@@ -153,7 +156,7 @@ class Erf2D6Problem : public Problem {
 
 			// take average of total flux across the y direction
 			// to spread the flux across all the elements
-			double v = tot_flux / (alpha*Ny*Nx);
+			double v = tot_flux / (alpha*Ny);
 			double new_x1 = domain->get_interface() + v * dt;
 
 			char filename[512];
@@ -236,7 +239,7 @@ class Erf2D6Problem : public Problem {
 
 				// take average of total flux across the y direction
 				// to spread the flux across all the elements
-				v[0] = tot_flux / (alpha*Ny*Nx1);
+				v[0] = tot_flux / (alpha*Ny);
 				double new_h = domain->get_interface() + v[0] * dt;
 				
 				domain->set_interface(new_h);
