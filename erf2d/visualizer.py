@@ -89,7 +89,7 @@ class _RunData:
 	@property
 	def errors(self):
 		if not self._errors:
-			self._errors = self._read_series(self.errorf)
+			self._errors = self._read_series(self.errorf, ignore_history=True)
 		return self._errors
 	
 	@property
@@ -145,9 +145,12 @@ class _RunData:
 
 		return pd.DataFrame(data, columns=cols)
 
-	def _read_series(self, ftype):
+	def _read_series(self, ftype, ignore_history=False):
 		data = []
 		for i, t in enumerate(self.times):
+			# ignore data set in initial condition (including history values)
+			if ignore_history and t <= self.config.t_shift:
+				continue
 			_data = self._read_file(ftype, i)
 			_data['time'] = t
 
@@ -515,7 +518,7 @@ class Visualizer:
 			case _:
 				raise Exception("Unknown analysis type provided")
 
-		xs = np.logspace(-1, -5)
+		xs = np.logspace(-1, -4)
 		x_orders = self._pd['x_order'].unique()
 		x_orders.sort()
 
