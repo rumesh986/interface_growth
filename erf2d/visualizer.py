@@ -256,13 +256,17 @@ class Visualizer:
 
 		plt.cla()
 
-		optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
-
-		x_ref = np.linspace(run.times[0], run.times[-1])
-		y_ref = f(x_ref, optimal[0], optimal[1])
-
 		plt.plot(run.times, run.interface, label='Interface position')
-		plt.plot(x_ref, y_ref, ls='--', label=f'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+
+		try:
+			optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
+			x_ref = np.linspace(run.times[0], run.times[-1])
+			y_ref = f(x_ref, optimal[0], optimal[1])
+
+			plt.plot(x_ref, y_ref, ls='--', label=f'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+		except:
+			print("Failed to fit h-curve")
+
 
 		plt.legend()
 		plt.xlabel('time')
