@@ -32,8 +32,6 @@ static const double y_1 = 1.0;
 
 static const double vel = 0.0;
 
-unsigned int num_y = 0;
-
 TwoPhaseDomain *domain;
 
 Vector<unsigned int> analytical_boundaries = {
@@ -86,9 +84,7 @@ class Erf2D6Problem : public Problem {
 		: Nx1(nx), Nx2(nx), Nx(nx+nx), Ny(ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
-			num_y = ny;
 			domain = new TwoPhaseDomain(x0, x1, x2, vel, Nx1, Nx2, Ny, time_pt());
-
 			mesh_pt() = new RefineableTwoLayer2DMesh<EL>(Nx1, Nx2, Ny, x0, x1, x2, y_0, y_1, domain, time_stepper_pt());
 			mesh_pt()->setup_boundary_element_info();
 
@@ -135,38 +131,7 @@ class Erf2D6Problem : public Problem {
 		void actions_after_newton_solve() {};
 
 		void actions_before_implicit_timestep() {
-			Vector<double> flux(2);
-			Vector<double> s(2);
-
-			// local coordinates in element
-			// set to middle of right hand side
-			s[0] = 1.0;
-			s[1] = 0.0;
-
-			double tot_flux = 0.0;
-
-			uint nelems = mesh_pt()->nboundary_element(4);
-			for (uint e = 0; e < nelems; e++) {
-				// only work with flux moving towards the right
-				if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
-				dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e))->get_flux(s, flux);
-				tot_flux += flux[0];
-			}
-			}
-
-			// take average of total flux across the y direction
-			// to spread the flux across all the elements
-			double v = tot_flux / (alpha*Ny);
-			double new_x1 = domain->get_interface() + v * dt;
-
-			char filename[512];
-			sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
-			FILE *file = fopen(filename, "a");
-			fprintf(file, "%8.6f %8.6f %8.6f\n", time_pt()->time(), new_x1, v);
-			fclose(file);
-
-			domain->set_interface(new_x1);
-			mesh_pt()->node_update();
+			update_interface();
 
 			// reset analytical boundaries
 			Vector<double> x(2);
@@ -212,9 +177,6 @@ class Erf2D6Problem : public Problem {
 				mesh_pt()->node_pt(n)->set_value(tsteps, 0, u[0]);
 			}
 
-			// use arbitrarily small starting point?
-			// double prev_time = dt;
-
 			int step = 0;
 			doc_solution(step, time_pt()->time(tsteps), tsteps);
 			step++;
@@ -222,34 +184,7 @@ class Erf2D6Problem : public Problem {
 			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
 				
-				// calculate flux from position in previous timestep
-				s[0] = 1.0;
-				s[1] = 0.0;
-
-				double tot_flux = 0.0;
-				uint nelems = mesh_pt()->nboundary_element(4);
-				for (uint e = 0; e < nelems; e++) {
-					// only work with flux moving towards the right
-					if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
-						EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-						get_flux_ic(t+1, elem, s, flux);
-						tot_flux += flux[0];
-					}
-				}
-
-				// take average of total flux across the y direction
-				// to spread the flux across all the elements
-				v[0] = tot_flux / (alpha*Ny);
-				double new_h = domain->get_interface() + v[0] * dt;
-				
-				domain->set_interface(new_h);
-				mesh_pt()->node_update();
-
-				char filename[512];
-				sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
-				FILE *file = fopen(filename, "a");
-				fprintf(file, "%8.6f %8.6f %8.6f\n", time, new_h, v[0]);
-				fclose(file);
+				update_interface(t);
 
 				// set initial values
 				for (unsigned long int n = 0; n < nnode; n++) {
@@ -259,14 +194,48 @@ class Erf2D6Problem : public Problem {
 					// printf("[%6.4f] x=% 6.4f u=% 6.4f actual=%6.4f\n", time, x[0], u[0], mesh_pt()->node_pt(n)->value(t, 0));
 				}
 
-				printf("[% 4d] Setting initial condition at t=%8.6f, moved interface to x=%8.6f (v=%8.6f, flux=%8.6f)\n", step, time, new_h, v[0], tot_flux);
+				printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
 				doc_solution(step, time, t);
 				step++;
-				// prev_time = time;
 			}
 
 			time_pt()->time() = t_shift;
-		};
+		}
+
+		void update_interface(const unsigned int &t = 0) {
+			Vector<double> s(2);
+			Vector<double> flux(2);
+
+			s[0] = 1.0;
+			s[1] = 0.0;
+
+			double tot_flux = 0.0;
+
+			unsigned long int nelems = mesh_pt()->nboundary_element(4);
+			for (unsigned long int e = 0; e < nelems; e++) {
+				if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+					if (t == 0) elem->get_flux(s, flux);
+					else 		get_flux_ic(t+1, elem, s, flux);
+
+					tot_flux += flux[0];
+				}
+			}
+
+			double v = tot_flux / (alpha * Ny);
+			double new_h = domain->get_interface() + v * dt;
+
+			domain->set_interface(new_h);
+			mesh_pt()->node_update();
+
+			char filename[512];
+			sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
+			FILE *file = fopen(filename, "a");
+			fprintf(file, "%8.6f %8.6f %8.6f\n", time_pt()->time(t), new_h, v);
+			fclose(file);
+
+			printf("moved interface to x=%8.6f (v=%8.6f, flux=%8.6f)\n", new_h, v, tot_flux);
+		}
 
 		void create_flux_elements(unsigned int b, FluxFctPt &flux_pt) {
 			unsigned int nelems = mesh_pt()->nboundary_element(b);
