@@ -275,12 +275,26 @@ class Erf2D6Problem : public Problem {
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->output_fct(outfile, npts, time, get_exact_u);
 			outfile.close();
 
-			double error, norm;
+			double norm = 0.0;
+			double error = 0.0;
+			double err_tmp = 0.0;
 			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
-			for (unsigned int e = 0; e < Nx*Ny; e++)
-				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->compute_error(outfile, get_exact_u, time, error, norm);
+			if (history_t == 0) {
+				for (unsigned int e = 0; e < Nx*Ny; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+					elem->compute_error(outfile, get_exact_u, time, err_tmp, norm);
+					error += err_tmp * err_tmp;
+				}
+			} else {
+				for (unsigned int e = 0; e < Nx*Ny; e++) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+					compute_error_ic(history_t, elem, outfile, get_exact_u, time, err_tmp, norm);
+					error += err_tmp * err_tmp;
+				}
+			}
 			outfile.close();
+			error = sqrt(error);
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
 
@@ -359,6 +373,81 @@ class Erf2D6Problem : public Problem {
         {
           flux[j] += elem->nodal_value(t, l, u_nodal_index) * dpsidx(l, j);
         }
+      }
+    }
+
+	// modified from UnsteadyHeatEquations<2>::compute_error from unsteady_heat_elements.cc
+	void compute_error_ic(
+		const unsigned int &t,
+		EL *elem,
+		std::ostream& outfile,
+		FiniteElement::UnsteadyExactSolutionFctPt exact_soln_pt,
+		const double& time,
+		double& error,
+		double& norm) 
+	{
+		// Initialise
+		error = 0.0;
+		norm = 0.0;
+		unsigned int DIM = 2;
+
+		// Vector of local coordinates
+		Vector<double> s(DIM);
+
+		// Vector for coordintes
+		Vector<double> x(DIM);
+
+		// Find out how many nodes there are in the element
+		unsigned n_node = elem->nnode();
+
+		Shape psi(n_node);
+
+		// Set the value of n_intpt
+		unsigned n_intpt = elem->integral_pt()->nweight();
+
+		// Tecplot
+		outfile << "ZONE" << std::endl;
+
+		// Exact solution Vector (here a scalar)
+		Vector<double> exact_soln(1);
+
+		// Loop over the integration points
+		for (unsigned ipt = 0; ipt < n_intpt; ipt++)
+		{
+			// Assign values of s
+			for (unsigned i = 0; i < DIM; i++)
+			{
+				s[i] = elem->integral_pt()->knot(ipt, i);
+			}
+
+			// Get the integral weight
+			double w = elem->integral_pt()->weight(ipt);
+
+			// Get jacobian of mapping
+			double J = elem->J_eulerian(s);
+
+			// Premultiply the weights and the Jacobian
+			double W = w * J;
+
+			// Get x position as Vector
+			elem->interpolated_x(s, x);
+
+			// Get FE function value
+			double u_fe = elem->interpolated_u_ust_heat(t, s);
+
+			// Get exact solution at this point
+			(*exact_soln_pt)(time, x, exact_soln);
+
+			// Output x,y,...,error
+			for (unsigned i = 0; i < DIM; i++)
+			{
+				outfile << x[i] << " ";
+			}
+			outfile << exact_soln[0] << " " << exact_soln[0] - u_fe << std::endl;
+
+			// Add to error and norm
+			norm += exact_soln[0] * exact_soln[0] * W;
+			error += (exact_soln[0] - u_fe) * (exact_soln[0] - u_fe) * W;
       }
     }
 };
