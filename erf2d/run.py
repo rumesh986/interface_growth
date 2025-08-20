@@ -116,6 +116,14 @@ class Run:
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
 		
+		with open('config', 'w') as f:
+			f.write(f'xs: {self.xs}\n')
+			f.write(f'ts: {self.ts}\n')
+			f.write(f'nxs: {self.nxs}\n')
+			f.write(f'dts: {self.dts}\n')
+			f.write(f'tsteps: {self.tsteps}\n')
+			f.write(f'dxdt: {self.dxdt}\n')
+
 		futures = {}
 		tshift = None
 		wf = None

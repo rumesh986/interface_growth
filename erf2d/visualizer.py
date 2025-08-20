@@ -89,7 +89,7 @@ class _RunData:
 	@property
 	def errors(self):
 		if not self._errors:
-			self._errors = self._read_series(self.errorf)
+			self._errors = self._read_series(self.errorf, ignore_history=True)
 		return self._errors
 	
 	@property
@@ -117,9 +117,10 @@ class _RunData:
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact_vals != 0.0
+		skip_steps = int(self.config.t_shift / self.config.dt)+1
 
 		abs_errors = np.fabs(errors)
-		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
+		rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
 
 		return abs_errors, rel_errors, self.errors[0]['x'][node]
 	
@@ -145,9 +146,12 @@ class _RunData:
 
 		return pd.DataFrame(data, columns=cols)
 
-	def _read_series(self, ftype):
+	def _read_series(self, ftype, ignore_history=False):
 		data = []
 		for i, t in enumerate(self.times):
+			# ignore data set in initial condition (including history values)
+			if ignore_history and t <= self.config.t_shift:
+				continue
 			_data = self._read_file(ftype, i)
 			_data['time'] = t
 
@@ -439,7 +443,6 @@ class Visualizer:
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
 		plt.close(fig)
 
-
 	def make_anims(self, run):
 		def _update(n):
 			time_text.set_text(f't={run.times[n]}')
@@ -519,7 +522,7 @@ class Visualizer:
 			case _:
 				raise Exception("Unknown analysis type provided")
 
-		xs = np.logspace(-1, -5)
+		xs = np.logspace(-1, -4)
 		x_orders = self._pd['x_order'].unique()
 		x_orders.sort()
 
