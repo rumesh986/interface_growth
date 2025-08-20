@@ -117,9 +117,10 @@ class _RunData:
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact_vals != 0.0
+		skip_steps = int(self.config.t_shift / self.config.dt)+1
 
 		abs_errors = np.fabs(errors)
-		rel_errors = abs_errors[mask] / np.fabs(exact_vals)[mask]
+		rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
 
 		return abs_errors, rel_errors, self.errors[0]['x'][node]
 	
@@ -437,7 +438,6 @@ class Visualizer:
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
 		plt.close(fig)
-
 
 	def make_anims(self, run):
 		def _update(n):
