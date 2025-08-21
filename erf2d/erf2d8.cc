@@ -60,9 +60,24 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 
 void get_initial_u(const Vector<double> &x, Vector<double> &u) {
 	// u[0] = (x[0] < x1) ? Ts : Tfr;
-	if (x[0] < x1) u[0] = Ts;
-	else if (x[0] == x1) u[0] = Tm;
-	else u[0] = Tfr;
+	// if (x[0] < x1) u[0] = Ts;
+	// else if (x[0] == x1) u[0] = Tm;
+	// else u[0] = Tfr;
+	
+	const unsigned int nx_base = 10;
+	double dx = (x1 - x0) / nx_base;
+
+	int xi = x[0] / dx;
+	// printf("x0 =% 8.6f xi =%3d\n", x[0], xi);
+	if (xi < 0) {
+		u[0] = Ts;
+	} else if (xi == 0) {
+		u[0] = x[0] * (Tfr - Ts)/(2*dx);
+	} else {
+		u[0] = Tfr;
+	}
+
+
 }
 
 void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
@@ -143,9 +158,9 @@ class Erf2D6Problem : public Problem {
 				unsigned long int nnode = mesh_pt()->nboundary_node(b);
 				for (unsigned int n = 0; n < nnode; n++) {
 					mesh_pt()->boundary_node_pt(b, n)->position(x);
-				get_exact_u(cur_t, x, u);
+					get_exact_u(cur_t, x, u);
 					mesh_pt()->boundary_node_pt(b, n)->set_value(0, u[0]);
-			}
+				}
 			}
 		}
 
@@ -173,7 +188,8 @@ class Erf2D6Problem : public Problem {
 			// set initial values
 			for (unsigned long int n = 0; n < nnode; n++) {
 				mesh_pt()->node_pt(n)->position(tsteps, x);
-				get_initial_u(x, u);
+				// get_initial_u(x, u);
+				get_exact_u(time_pt()->time(tsteps), x, u);
 				mesh_pt()->node_pt(n)->set_value(tsteps, 0, u[0]);
 			}
 
@@ -183,7 +199,7 @@ class Erf2D6Problem : public Problem {
 
 			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
-				
+
 				update_interface(t, true);
 
 				// set initial values
@@ -454,8 +470,8 @@ class Erf2D6Problem : public Problem {
 			// Add to error and norm
 			norm += exact_soln[0] * exact_soln[0] * W;
 			error += (exact_soln[0] - u_fe) * (exact_soln[0] - u_fe) * W;
-      }
-    }
+		}
+	}
 };
 
 int main(int argc, char **argv) {
