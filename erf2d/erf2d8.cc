@@ -24,7 +24,7 @@ static const double Tfr = 1.0;
 static const double alpha = 1.0;
 
 static const double x0 = -1.0;
-static const double x1 = 0.0; // h0
+static const double x1 = 0.025; // h0
 static const double x2 = 1.0;
 
 static const double y_0 = 0.0;
@@ -297,8 +297,9 @@ class Erf2D6Problem : public Problem {
 			error = sqrt(error);
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
+			double D_eff = 4 * gamma * gamma * D1;
 
-			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | gamma = %8.6f\n", timestep, time, error, domain->get_interface(), gamma);
+			printf("[%4u] time = %10.8f | error = %e | interface = %8.6f | gamma = %8.6f | D_eff = %8.6f\n", timestep, time, error, domain->get_interface(), gamma, D_eff);
 
 			sprintf(filename, "%s/times.dat", info.directory().c_str());
 			outfile.open(filename, ios::app);
@@ -308,6 +309,11 @@ class Erf2D6Problem : public Problem {
 			sprintf(filename, "%s/interface.dat", info.directory().c_str());
 			outfile.open(filename, ios::app);
 			outfile << domain->get_interface() << endl;
+			outfile.close();
+
+			sprintf(filename, "%s/gamma.dat", info.directory().c_str());
+			outfile.open(filename, ios::app);
+			outfile << gamma << endl;
 			outfile.close();
 
 			info.number()++;
