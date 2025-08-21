@@ -184,7 +184,7 @@ class Erf2D6Problem : public Problem {
 			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
 				
-				update_interface(t);
+				update_interface(t, true);
 
 				// set initial values
 				for (unsigned long int n = 0; n < nnode; n++) {
@@ -202,7 +202,7 @@ class Erf2D6Problem : public Problem {
 			time_pt()->time() = t_shift;
 		}
 
-		void update_interface(const unsigned int &t = 0) {
+		void update_interface(const unsigned int &t = 0, bool ic = false) {
 			Vector<double> s(2);
 			Vector<double> flux(2);
 
@@ -215,8 +215,8 @@ class Erf2D6Problem : public Problem {
 			for (unsigned long int e = 0; e < nelems; e++) {
 				if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-					if (t == 0) elem->get_flux(s, flux);
-					else 		get_flux_ic(t+1, elem, s, flux);
+					if (ic) get_flux_ic(t+1, elem, s, flux);
+					else 	elem->get_flux(s, flux);
 
 					tot_flux += flux[0];
 				}
