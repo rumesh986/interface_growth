@@ -117,7 +117,8 @@ class _RunData:
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact_vals != 0.0
-		skip_steps = int(self.config.t_shift / self.config.dt)+1
+		# skip_steps = int(self.config.t_shift / self.config.dt)+1
+		skip_steps = self.config.t_order + 1
 
 		abs_errors = np.fabs(errors)
 		rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
