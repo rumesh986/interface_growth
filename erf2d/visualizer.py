@@ -53,9 +53,9 @@ class _RunData:
 		self, 
 		inp_folder,
 		out_folder,
-		solnf='soln', 
-		exact_solnf='exact_soln', 
-		errorf='error',
+		solnf='solns/soln', 
+		exact_solnf='exact_solns/exact_soln', 
+		errorf='errors/error',
 		configf='config',
 		ext='dat'
 	):

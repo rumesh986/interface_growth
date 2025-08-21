@@ -272,10 +272,10 @@ class Erf2D6Problem : public Problem {
 		void doc_solution(uint timestep, double time, const unsigned int &history_t) {
 			cuint npts = 5;
 
-			char filename[100];
+			char filename[256];
 			ofstream outfile;
 
-			sprintf(filename, "%s/soln%i.dat", info.directory().c_str(), info.number());
+			sprintf(filename, "%s/solns/soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
 			if (history_t == 0) {
 				for (unsigned int e = 0; e < Nx*Ny; e++)
@@ -285,7 +285,7 @@ class Erf2D6Problem : public Problem {
 			}
 			outfile.close();
 
-			sprintf(filename, "%s/exact_soln%i.dat", info.directory().c_str(), info.number());
+			sprintf(filename, "%s/exact_solns/exact_soln%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
 			for (unsigned int e = 0; e < Nx*Ny; e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->output_fct(outfile, npts, time, get_exact_u);
@@ -294,23 +294,23 @@ class Erf2D6Problem : public Problem {
 			double norm = 0.0;
 			double error = 0.0;
 			double err_tmp = 0.0;
-			sprintf(filename, "%s/error%i.dat", info.directory().c_str(), info.number());
+			sprintf(filename, "%s/errors/error%i.dat", info.directory().c_str(), info.number());
 			outfile.open(filename);
 			if (history_t == 0) {
 				for (unsigned int e = 0; e < Nx*Ny; e++) {
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
 					elem->compute_error(outfile, get_exact_u, time, err_tmp, norm);
-					error += err_tmp * err_tmp;
+					error += err_tmp;
 				}
 			} else {
 				for (unsigned int e = 0; e < Nx*Ny; e++) {
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
 					compute_error_ic(history_t, elem, outfile, get_exact_u, time, err_tmp, norm);
-					error += err_tmp * err_tmp;
+					error += err_tmp;
 				}
 			}
 			outfile.close();
-			error = sqrt(error);
+			error = sqrt(error) / (Nx*Ny);
 
 			double gamma = domain->get_interface() / (2 * sqrt(D2 * time));
 			double D_eff = 4 * gamma * gamma * D1;
@@ -524,6 +524,28 @@ int main(int argc, char **argv) {
 		cout << dname << " exists" << endl;
 	} else {
 		std::filesystem::create_directories(dname);
+	}
+
+	char sub_dname[512];
+	sprintf(sub_dname, "%s/errors", dname);
+	if (std::filesystem::exists(sub_dname)) {
+		cout << sub_dname << " exists" << endl;
+	} else {
+		std::filesystem::create_directories(sub_dname);
+	}
+
+	sprintf(sub_dname, "%s/solns", dname);
+	if (std::filesystem::exists(sub_dname)) {
+		cout << sub_dname << " exists" << endl;
+	} else {
+		std::filesystem::create_directories(sub_dname);
+	}
+
+	sprintf(sub_dname, "%s/exact_solns", dname);
+	if (std::filesystem::exists(sub_dname)) {
+		cout << sub_dname << " exists" << endl;
+	} else {
+		std::filesystem::create_directories(sub_dname);
 	}
 
 	DocInfo info;
