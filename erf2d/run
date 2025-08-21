@@ -73,5 +73,12 @@ if __name__ == '__main__':
 		help="Use this flag to compile faster with debug flags"
 	)
 
+	parser.add_argument('--tshift',
+		type=float,
+		dest='tshift',
+		default=0.0,
+		help='time to start from'
+	)
+
 	args = parser.parse_args()
 	run = Run(**vars(args))

@@ -46,7 +46,7 @@ class Run:
 
 			os.chdir(self.wd)
 
-			self.run()
+			self.run(**kwargs)
 
 			print(self.dxdt)
 			
@@ -125,7 +125,10 @@ class Run:
 			f.write(f'dxdt: {self.dxdt}\n')
 
 		futures = {}
-		tshift = None
+		if 'tshift' in kwargs.keys():
+			tshift = kwargs['tshift']
+		else:
+			tshift = None
 		wf = None
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
 			if 't' in self.dxdt:
