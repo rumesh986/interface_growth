@@ -292,22 +292,28 @@ class Visualizer:
 		
 		plt.cla()
 
+		fig, ax = plt.subplots(1,1)
+
+
 		for run in self.runs:
-			plt.plot(run.times, run.interface, label=run.title)
+			ax.plot(run.times, run.interface, label=run.title)
 		
 		try:
 			optimal, _ = scopt.curve_fit(f, self.runs[0].times, self.runs[0].interface, p0=[1.0, 0.0])
 			x_ref = np.linspace(self.runs[0].times[0], self.runs[0].times[-1])
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
-			plt.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')
+			ax.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')
 		except:
 			print("Failed to fit interface curve")
 
-		plt.legend()
-		plt.xlabel('time')
-		plt.ylabel('Interface position $h(t)$')
-		plt.title('Interface position with time')
+		ax.set_xlabel('time')
+		ax.set_ylabel('Interface position $h(t)$')
+		ax.set_title('Interface position with time')
+
+		box=ax.get_position()
+		ax.set_position([box.x0, box.y0 + box.height * 0.05, box.width, box.height * 0.95])
+		ax.legend(loc='upper center', bbox_to_anchor=(0.5,-0.05), ncol=3, prop={'size': 8})
 
 		plt.savefig(f'{self.outd}/{self.prefix}_interfaces.png')
 
