@@ -214,8 +214,8 @@ class Visualizer:
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
 			self.make_surf_profile_anim(run)
-			if (run.interface is not None):
-				self.plot_interface(run)
+			# if (run.interface is not None):
+			# 	self.plot_interface(run)
 
 		except:
 			raise Exception(f"Crashing for some reason {run.config}")
@@ -224,6 +224,7 @@ class Visualizer:
 		with ProcessPoolExecutor(max_workers=10) as executor:
 			for run, thread in zip(self.runs, executor.map(self._make, self.runs)):
 				print(f'Standard processing for \n{run.config}')
+		self.plot_interfaces()
 
 	def plot_errors(self, run):
 		plt.cla()
@@ -268,7 +269,7 @@ class Visualizer:
 			x_ref = np.linspace(run.times[0], run.times[-1])
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
-			plt.plot(x_ref, y_ref, ls='--', label=f'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
 		except:
 			print("Failed to fit h-curve")
 
@@ -279,6 +280,36 @@ class Visualizer:
 		plt.title('Interface position with time')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
+
+		if self.interactive:
+			plt.show()
+		
+		plt.close()
+	
+	def plot_interfaces(self):
+		def f(x, a, b):
+			return np.sqrt(x*a) + b
+		
+		plt.cla()
+
+		for run in self.runs:
+			plt.plot(run.times, run.interface, label=run.title)
+		
+		try:
+			optimal, _ = scopt.curve_fit(f, self.runs[0].times, self.runs[0].interface, p0=[1.0, 0.0])
+			x_ref = np.linspace(self.runs[0].times[0], self.runs[0].times[-1])
+			y_ref = f(x_ref, optimal[0], optimal[1])
+
+			plt.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')
+		except:
+			print("Failed to fit interface curve")
+
+		plt.legend()
+		plt.xlabel('time')
+		plt.ylabel('Interface position $h(t)$')
+		plt.title('Interface position with time')
+
+		plt.savefig(f'{self.outd}/{self.prefix}_interfaces.png')
 
 		if self.interactive:
 			plt.show()
