@@ -89,7 +89,7 @@ class _RunData:
 	@property
 	def errors(self):
 		if not self._errors:
-			self._errors = self._read_series(self.errorf, ignore_history=True)
+			self._errors = self._read_series(self.errorf)#, ignore_history=True)
 		return self._errors
 	
 	@property
@@ -121,7 +121,8 @@ class _RunData:
 		skip_steps = self.config.t_order + 1
 
 		abs_errors = np.fabs(errors)
-		rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
+		# rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
+		rel_errors = abs_errors[mask] / np.fabs(exact_vals[mask])
 
 		return abs_errors, rel_errors, self.errors[0]['x'][node]
 	
@@ -436,6 +437,7 @@ class Visualizer:
 
 			data = _extract_data(run.solns[n])
 			exact_data = _extract_data(run.exact_solns[n])
+			errors = _extract_data(run.errors[n])
 
 			# account for repeated points 
 			# 	avoids a line crossing the plot unnecessarily
@@ -445,13 +447,18 @@ class Visualizer:
 
 			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
 			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
+			line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
 
 			if run.interface is not None:
 				line_interface.set_xdata(run.interface[n])
+				diff_interface.set_xdata(run.interface[n])
+
+			diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
 		
 		plt.cla()
 		
-		fig, prof_ax = plt.subplots(1)
+		fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+
 		time_text = prof_ax.annotate(
 			f't={run.times[0]}',
 			xy=(0.8,0.9),
@@ -460,12 +467,15 @@ class Visualizer:
 
 		data = _extract_data(run.solns[0])
 		exact_data = _extract_data(run.exact_solns[0])
+		errors = _extract_data(run.errors[0])
 
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
 		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
+		line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
 
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 		
 		for pos in run.config.fixed_pos:
 			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
@@ -476,6 +486,11 @@ class Visualizer:
 		prof_ax.set_ylim([-1.5, 1.5])
 		prof_ax.set_ylabel('Temperature-ish')
 		prof_ax.set_title('Temperature profile')
+
+		diff_ax.set_xlabel('x')
+		diff_ax.set_ylabel('Error')
+		diff_ax.set_title('Error in profile')
+		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
 
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
