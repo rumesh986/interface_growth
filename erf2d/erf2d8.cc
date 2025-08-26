@@ -40,6 +40,10 @@ Vector<unsigned int> analytical_boundaries = {
 	4  // interface
 };
 
+Vector<unsigned int> pinned_boundaries = {
+	// 4 // interface
+};
+
 void no_flux_fct(const double &t, const Vector<double> &x, double &flux) {
 	flux = 0.0;
 }
@@ -107,6 +111,12 @@ class Erf2D6Problem : public Problem {
 
 			for (uint e = 0; e < mesh_pt()->nelement(); e++)
 				dynamic_cast<EL *>(mesh_pt()->element_pt(e))->source_fct_pt() = get_source;
+				
+			for (unsigned int b : pinned_boundaries) {
+				unsigned long int nnode = mesh_pt()->nboundary_node(b);
+				for (unsigned long int n = 0; n < nnode; n++)
+					mesh_pt()->boundary_node_pt(b, n)->pin_all();
+			}
 
 			// pin analytical boundaries
 			for (unsigned int b : analytical_boundaries) {
