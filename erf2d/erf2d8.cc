@@ -225,6 +225,25 @@ class Erf2D6Problem : public Problem {
 				step++;
 			}
 
+			// s[0] = 1.0;
+			// s[1] = -1.0;
+			// for (int t = tsteps; t >= 0; t--) {
+			// 	for (unsigned long int e = 0; e < Nx; e++) {
+			// 		dynamic_cast<FiniteElement *>(mesh_pt()->element_pt(e))->get_x_from_macro_element(t, s, x);
+			// 		printf("[%d] e=%4lu x0=%8.6f x1=%8.6f\n", t, e, x[0], x[1]);
+			// 	}
+			// 	// mesh_pt()->boundary_node_pt(4,0)->position(t, x);
+			// 	// printf("[%d] x0=%8.6f x1=%8.6f\n", t, x[0], x[1]);
+			// }
+
+			// char fname[256];
+			// sprintf(fname, "%s/mesh_dump.dat", info.directory().c_str());
+			// printf("Dumping nodes into %s\n", fname);
+			// mesh_pt()->dump(fname);
+			// printf("Finished dumping nodes!\n");
+			// exit(1);
+
+
 			time_pt()->time() = t_shift;
 		}
 
@@ -253,6 +272,40 @@ class Erf2D6Problem : public Problem {
 
 			domain->set_interface(new_h);
 			mesh_pt()->node_update();
+
+			if (ic) {
+				std::map<Node *, bool> node_handled;
+				Vector<double> r(2);
+
+				unsigned long int nelems = Nx*Ny;
+				unsigned long int nnode_total = mesh_pt()->nnode();
+				
+				for (unsigned long int n = 0; n < nnode_total; n++) {
+					Node *node_pt = mesh_pt()->node_pt(n);
+					node_handled[node_pt] = false;
+				}
+
+				for (unsigned long int e = 0; e < nelems; e++) {
+					FiniteElement *elem_pt = dynamic_cast<FiniteElement *>(mesh_pt()->element_pt(e));
+					unsigned long int nnode = elem_pt->nnode();
+					for (unsigned long int n = 0; n < nnode; n++) {
+						Node *node_pt = elem_pt->node_pt(n);
+
+						if (!node_handled[node_pt]) {
+							elem_pt->local_coordinate_of_node(n, s);
+							elem_pt->get_x(t, s, r);
+							if (elem_pt->macro_elem_pt() == 0) {
+								printf("We have big problems here !!!!\n\n");
+							}
+
+							for (int i = 0; i < 2; i++)
+								node_pt->x(t, i) = r[i];
+							
+							node_handled[node_pt] = true;
+						}
+					}
+				}
+			}
 
 			char filename[512];
 			sprintf(filename, "%s/interface_velocity.dat", info.directory().c_str());
