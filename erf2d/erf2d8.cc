@@ -21,7 +21,7 @@ static const double Ts = -1.0;
 static const double Tm = 0.0;
 static const double Tfr = 1.0;
 
-static const double alpha = 1.0;
+static const double alpha = 3.0;
 
 static const double x0 = -1.0;
 static const double x1 = 0.025; // h0
@@ -101,7 +101,9 @@ class Erf2D6Problem : public Problem {
 	public:
 		Erf2D6Problem(uint nx, uint ny,  uint t_steps, double dt, double t_shift, DocInfo info)
 		: Nx1(nx), Nx2(nx), Nx(nx+nx), Ny(ny), t_steps(t_steps), dt(dt), t_shift(t_shift), info(info) {
+			// calls super constructor as Problem() has no arguments
 			add_time_stepper_pt(new BDF<T_ORDER>);
+			problem_is_nonlinear(false);
 
 			domain = new TwoPhaseDomain(x0, x1, x2, vel, Nx1, Nx2, Ny, time_pt());
 			mesh_pt() = new RefineableTwoLayer2DMesh<EL>(Nx1, Nx2, Ny, x0, x1, x2, y_0, y_1, domain, time_stepper_pt());
@@ -260,12 +262,19 @@ class Erf2D6Problem : public Problem {
 
 			unsigned long int nelems = mesh_pt()->nboundary_element(4);
 			for (unsigned long int e = 0; e < nelems; e++) {
-				if (mesh_pt()->face_index_at_boundary(4, e) == 1) {
+				int face_index = mesh_pt()->face_index_at_boundary(4, e);
+				if (face_index == 1) {
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
 
-					tot_flux += flux[0];
+					tot_flux += D1 * flux[0];
+				} else if (face_index == -1) {
+					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+					if (ic) get_flux_ic(t+1, elem, s, flux);
+					else 	elem->get_flux(s, flux);
+
+					tot_flux += D2 * flux[0];
 				}
 			}
 
