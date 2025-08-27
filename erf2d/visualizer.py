@@ -165,6 +165,87 @@ class _RunData:
 		if not os.path.exists(self.out_folder):
 			os.mkdir(self.out_folder)
 
+class _RunData2:
+	_STEP_HEADERS = ['x', 'y', 'exact', 'u', 'error']
+	_OVERALL_HEADERS = ['time', 'error', 'interface']
+
+	def __init__(
+		self,
+		inp_folder,
+		out_folder,
+		stepsf='steps/step',
+		configf='config',
+		resultsf='results',
+		ext='dat'
+	):
+		self.inp_folder = inp_folder
+		self.out_folder = out_folder
+		self.stepsf = stepsf
+		self.resultsf = resultsf
+		self.ext = ext
+		
+		self.config = _Config(f'{self.inp_folder}/{configf}')
+
+		try:
+			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)
+			self.times = self.results['time']
+			self.interface = self.results['interface']
+		except FileNotFoundError as e:
+			print("Results file not found")
+			raise e
+		
+		self.data = []
+		self.errors = []
+		self.exact_solns = []
+		self.solns = []
+		for i, t in enumerate(self.results['time']):
+			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+			data['time'] = t
+
+			self.errors.append(data[['time', 'x', 'y', 'error']])
+			self.exact_solns.append(data[['time', 'x', 'y', 'exact']].rename(columns={'exact': 'u'}))
+			self.solns.append(data[['time', 'x', 'y', 'u']])
+
+			self.data.append(data)
+
+	@property
+	def title(self):
+		return self.config.title
+	
+	@property
+	def error_norms(self):
+		return self.results['error']
+		# abs_errors = np.array([np.linalg.norm(x['error']) for x in self.errors])
+		# abs_errors /= len(self.errors[0]['error'])
+
+		# if np.all(np.equal(abs_errors, self.results['error'])):
+		# 	print("Yup its all equal")
+		# else:
+		# 	print("There appears to be some difference")
+		# 	print(f"Mag: {np.linalg.norm(abs_errors - self.results['error'])}")
+		# 	print(np.c_[self.results['error'], abs_errors])
+		# return abs_errors
+	
+	@property
+	def error_max(self):
+		node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1
+		errors = np.array([df['error'][node] for df in self.errors])
+		exact = np.array([df['u'][node] for df in self.exact_solns])
+		mask = exact != 0.0
+
+		abs_errors = np.fabs(errors)
+		rel_errors = abs_errors[mask] / np.fabs(exact[mask])
+
+		return abs_errors, rel_errors, self.errors[0]['x'][node]
+	
+	@property
+	def total_error_norm(self):
+		return np.linalg.norm(self.results['error'])/len(self.results['error'])
+
+	def create_outdir(self):
+		if not os.path.exists(self.out_folder):
+			os.mkdir(self.out_folder)
+
 class Visualizer:
 	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', interactive=False):
 		self.prefix = prefix
@@ -186,7 +267,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}'))
+			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}'))
 		
 		if 'a' in self.dxdt:
 			for run in self.runs:
@@ -215,8 +296,8 @@ class Visualizer:
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
 			self.make_surf_profile_anim(run)
-			# if (run.interface is not None):
-			# 	self.plot_interface(run)
+			if (run.interface is not None):
+				self.plot_interface(run)
 
 		except:
 			raise Exception(f"Crashing for some reason {run.config}")
@@ -267,7 +348,7 @@ class Visualizer:
 
 		try:
 			optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
-			x_ref = np.linspace(run.times[0], run.times[-1])
+			x_ref = np.linspace(run.times.iloc[0], run.times.iloc[-1])
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
@@ -301,7 +382,7 @@ class Visualizer:
 		
 		try:
 			optimal, _ = scopt.curve_fit(f, self.runs[0].times, self.runs[0].interface, p0=[1.0, 0.0])
-			x_ref = np.linspace(self.runs[0].times[0], self.runs[0].times[-1])
+			x_ref = np.linspace(self.runs[0].times.iloc[0], self.runs[0].times.iloc[-1])
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			ax.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')

@@ -204,7 +204,8 @@ class Erf2D6Problem : public Problem {
 			}
 
 			int step = 0;
-			doc_solution(step, time_pt()->time(tsteps), tsteps);
+			// doc_solution(step, time_pt()->time(tsteps), tsteps);
+			doc_step(step, tsteps);
 			step++;
 
 			for (int t = tsteps-1; t >= 0; t--) {
@@ -221,7 +222,8 @@ class Erf2D6Problem : public Problem {
 				}
 
 				printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
-				doc_solution(step, time, t);
+				// doc_solution(step, time, t);
+				doc_step(step, t);
 				step++;
 			}
 
@@ -429,6 +431,39 @@ class Erf2D6Problem : public Problem {
 		}
 	}
 
+	void doc_step(const unsigned int &timestep, const unsigned int &t = 0) {
+		double time = time_pt()->time(t);
+		unsigned long int nnode = mesh_pt()->nnode();
+
+		Vector<double> x(2);
+		Vector<double> exact_u(1);
+		Vector<double> numerical_u(1);
+
+		double tot_error = 0.0;
+
+		char fname[512];
+		sprintf(fname, "%s/steps/step%u.dat", info.directory().c_str(), timestep);
+		FILE *file = fopen(fname, "w");
+		for (unsigned long int n = 0; n < nnode; n++) {
+			mesh_pt()->node_pt(n)->position(t, x);
+			mesh_pt()->node_pt(n)->value(t, numerical_u);
+			get_exact_u(time, x, exact_u);
+
+			double error = numerical_u[0] - exact_u[0];
+			tot_error += error * error;
+
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[0], numerical_u[0], error);
+		}
+		fclose(file);
+		
+		tot_error = sqrt(tot_error) / nnode;
+
+		sprintf(fname, "%s/results.dat", info.directory().c_str());
+		file = fopen(fname, "a");
+		fprintf(file, "%16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface());
+		fclose(file);
+	}
+
 	// modified from UnsteadyHeatEquations::get_flux from unsteady_heat_elements.h
 	void get_flux_ic(const unsigned int &t, EL * elem, const Vector<double>& s, Vector<double>& flux) const {
       // Find out how many nodes there are in the element
@@ -611,6 +646,13 @@ int main(int argc, char **argv) {
 		std::filesystem::create_directories(sub_dname);
 	}
 
+	sprintf(sub_dname, "%s/steps", dname);
+	if (std::filesystem::exists(sub_dname)) {
+		cout << sub_dname << " exists" << endl;
+	} else {
+		std::filesystem::create_directories(sub_dname);
+	}
+
 	DocInfo info;
 	info.set_directory(dname);
 	info.number() = 0;
@@ -651,7 +693,8 @@ int main(int argc, char **argv) {
 		problem.unsteady_newton_solve(dt);
 
 		if (t % write_freq == 0)
-			problem.doc_solution(t + prev_steps);
+			// problem.doc_solution(t + prev_steps);
+			problem.doc_step(t+prev_steps);
 
 		double x_int = domain->get_interface();
 
