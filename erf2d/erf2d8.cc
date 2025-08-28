@@ -14,14 +14,26 @@
 #define T_ORDER 1
 #endif
 
-static const double D1 = 1.0;
-static const double D2 = 0.5;
+double k1 = 1.0;
+double k2 = 0.5;
+
+double rho1 = 1.0;
+double rho2 = 0.5;
+
+double Cp1 = 1.0;
+double Cp2 = 0.5;
+
+double D1 = k1 / (Cp1 * rho1);
+double D2 = k2 / (Cp2 * rho2);
+
+double L = 1.0;
+
+// static const double D1 = 1.0;
+// static const double D2 = 0.5;
 
 static const double Ts = -1.0;
 static const double Tm = 0.0;
 static const double Tfr = 1.0;
-
-static const double alpha = 3.0;
 
 static const double x0 = -1.0;
 static const double x1 = 0.025; // h0
@@ -84,10 +96,10 @@ void get_initial_u(const Vector<double> &x, Vector<double> &u) {
 
 }
 
-void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
-	double h = domain->get_interface();
-	v[0] = 2*(Tm-Ts)/(alpha * sqrt(Pi*D1*t) * (1 + erf(h/(2*sqrt(D1*t))))) * exp(-1 * h*h/(4*D1*t));
-}
+// void dhdt(const double &t, const Vector<double> &x, Vector<double> &v) {
+// 	double h = domain->get_interface();
+// 	v[0] = 2*(Tm-Ts)/(alpha * sqrt(Pi*D1*t) * (1 + erf(h/(2*sqrt(D1*t))))) * exp(-1 * h*h/(4*D1*t));
+// }
 
 template<class EL>
 class Erf2D6Problem : public Problem {
@@ -134,10 +146,10 @@ class Erf2D6Problem : public Problem {
 
 			for (uint yi = 0; yi < Ny; yi++) {
 				for (uint e = 0; e < Nx1; e++)
-					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*Nx + e))->beta_pt() = (double *) &D1;
+					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*Nx + e))->beta_pt() = &D1;
 				
 				for (uint e = Nx1; e < Nx; e++)
-					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*Nx + e))->beta_pt() = (double *) &D2;
+					dynamic_cast<EL *>(mesh_pt()->element_pt(yi*Nx + e))->beta_pt() = &D2;
 			}
 
 			assign_eqn_numbers();
@@ -268,17 +280,17 @@ class Erf2D6Problem : public Problem {
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
 
-					tot_flux += D1 * flux[0];
+					tot_flux += k1 * flux[0];
 				} else if (face_index == -1) {
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
 
-					tot_flux += D2 * flux[0];
+					tot_flux += k2 * flux[0];
 				}
 			}
 
-			double v = tot_flux / (alpha * Ny);
+			double v = tot_flux / (rho1 * L * Ny);
 			double new_h = domain->get_interface() + v * dt;
 
 			domain->set_interface(new_h);
@@ -471,6 +483,8 @@ class Erf2D6Problem : public Problem {
 		file = fopen(fname, "a");
 		fprintf(file, "%16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface());
 		fclose(file);
+
+		printf("[%4u] time=%8.6f error = %e interface = %8.6f\n", timestep, time, tot_error, domain->get_interface());
 	}
 
 	// modified from UnsteadyHeatEquations::get_flux from unsteady_heat_elements.h
@@ -671,6 +685,12 @@ int main(int argc, char **argv) {
 	if (t_shift == 0.0) {
 		t_shift = T_ORDER * dt;
 	}
+
+	printf("Problem Def:\n");
+	printf("\tk1=%8.6f k2=%8.6f\n", k1, k2);
+	printf("\trho1=%8.6f rho2=%8.6f\n", rho1, rho2);
+	printf("\tCp1=%8.6f Cp2=%8.6f\n", Cp1, Cp2);
+	printf("\tD1=%8.6f D2=%8.6f\n", D1, D2);
 
 	// Ny = Nx;
 
