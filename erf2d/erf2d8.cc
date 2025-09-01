@@ -176,7 +176,7 @@ class Erf2D6Problem : public Problem {
 			Vector<double> x(2);
 			Vector<double> u(1);
 
-			double cur_t = time_pt()->time();
+			double cur_t = time_pt()->time() + dt;
 
 			for (unsigned long int b : analytical_boundaries) {
 				unsigned long int nnode = mesh_pt()->nboundary_node(b);
