@@ -153,9 +153,9 @@ class Run:
 					for t in self.ts:
 						for nx in self.nxs:
 							for dt in self.dts:
-								kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs["k1"]:9.7f}_{kwargs["k2"]:9.7f}_{kwargs["rho1"]:9.7f}_{kwargs["rho2"]:9.7f}_{kwargs["cp1"]:9.7f}_{kwargs["cp2"]:9.7f}'
+								kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs["k1"]:9.7f}_{kwargs["k2"]:9.7f}_{kwargs["rho1"]:9.7f}_{kwargs["rho2"]:9.7f}_{kwargs["cp1"]:9.7f}_{kwargs["cp2"]:9.7f}_{kwargs["L"]:9.7f}'
 								futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs)
-								for v in ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2']:
+								for v in ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L']:
 									kwargs_cp = kwargs.copy()
 									kwargs_cp[v] *= (1.0 + kwargs_cp['eps'])
 									kwargs_cp['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs_cp["k1"]:9.7f}_{kwargs_cp["k2"]:9.7f}_{kwargs_cp["rho1"]:9.7f}_{kwargs_cp["rho2"]:9.7f}_{kwargs_cp["cp1"]:9.7f}_{kwargs_cp["cp2"]:9.7f}'

@@ -621,6 +621,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--rho2", &rho2);
 	CommandLineArgs::specify_command_line_flag("--cp1", &Cp1);
 	CommandLineArgs::specify_command_line_flag("--cp2", &Cp2);
+	CommandLineArgs::specify_command_line_flag("--L", &L);
 	CommandLineArgs::specify_command_line_flag("--dname", &dname, "doc");
 
 	CommandLineArgs::parse_and_assign();
@@ -733,6 +734,7 @@ int main(int argc, char **argv) {
 	fprintf(file, "rho2=%10.8f\n", rho2);
 	fprintf(file, "cp1=%10.8f\n", Cp1);
 	fprintf(file, "cp2=%10.8f\n", Cp2);
+	fprintf(file, "L=%10.8f\n", L);
 	fclose(file);
 
 	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;

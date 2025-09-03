@@ -264,6 +264,7 @@ class Visualizer:
 		self._markers = ['+', 'o', '.', '*', 'x', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
+		stylef='report.mplstyle'
 		plt.style.use(f'../../{stylef}')
 
 		for rundir in os.listdir(self.resd):
@@ -782,18 +783,18 @@ class Visualizer:
 			return np.sqrt(x*a) + b
 		
 		eps = 1e-6
-		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'deff', 'sensitivity'])
+		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity'])
 		for i, run in enumerate(self.runs):
 			try:
 				optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 				params = run.config.params
-				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], optimal[0], 0.0]
+				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], params['L'], optimal[0], 0.0]
 			except:
 				print("Something went wrong")
 				raise
 		pd.set_option("display.precision", 10)
 
-		keys = ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2']
+		keys = ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L']
 		orig = {}
 		for k in keys:
 			orig[k] = table[k].min()
@@ -804,7 +805,8 @@ class Visualizer:
 			(table['rho1'] == orig['rho1']) & 
 			(table['rho2'] == orig['rho2']) & 
 			(table['cp1'] == orig['cp1']) &
-			(table['cp2'] == orig['cp2'])
+			(table['cp2'] == orig['cp2']) &
+			(table['L'] == orig['L'])
 		]
 
 		key_names = {
@@ -814,6 +816,7 @@ class Visualizer:
 			'rho2': r'$\rho_l$',
 			'cp1': r'$C_{p_s}$',
 			'cp2': r'$C_{p_l}$',
+			'L': r'$\mathcal{L}_f$'
 		}
 
 		sensitivity = {}
@@ -832,7 +835,7 @@ class Visualizer:
 		plt.plot(filtered_table['key'], filtered_table['scaled_sensitivity'].abs())
 		plt.xlabel('Parameters')
 		plt.ylabel('Scaled sensitivities')
-		plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
+		# plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
 		plt.savefig(f'{self.outd}/{self.prefix}-sensitivity.png')
 
 if __name__ =='__main__':
