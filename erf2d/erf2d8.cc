@@ -605,6 +605,8 @@ int main(int argc, char **argv) {
 	double t_shift = 0.0;
 	bool var_dt = false;
 	uint write_freq = 1;
+	// char dname[256] = "";
+	std::string dname;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx);
 	CommandLineArgs::specify_command_line_flag("--ny", &Ny);
@@ -613,6 +615,13 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--tshift", &t_shift);
 	CommandLineArgs::specify_command_line_flag("--vardt");
 	CommandLineArgs::specify_command_line_flag("--write-freq", &write_freq);
+	CommandLineArgs::specify_command_line_flag("--k1", &k1);
+	CommandLineArgs::specify_command_line_flag("--k2", &k2);
+	CommandLineArgs::specify_command_line_flag("--rho1", &rho1);
+	CommandLineArgs::specify_command_line_flag("--rho2", &rho2);
+	CommandLineArgs::specify_command_line_flag("--cp1", &Cp1);
+	CommandLineArgs::specify_command_line_flag("--cp2", &Cp2);
+	CommandLineArgs::specify_command_line_flag("--dname", &dname, "doc");
 
 	CommandLineArgs::parse_and_assign();
 
@@ -637,39 +646,43 @@ int main(int argc, char **argv) {
 		dt = pow(((double)1/(double)Nx), 2);
 	}
 
-	char dname[256];
-	sprintf(dname, "RESLT/%dn%u_%dt%.2e", X_ORDER, Nx, T_ORDER, dt);
-	printf("Saving results to %s\n", dname);
+	if (!CommandLineArgs::command_line_flag_has_been_set("--dname")) {
+		char temp[256];
+		sprintf(temp, "RESLT/%dn%u_%dt%.2e", X_ORDER, Nx, T_ORDER, dt);
+		dname.assign(temp);
+	}
+
+	printf("Saving results to %s\n", dname.c_str());
 	
-	if (std::filesystem::exists(dname)) {
+	if (std::filesystem::exists(dname.c_str())) {
 		cout << dname << " exists" << endl;
 	} else {
-		std::filesystem::create_directories(dname);
+		std::filesystem::create_directories(dname.c_str());
 	}
 
-	char sub_dname[512];
-	sprintf(sub_dname, "%s/errors", dname);
+	char sub_dname[1024];
+	sprintf(sub_dname, "%s/errors", dname.c_str());
 	if (std::filesystem::exists(sub_dname)) {
 		cout << sub_dname << " exists" << endl;
 	} else {
 		std::filesystem::create_directories(sub_dname);
 	}
 
-	sprintf(sub_dname, "%s/solns", dname);
+	sprintf(sub_dname, "%s/solns", dname.c_str());
 	if (std::filesystem::exists(sub_dname)) {
 		cout << sub_dname << " exists" << endl;
 	} else {
 		std::filesystem::create_directories(sub_dname);
 	}
 
-	sprintf(sub_dname, "%s/exact_solns", dname);
+	sprintf(sub_dname, "%s/exact_solns", dname.c_str());
 	if (std::filesystem::exists(sub_dname)) {
 		cout << sub_dname << " exists" << endl;
 	} else {
 		std::filesystem::create_directories(sub_dname);
 	}
 
-	sprintf(sub_dname, "%s/steps", dname);
+	sprintf(sub_dname, "%s/steps", dname.c_str());
 	if (std::filesystem::exists(sub_dname)) {
 		cout << sub_dname << " exists" << endl;
 	} else {
@@ -677,7 +690,7 @@ int main(int argc, char **argv) {
 	}
 
 	DocInfo info;
-	info.set_directory(dname);
+	info.set_directory(dname.c_str());
 	info.number() = 0;
 
 	cout << "Output directory: " << info.directory() << endl;
@@ -702,7 +715,7 @@ int main(int argc, char **argv) {
 	// problem.doc_solution(0);
 
 	char config_fname[256];
-	sprintf(config_fname, "%s/config", dname);
+	sprintf(config_fname, "%s/config", dname.c_str());
 
 	FILE *file = fopen(config_fname, "w");
 	fprintf(file, "nx1=%d\n", Nx);
@@ -714,6 +727,12 @@ int main(int argc, char **argv) {
 	fprintf(file, "t_order=%d\n", T_ORDER);
 	fprintf(file, "t_steps=%d\n", t_steps);
 	fprintf(file, "write_freq=%u\n", write_freq);
+	fprintf(file, "k1=%10.8f\n", k1);
+	fprintf(file, "k2=%10.8f\n", k2);
+	fprintf(file, "rho1=%10.8f\n", rho1);
+	fprintf(file, "rho2=%10.8f\n", rho2);
+	fprintf(file, "cp1=%10.8f\n", Cp1);
+	fprintf(file, "cp2=%10.8f\n", Cp2);
 	fclose(file);
 
 	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;

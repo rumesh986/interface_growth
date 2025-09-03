@@ -8,6 +8,8 @@ import subprocess
 from datetime import datetime
 from concurrent.futures import wait, ProcessPoolExecutor
 
+import numpy as np
+
 from visualizer import Visualizer
 
 class Run:
@@ -94,24 +96,33 @@ class Run:
 		tstepsargs = ('--tsteps', str(tsteps))
 		tshiftargs = ('--tshift', str(tshift) if tshift is not None else "0.0")
 		write_freqargs = ('--write-freq', str(write_freq) if write_freq is not None else "1")
+
+		translated_kwargs = []
+		for key, value in kwargs.items():
+			if key == 'tshift' or value is None or key == 'eps':
+				continue
+			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
 		try:
-			with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'w') as f:
+			if 'dname' not in kwargs.keys():
+				kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
+			with open(f'{kwargs["dname"]}.stdout', 'w') as f:
+				print(f'{kwargs["dname"]}: {translated_kwargs}')
 				subprocess.run(
-					[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs], 
+					[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs, *translated_kwargs], 
 					check=True,
 					stderr=subprocess.STDOUT,
 					stdout=f
 				)
 		except subprocess.CalledProcessError as e:
 			print(f"Run failed with {x=} {t=}")
-			with open(f'RESLT/{x}n{nx}_{t}t{dt}.stdout', 'r') as f:
+			with open(f'{kwargs["dname"]}.stdout', 'r') as f:
 				print(f.read())
 			raise
 	
-	def run(self, **kwargs):
+	def run(self, tshift=None, **kwargs):
 		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
@@ -123,12 +134,9 @@ class Run:
 			f.write(f'dts: {self.dts}\n')
 			f.write(f'tsteps: {self.tsteps}\n')
 			f.write(f'dxdt: {self.dxdt}\n')
+			f.write(f'kwargs: {self.kwargs}')
 
 		futures = {}
-		if 'tshift' in kwargs.keys():
-			tshift = kwargs['tshift']
-		else:
-			tshift = None
 		wf = None
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
 			if 't' in self.dxdt:
@@ -140,13 +148,25 @@ class Run:
 							for dt in self.dts:
 								tsteps = self.tsteps / dt
 								wf = max_dt / dt
-								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf)
+								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf, **kwargs)
+			elif 's' in self.dxdt:
+				for x in self.xs:
+					for t in self.ts:
+						for nx in self.nxs:
+							for dt in self.dts:
+								kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs["k1"]:9.7f}_{kwargs["k2"]:9.7f}_{kwargs["rho1"]:9.7f}_{kwargs["rho2"]:9.7f}_{kwargs["cp1"]:9.7f}_{kwargs["cp2"]:9.7f}'
+								futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs)
+								for v in ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2']:
+									kwargs_cp = kwargs.copy()
+									kwargs_cp[v] *= (1.0 + kwargs_cp['eps'])
+									kwargs_cp['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs_cp["k1"]:9.7f}_{kwargs_cp["k2"]:9.7f}_{kwargs_cp["rho1"]:9.7f}_{kwargs_cp["rho2"]:9.7f}_{kwargs_cp["cp1"]:9.7f}_{kwargs_cp["cp2"]:9.7f}'
+									futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs_cp)
 			else:
 				for x in self.xs:
 					for t in self.ts:
 						for nx in self.nxs:
 							for dt in self.dts:
-								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf)
+								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs)
 			
 			while True:
 				if len(futures.items()) == 0:
@@ -154,7 +174,7 @@ class Run:
 				
 				dellist = []
 				for key, future in futures.items():
-					x, t, nx, dt = key
+					x, t, nx, dt = key[:4]
 					if future.done():
 						print(f"Completed config {x=}, {t=}, {nx=} and {dt=}")
 						if future.exception() is None:

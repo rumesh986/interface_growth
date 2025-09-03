@@ -23,6 +23,7 @@ class _Config:
 		self.t_steps = 0
 		self.write_freq = 1
 
+		self.params = {}
 		self.fixed_pos = []
 
 		with open(file) as f:
@@ -38,6 +39,7 @@ class _Config:
 					case 't_steps': self.t_steps = int(v)
 					case 'write_freq': self.write_freq = int(v)
 					case x if x.startswith('x'): self.fixed_pos.append(float(v))
+					case _: self.params[k] = float(v)
 
 		self._title = f'nx={self.nx}, dt={self.dt}, X({self.x_order}), T({self.t_order})'
 
@@ -173,6 +175,7 @@ class _RunData2:
 		self,
 		inp_folder,
 		out_folder,
+		load_data=True,
 		stepsf='steps/step',
 		configf='config',
 		resultsf='results',
@@ -187,7 +190,9 @@ class _RunData2:
 		self.config = _Config(f'{self.inp_folder}/{configf}')
 
 		try:
+			if load_data:
 			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)
+	
 			self.times = self.results['time']
 			self.interface = self.results['interface']
 		except FileNotFoundError as e:
@@ -198,6 +203,8 @@ class _RunData2:
 		self.errors = []
 		self.exact_solns = []
 		self.solns = []
+
+		if load_data:
 		for i, t in enumerate(self.results['time']):
 			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
 			data['time'] = t
@@ -267,7 +274,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}'))
+			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}', self.dxdt == 's'))
 		
 		if 'a' in self.dxdt:
 			for run in self.runs:
@@ -279,6 +286,7 @@ class Visualizer:
 				match rtype:
 					case 'a': self.standard()
 					case x if x in 'bxt': self.plot_analysis(x)
+					case 's': self.sensitivity_analysis()
 
 	def prepare_pd(self):
 		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
@@ -698,10 +706,68 @@ class Visualizer:
 			plt.show()
 
 		plt.close(fig)
+	
+	def sensitivity_analysis(self):
+		def f(x, a, b):
+			return np.sqrt(x*a) + b
+		
+		eps = 1e-6
+		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'deff', 'sensitivity'])
+		for i, run in enumerate(self.runs):
+			try:
+				optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
+				params = run.config.params
+				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], optimal[0], 0.0]
+			except:
+				print("Something went wrong")
+				raise
+		pd.set_option("display.precision", 10)
+
+		keys = ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2']
+		orig = {}
+		for k in keys:
+			orig[k] = table[k].min()
+
+		orig_row = table[
+			(table['k1'] == orig['k1']) & 
+			(table['k2'] == orig['k2']) & 
+			(table['rho1'] == orig['rho1']) & 
+			(table['rho2'] == orig['rho2']) & 
+			(table['cp1'] == orig['cp1']) &
+			(table['cp2'] == orig['cp2'])
+		]
+
+		key_names = {
+			'k1': r'$\lambda_s$',
+			'k2': r'$\lambda_l$',
+			'rho1': r'$\rho_s$',
+			'rho2': r'$\rho_l$',
+			'cp1': r'$C_{p_s}$',
+			'cp2': r'$C_{p_l}$',
+		}
+
+		sensitivity = {}
+		for k in keys:
+			index = table.index[table[k] == table[k].max()]
+			h = table.loc[index, k] - orig_row[k].iloc[0]
+
+			table.loc[index, 'key'] = key_names[k]
+			table.loc[index, 'sensitivity'] = (table.loc[index, 'deff'] - orig_row['deff'].iloc[0]) / h
+			table.loc[index, 'scaled_sensitivity'] = table.loc[index, k] * table.loc[index, 'sensitivity']
+
+		print(table)
+
+		filtered_table = table[table['key'] != '']
+
+		plt.plot(filtered_table['key'], filtered_table['scaled_sensitivity'].abs())
+		plt.xlabel('Parameters')
+		plt.ylabel('Scaled sensitivities')
+		plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
+		plt.savefig(f'{self.outd}/{self.prefix}-sensitivity.png')
 
 if __name__ =='__main__':
 	assert len(sys.argv) == 3
-	assert sum(c1 == c2 for c1 in "abxt" for c2 in sys.argv[2]) > 0
+	assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
 	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
 	vis = Visualizer(sys.argv[1], sys.argv[2])
