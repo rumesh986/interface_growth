@@ -129,5 +129,12 @@ if __name__ == '__main__':
 		help='simulation parameter'
 	)
 
+	parser.add_argument('--style',
+		type=str,
+		dest='stylef',
+		default='pltstyle.mplstyle',
+		help='Stylesheet for matplotlib'
+	)
+
 	args = parser.parse_args()
 	run = Run(**vars(args))

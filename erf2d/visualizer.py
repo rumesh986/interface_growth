@@ -4,6 +4,7 @@ import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, ArtistAnimation
 
@@ -190,9 +191,7 @@ class _RunData2:
 		self.config = _Config(f'{self.inp_folder}/{configf}')
 
 		try:
-			if load_data:
-				self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)
-	
+			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)	
 			self.times = self.results['time']
 			self.interface = self.results['interface']
 		except FileNotFoundError as e:
@@ -254,7 +253,7 @@ class _RunData2:
 			os.mkdir(self.out_folder)
 
 class Visualizer:
-	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', interactive=False):
+	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False):
 		self.prefix = prefix
 		self.dxdt = dxdt
 		self.resd = resd
@@ -265,7 +264,7 @@ class Visualizer:
 		self._markers = ['+', 'o', '.', '*', 'x', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
-		plt.style.use('../../pltstyle.mplstyle')
+		plt.style.use(f'../../{stylef}')
 
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
@@ -274,7 +273,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}', self.dxdt == 's'))
+			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}', self.dxdt != 's'))
 		
 		if 'a' in self.dxdt:
 			for run in self.runs:
@@ -354,7 +353,7 @@ class Visualizer:
 		norm_err = run.error_norms
 		# abs_max_err, rel_max_err, pos = run.error_max
 
-		fig, ax = plt.subplots(1, figsize=(5,4))
+		fig, ax = plt.subplots(1)
 		# fig.suptitle(f'Errors ({run.title})')
 
 		ax.semilogy(norm_err)
@@ -385,7 +384,7 @@ class Visualizer:
 
 		plt.cla()
 
-		fig, ax = plt.subplots(1, figsize=(5,4))
+		fig, ax = plt.subplots(1)
 
 		ax.plot(run.times, run.interface, label='Interface position')
 
@@ -446,6 +445,7 @@ class Visualizer:
 		
 		plt.close()
 	
+	@mpl.rc_context({'font.size': 20})
 	def subplot_surf_prof(self, run):
 		def _extract_data(data):
 			ys = data['y'].unique()
@@ -457,35 +457,28 @@ class Visualizer:
 
 		plt.cla()
 
-		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(10,7))
+		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(14,10), layout="compressed")
 
 		num_frames = len(run.solns) // 4
 
-		print(axs)
-
 		for i, ax in enumerate(axs.flatten()):
-			print(ax)
 			data = _extract_data(run.solns[i*num_frames])
 			exact_data = _extract_data(run.exact_solns[i*num_frames])
 
 			ax.plot(data['x'], data['u'])
-			ax.scatter(exact_data['x'][::10], exact_data['u'][::10], marker='X', c='C1')
+			ax.scatter(exact_data['x'][::10], exact_data['u'][::10], marker='X', c='C1', zorder=2)
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
 
 			ax.set_title(f't={run.times[i*num_frames]}')
-			# ax.set_xlabel('x')
-			# ax.set_ylabel('Temperature')
 
 			if i == 3:
 				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
 		
-		# fig.set_xlabel('x')
-		# fig.legend(['Numerical', 'Analytical', 'Interface'], loc='right')
-
-		fig.supxlabel('              X')
+		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
 		
-		fig.suptitle('Profiles')
+		fig.suptitle('Temperature Profiles')
+		plt.tight_layout()
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
 		plt.close(fig)
 

@@ -52,7 +52,7 @@ class Run:
 
 			print(self.dxdt)
 			
-			Visualizer(self.prog, self.dxdt)
+			Visualizer(self.prog, self.dxdt, stylef=kwargs.get('stylef'))
 			os.chdir(self.od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
@@ -109,7 +109,6 @@ class Run:
 			if 'dname' not in kwargs.keys():
 				kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
 			with open(f'{kwargs["dname"]}.stdout', 'w') as f:
-				print(f'{kwargs["dname"]}: {translated_kwargs}')
 				subprocess.run(
 					[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs, *translated_kwargs], 
 					check=True,
