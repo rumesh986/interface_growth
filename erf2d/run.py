@@ -43,6 +43,7 @@ class Run:
 		print(f'__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 		# print(f'Running in directorys: {self.wd}')
 
+		stylef = kwargs.pop('stylef', None)
 		if not self.interactive:
 			self.build()
 
@@ -52,7 +53,7 @@ class Run:
 
 			print(self.dxdt)
 			
-			Visualizer(self.prog, self.dxdt, stylef=kwargs.get('stylef'))
+			Visualizer(self.prog, self.dxdt, stylef=stylef)
 			os.chdir(self.od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
@@ -140,7 +141,10 @@ class Run:
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
 			if 't' in self.dxdt:
 				max_dt = max(self.dts)
-				tshift = (max(self.ts) + 1) * max_dt
+				if tshift is None:
+					tshift = (max(self.ts) + 1) * max_dt
+				else:
+					tshift += (max(self.ts) + 1) * max_dt
 				for x in self.xs:
 					for t in self.ts:
 						for nx in self.nxs:

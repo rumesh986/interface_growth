@@ -463,7 +463,7 @@ class Erf2D6Problem : public Problem {
 		double tot_error = 0.0;
 
 		char fname[512];
-		sprintf(fname, "%s/steps/step%u.dat", info.directory().c_str(), timestep);
+		sprintf(fname, "%s/steps/step%u.dat", info.directory().c_str(), info.number());
 		FILE *file = fopen(fname, "w");
 		for (unsigned long int n = 0; n < nnode; n++) {
 			mesh_pt()->node_pt(n)->position(t, x);
@@ -485,6 +485,7 @@ class Erf2D6Problem : public Problem {
 		fclose(file);
 
 		printf("[%4u] time=%8.6f error = %e interface = %8.6f\n", timestep, time, tot_error, domain->get_interface());
+		info.number()++;
 	}
 
 	// modified from UnsteadyHeatEquations::get_flux from unsteady_heat_elements.h
