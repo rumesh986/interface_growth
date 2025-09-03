@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
 	parser.add_argument('--type',
 		type=str,
-		choices=['a', 'x', 't', 'b', 'ax', 'at', 'ab'],
+		choices=['a', 'x', 't', 'b', 's', 'ax', 'at', 'ab', 'as'],
 		dest='dxdt',
 		default='a',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt"
@@ -78,6 +78,55 @@ if __name__ == '__main__':
 		dest='tshift',
 		default=0.0,
 		help='time to start from'
+	)
+
+	parser.add_argument('--k1',
+		type=float,
+		dest='k1',
+		default=1.0,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--k2',
+		type=float,
+		dest='k2',
+		default=0.5,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--rho1',
+		type=float,
+		dest='rho1',
+		default=1.0,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--rho2',
+		type=float,
+		dest='rho2',
+		default=0.5,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--cp1',
+		type=float,
+		dest='cp1',
+		default=1.0,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--cp2',
+		type=float,
+		dest='cp2',
+		default=0.5,
+		help='simulation parameter'
+	)
+
+	parser.add_argument('--eps',
+		type=float,
+		dest='eps',
+		default=1e-6,
+		help='simulation parameter'
 	)
 
 	args = parser.parse_args()
