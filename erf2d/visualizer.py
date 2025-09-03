@@ -191,7 +191,7 @@ class _RunData2:
 
 		try:
 			if load_data:
-			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)
+				self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)
 	
 			self.times = self.results['time']
 			self.interface = self.results['interface']
@@ -205,15 +205,15 @@ class _RunData2:
 		self.solns = []
 
 		if load_data:
-		for i, t in enumerate(self.results['time']):
-			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
-			data['time'] = t
+			for i, t in enumerate(self.results['time']):
+				data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+				data['time'] = t
 
-			self.errors.append(data[['time', 'x', 'y', 'error']])
-			self.exact_solns.append(data[['time', 'x', 'y', 'exact']].rename(columns={'exact': 'u'}))
-			self.solns.append(data[['time', 'x', 'y', 'u']])
+				self.errors.append(data[['time', 'x', 'y', 'error']])
+				self.exact_solns.append(data[['time', 'x', 'y', 'exact']].rename(columns={'exact': 'u'}))
+				self.solns.append(data[['time', 'x', 'y', 'u']])
 
-			self.data.append(data)
+				self.data.append(data)
 
 	@property
 	def title(self):
@@ -299,11 +299,13 @@ class Visualizer:
 	def _make(self, run):
 		try:
 			# self.make_anims(run)
-			self.plot_errors(run)
+			# self.plot_errors(run)
+			self.plot_error_norms(run)
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
-			self.make_surf_profile_anim(run)
+			# self.make_surf_profile_anim(run)
+			self.subplot_surf_prof(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
 
@@ -346,13 +348,46 @@ class Visualizer:
 			
 		plt.close(fig)
 	
+	def plot_error_norms(self, run):
+		plt.cla()
+
+		norm_err = run.error_norms
+		# abs_max_err, rel_max_err, pos = run.error_max
+
+		fig, ax = plt.subplots(1, figsize=(5,4))
+		# fig.suptitle(f'Errors ({run.title})')
+
+		ax.semilogy(norm_err)
+		print(f'{run.title=} max error={norm_err.max()} at {norm_err.argmax()}')
+		
+		ax.set_xlabel('Timestep')
+		ax.set_ylabel('Norm of Error at timestep')
+		ax.set_title('L2 norm of errors')
+
+		# max_ax.semilogy(abs_max_err, label='Absolute')
+		# max_ax.semilogy(rel_max_err, label='Relative')
+		
+		# max_ax.legend()
+		# max_ax.set_xlabel('Timestep')
+		# max_ax.set_ylabel('Error magnitude')
+		# max_ax.set_title(f'Magnitude of errors at x={pos}')
+
+		plt.savefig(f'{run.out_folder}/{self.prefix}-error_norms.png')
+
+		if self.interactive:
+			plt.show()
+			
+		plt.close(fig)
+	
 	def plot_interface(self, run):
 		def f(x, a, b):
 			return np.sqrt(x * a) + b
 
 		plt.cla()
 
-		plt.plot(run.times, run.interface, label='Interface position')
+		fig, ax = plt.subplots(1, figsize=(5,4))
+
+		ax.plot(run.times, run.interface, label='Interface position')
 
 		try:
 			optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
@@ -363,13 +398,12 @@ class Visualizer:
 		except:
 			print("Failed to fit h-curve")
 
+		ax.legend()
+		ax.set_xlabel('time')
+		ax.set_ylabel('interface posiion h(t)')
+		ax.set_title('Interface position with time')
 
-		plt.legend()
-		plt.xlabel('time')
-		plt.ylabel('interface posiion h(t)')
-		plt.title('Interface position with time')
-
-		plt.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
+		fig.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
 		if self.interactive:
 			plt.show()
@@ -411,6 +445,49 @@ class Visualizer:
 			plt.show()
 		
 		plt.close()
+	
+	def subplot_surf_prof(self, run):
+		def _extract_data(data):
+			ys = data['y'].unique()
+			ref_y = ys[ys.shape[0] //2]
+
+			mask = np.isclose(data['y'].values, ref_y)
+
+			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
+
+		plt.cla()
+
+		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(10,7))
+
+		num_frames = len(run.solns) // 4
+
+		print(axs)
+
+		for i, ax in enumerate(axs.flatten()):
+			print(ax)
+			data = _extract_data(run.solns[i*num_frames])
+			exact_data = _extract_data(run.exact_solns[i*num_frames])
+
+			ax.plot(data['x'], data['u'])
+			ax.scatter(exact_data['x'][::10], exact_data['u'][::10], marker='X', c='C1')
+			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
+
+			ax.set_title(f't={run.times[i*num_frames]}')
+			# ax.set_xlabel('x')
+			# ax.set_ylabel('Temperature')
+
+			if i == 3:
+				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
+		
+		# fig.set_xlabel('x')
+		# fig.legend(['Numerical', 'Analytical', 'Interface'], loc='right')
+
+		fig.supxlabel('              X')
+		fig.supylabel('Temperature')
+		
+		fig.suptitle('Profiles')
+		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
+		plt.close(fig)
 
 	def _reshape_2D_data(self, data, key):
 		xs = data['x'].unique()
