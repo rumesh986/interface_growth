@@ -306,6 +306,7 @@ class Visualizer:
 			# self.make_results_surf(run)
 			# self.make_surf_profile_anim(run)
 			self.subplot_surf_prof(run)
+			self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
 
@@ -472,8 +473,8 @@ class Visualizer:
 
 			ax.set_title(f't={run.times[i*num_frames]}')
 
-			if i == 3:
-				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
+			if i == 0:
+				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='upper left')
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
@@ -481,6 +482,29 @@ class Visualizer:
 		fig.suptitle('Temperature Profiles')
 		plt.tight_layout()
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
+		plt.close(fig)
+	
+	@mpl.rc_context({'font.size': 20})
+	def subplot_mesh(self, run):
+		print("Im here in subplot_mesh")
+		plt.cla()
+		
+		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(14,10), layout="compressed")
+
+		num_frames = len(run.exact_solns) // 4
+		print(num_frames)
+
+		for i, ax in enumerate(axs.flatten()):
+			data = run.exact_solns[i*num_frames]
+
+			ax.scatter(data['x'], data['y'])
+			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
+			ax.set_title(f't={run.times[i*num_frames]}')
+		
+		fig.supxlabel('            X')
+		fig.supylabel('Y')
+		
+		fig.savefig(f'{run.out_folder}/{self.prefix}-meshes.png')
 		plt.close(fig)
 
 	def _reshape_2D_data(self, data, key):
