@@ -264,6 +264,7 @@ class Visualizer:
 		self._markers = ['+', 'o', 'x', '*', '.', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
+		stylef='report.mplstyle'
 		plt.style.use(f'../../{stylef}')
 
 		for rundir in os.listdir(self.resd):
@@ -307,6 +308,7 @@ class Visualizer:
 			# self.make_results_surf(run)
 			# self.make_surf_profile_anim(run)
 			self.subplot_surf_prof(run)
+			self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
 
@@ -473,8 +475,8 @@ class Visualizer:
 
 			ax.set_title(f't={run.times[i*num_frames]}')
 
-			if i == 3:
-				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
+			if i == 0:
+				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='upper left')
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
@@ -482,6 +484,29 @@ class Visualizer:
 		# fig.suptitle('Temperature Profiles')
 		plt.tight_layout()
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
+		plt.close(fig)
+	
+	@mpl.rc_context({'font.size': 20})
+	def subplot_mesh(self, run):
+		print("Im here in subplot_mesh")
+		plt.cla()
+		
+		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(14,10), layout="compressed")
+
+		num_frames = len(run.exact_solns) // 4
+		print(num_frames)
+
+		for i, ax in enumerate(axs.flatten()):
+			data = run.exact_solns[i*num_frames]
+
+			ax.scatter(data['x'], data['y'])
+			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
+			ax.set_title(f't={run.times[i*num_frames]}')
+		
+		fig.supxlabel('            X')
+		fig.supylabel('Y')
+		
+		fig.savefig(f'{run.out_folder}/{self.prefix}-meshes.png')
 		plt.close(fig)
 
 	def _reshape_2D_data(self, data, key):
@@ -802,18 +827,18 @@ class Visualizer:
 			return np.sqrt(x*a) + b
 		
 		eps = 1e-6
-		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'deff', 'sensitivity'])
+		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity'])
 		for i, run in enumerate(self.runs):
 			try:
 				optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 				params = run.config.params
-				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], optimal[0], 0.0]
+				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], params['L'], optimal[0], 0.0]
 			except:
 				print("Something went wrong")
 				raise
 		pd.set_option("display.precision", 10)
 
-		keys = ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2']
+		keys = ['k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L']
 		orig = {}
 		for k in keys:
 			orig[k] = table[k].min()
@@ -824,7 +849,8 @@ class Visualizer:
 			(table['rho1'] == orig['rho1']) & 
 			(table['rho2'] == orig['rho2']) & 
 			(table['cp1'] == orig['cp1']) &
-			(table['cp2'] == orig['cp2'])
+			(table['cp2'] == orig['cp2']) &
+			(table['L'] == orig['L'])
 		]
 
 		key_names = {
@@ -834,6 +860,7 @@ class Visualizer:
 			'rho2': r'$\rho_l$',
 			'cp1': r'$C_{p_s}$',
 			'cp2': r'$C_{p_l}$',
+			'L': r'$\mathcal{L}_f$'
 		}
 
 		sensitivity = {}
@@ -852,7 +879,7 @@ class Visualizer:
 		plt.plot(filtered_table['key'], filtered_table['scaled_sensitivity'].abs())
 		plt.xlabel('Parameters')
 		plt.ylabel('Scaled sensitivities')
-		plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
+		# plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
 		plt.savefig(f'{self.outd}/{self.prefix}-sensitivity.png')
 
 if __name__ =='__main__':

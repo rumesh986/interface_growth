@@ -122,6 +122,13 @@ if __name__ == '__main__':
 		help='simulation parameter'
 	)
 
+	parser.add_argument('--L',
+		type=float,
+		dest='L',
+		default=1.0,
+		help='simulation parameter'
+	)
+
 	parser.add_argument('--eps',
 		type=float,
 		dest='eps',
