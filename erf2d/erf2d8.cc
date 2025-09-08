@@ -36,7 +36,7 @@ static const double Tm = 0.0;
 static const double Tfr = 1.0;
 
 static const double x0 = -1.0;
-static const double x1 = 0.025; // h0
+double x1 = 0.025; // h0
 static const double x2 = 1.0;
 
 static const double y_0 = 0.0;
@@ -700,6 +700,8 @@ int main(int argc, char **argv) {
 	if (t_shift == 0.0) {
 		t_shift = T_ORDER * dt;
 	}
+
+	x1 = sqrt(1.26 * t_shift);
 
 	printf("Problem Def:\n");
 	printf("\tk1=%8.6f k2=%8.6f\n", k1, k2);
