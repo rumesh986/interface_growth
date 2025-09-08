@@ -261,7 +261,7 @@ class Visualizer:
 		self.interactive = interactive
 
 		self.runs = []
-		self._markers = ['+', 'o', '.', '*', 'x', 'D', '^', 'v']
+		self._markers = ['+', 'o', 'x', '*', '.', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
 		plt.style.use(f'../../{stylef}')
@@ -609,8 +609,8 @@ class Visualizer:
 			line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
 
 			if run.interface is not None:
-				line_interface.set_xdata(run.interface[n])
-				diff_interface.set_xdata(run.interface[n])
+				line_interface.set_xdata([run.interface[n]])
+				diff_interface.set_xdata([run.interface[n]])
 
 			diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
 		
