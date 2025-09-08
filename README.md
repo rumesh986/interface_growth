@@ -28,8 +28,9 @@
 	./autogen.sh
 	```
 
-	> [!important]
-	> On SCRTP systems you may need to load the appropriate modules first. These can be found in this repo in the file `erf2d/scrtp_modules`. You will need to source this file with `. ./erf2d/scrtp_modules`. As you may not have cloned the repo yet, you may have to download the file seperately or just run the commands within the script yourself.
+> [!important]
+> 
+> On SCRTP systems you may need to load the appropriate modules first. These can be found in this repo in the file `erf2d/scrtp_modules`. You will need to source this file with `source ./erf2d/scrtp_modules`. As you may not have cloned the repo yet, you may have to download the file seperately or just run the commands within the script yourself.
 
 	You will be asked some questions before the build actually begins. You can use the default options for these (or skip the self-tests to save time).
 
