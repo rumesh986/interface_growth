@@ -854,7 +854,12 @@ class Visualizer:
 
 		print(table)
 
-		filtered_table = table[table['key'] != '']
+		filtered_table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity', 'scaled_sensitivity'])
+		for i, k in enumerate(key_names.keys()):
+			print(table.columns)
+			print(filtered_table.columns)
+			print(len(table[table['key'] == key_names[k]]))
+			filtered_table.loc[i] = table[table['key'] == key_names[k]].iloc[0]
 
 		plt.plot(filtered_table['key'], filtered_table['scaled_sensitivity'].abs())
 		plt.xlabel('Parameters')
