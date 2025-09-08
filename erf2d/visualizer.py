@@ -293,6 +293,8 @@ class Visualizer:
 
 		for i, run in enumerate(self.runs):
 			x_order, t_order, dx, dt = config(run.config)
+			if 'x' in self.dxdt:
+				dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
 			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
 
 	def _make(self, run):
@@ -361,7 +363,7 @@ class Visualizer:
 		
 		ax.set_xlabel('Timestep')
 		ax.set_ylabel('Norm of Error at timestep')
-		ax.set_title('L2 norm of errors')
+		# ax.set_title('L2 norm of errors')
 
 		# max_ax.semilogy(abs_max_err, label='Absolute')
 		# max_ax.semilogy(rel_max_err, label='Relative')
@@ -400,7 +402,7 @@ class Visualizer:
 		ax.legend()
 		ax.set_xlabel('time')
 		ax.set_ylabel('interface posiion h(t)')
-		ax.set_title('Interface position with time')
+		# ax.set_title('Interface position with time')
 
 		fig.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
@@ -477,7 +479,7 @@ class Visualizer:
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
 		
-		fig.suptitle('Temperature Profiles')
+		# fig.suptitle('Temperature Profiles')
 		plt.tight_layout()
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
 		plt.close(fig)
@@ -712,6 +714,19 @@ class Visualizer:
 		plt.close(fig)
 
 	def plot_analysis(self, rtype):
+		def _legend(x, t):
+			ret = None
+			if (rtype == 'x'):
+				match x:
+					case 2: ret = "Linear" 
+					case 3: ret = "Quadratic"
+					case 4: ret = "Cubic"
+					case _: raise Exception("Unknown element order")
+			else:
+				ret = f'BDF {t}'
+			return ret
+
+		self.plot_interfaces()
 		match rtype:
 			case 'x':
 				xlabel = 'dx'
@@ -719,22 +734,24 @@ class Visualizer:
 				fname = 'dx_errors'
 				label = 'order'
 				ref_order = 'x_order'
+				xs = np.logspace(0, -3)
 			case 'b':
 				xlabel = 'dx'
 				title = f'{self.prefix} dxdt error analysis'
 				fname = 'dxdt_errors'
 				label = 'order'
 				ref_order = 'x_order'
+				xs = np.logspace(0, -3)
 			case 't':
 				xlabel = 'dt'
 				title = f'{self.prefix} dt error analysis'
 				fname = 'dt_errors'
 				label = 'BDF'
 				ref_order = 't_order'
+				xs = np.logspace(0, -4)
 			case _:
 				raise Exception("Unknown analysis type provided")
 
-		xs = np.logspace(-1, -4)
 		x_orders = self._pd['x_order'].unique()
 		x_orders.sort()
 
@@ -747,7 +764,8 @@ class Visualizer:
 			'xscale': 'log',
 			'yscale': 'log',
 			'ylim': [self._pd['error'].min() * 1e-1, self._pd['error'].max() * 1e1],
-			'title': title
+			'xlim': [self._pd[xlabel].min() * 0.8, self._pd[xlabel].max() * 1.2],
+			# 'title': title
 		})
 
 		marker_i = 0
@@ -756,7 +774,7 @@ class Visualizer:
 				df = self._pd.loc[self._pd['x_order'] == x]
 				df = df.loc[df['t_order'] == t]
 
-				ax.scatter(df[xlabel], df['error'], label=f'X({x}) T({t})', marker=self._markers[marker_i % len(self._markers)])
+				ax.scatter(df[xlabel], df['error'], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
 				marker_i += 1
 
 		ref_orders = self._pd[ref_order].unique()
@@ -765,10 +783,12 @@ class Visualizer:
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
-			max_point = df.loc[df['error'] == df['error'].max()]
-			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=f'Reference (order={x})', linestyle='--', marker='')
+			max_point = df.loc[df[xlabel] == df[xlabel].max()]
+			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=fr'$\mathcal{{O}}({rtype}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
 
-		ax.legend(ncols=ref_orders.shape[0])
+		box=ax.get_position()
+		ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
+		plt.tight_layout()
 
 		fig.savefig(f'{self.outd}/{self.prefix}_{fname}.png')
 
