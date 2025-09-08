@@ -1,0 +1,3 @@
+#!/bin/bash
+
+module load GCC/13.2.0 SciPy-bundle/2023.11
