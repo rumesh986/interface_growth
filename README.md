@@ -5,12 +5,23 @@
 	```
 	git clone git@github.com:oomph-lib/oomph-lib.git
 	```
-	From here onwards, `$OOMPH_DIR` will refer to the directory the repo has been cloned into.
+	From here onwards, `$OOMPH_DIR` will refer to the directory the oomph-lib repo has been cloned into.
+
+- Clone this repo to the correct directory.
+	```
+	cd $OOMPH_DIR/user_drivers/
+	git clone git@github.com:rumesh986/interface_growth.git
+	```
+	From here onwards, we will refer to the location of this repo as `$IFACE_DIR`
+
+> [!important]
+> 
+> On SCRTP systems you may need to load the appropriate modules before continuing. These can be found in this repo in the file `$IFACE_DIR/erf2d/scrtp_modules`. You will need to source this file with `source $IFACE_DIR/erf2d/scrtp_modules`. As you may not have cloned the repo yet, you may have to download the file seperately or just run the commands within the script yourself.
+
 - Configure and Run the installation
-	```
-	cd $OOMPH_DIR
-	```
-	When your run the actual build command, you will be asked to select a configuration file in `$OOMPH_DIR/config/configure_options/`. You can make your own or copy an existing one. The following options were used for the code in this repo.
+
+	You can set the right configuration options by copying `$OOMPH_DIR/config/configuration_options/default` to `$OOMPH_DIR/config/configuration_options/current` and modify it to reflect the below code block.
+
 	```
 	--enable-suppress-doc
 	--enable-suppress-pdf-doc
@@ -22,26 +33,19 @@
 	
 	Note that not all options will be needed. The first two options save some time when compiling the library.
 
-	Once `autogen` has been configured, you can actually build the library with
+	Once has been configured, you can actually build the library with
 	
 	```
 	./autogen.sh
 	```
+	You will be asked some questions before the build actually begins. You can use the default options for these.
 
-> [!important]
-> 
-> On SCRTP systems you may need to load the appropriate modules first. These can be found in this repo in the file `erf2d/scrtp_modules`. You will need to source this file with `source ./erf2d/scrtp_modules`. As you may not have cloned the repo yet, you may have to download the file seperately or just run the commands within the script yourself.
+	Go ahead and get a cup of coffee as this takes a significant amount of time on the hetmathsys nodes.
 
-	You will be asked some questions before the build actually begins. You can use the default options for these (or skip the self-tests to save time).
+> [!Notice]
+>
+> Use the `--jobs=n` flag to use multiple cores for the build to make it faster
 
-- Once the library has been built, you can go to `$OOMPH_DIR/user_drivers/` and clone this repo.
-
-```
-cd $OOMPH_DIR/user_drivers/
-git clone git@github.com:rumesh986/interface_growth.git
-```
-
-From here onwards, we will refer to the location of this repo as `$IFACE_DIR`
 
 - go to `$IFACE_DIR/erf2d` to find the latest code for simulating a moving interface.
 
