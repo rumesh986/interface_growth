@@ -19,7 +19,7 @@ if __name__ == '__main__':
 		type=int,
 		dest='xs',
 		default=2,
-		help="NNode per elements to simulate with, accepts multiple arguments to be in a list"
+		help="NNode per elements in one dimension to simulate with, accepts multiple arguments to be in a list"
 	)
 
 	parser.add_argument('--ts', '--t',
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 		choices=['a', 'x', 't', 'b', 's', 'ax', 'at', 'ab', 'as'],
 		dest='dxdt',
 		default='a',
-		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt"
+		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt\ns: sensitivity analysis"
 	)
 
 	parser.add_argument('--nthreads',
@@ -84,56 +84,56 @@ if __name__ == '__main__':
 		type=float,
 		dest='k1',
 		default=1.0,
-		help='simulation parameter'
+		help='Phase 1 thermal conductivity'
 	)
 
 	parser.add_argument('--k2',
 		type=float,
 		dest='k2',
 		default=0.5,
-		help='simulation parameter'
+		help='Phase 2 thermal conductivity'
 	)
 
 	parser.add_argument('--rho1',
 		type=float,
 		dest='rho1',
 		default=1.0,
-		help='simulation parameter'
+		help='Phase 1 density'
 	)
 
 	parser.add_argument('--rho2',
 		type=float,
 		dest='rho2',
 		default=0.5,
-		help='simulation parameter'
+		help='Phase 2 density'
 	)
 
 	parser.add_argument('--cp1',
 		type=float,
 		dest='cp1',
 		default=1.0,
-		help='simulation parameter'
+		help='Phase 1 specific heat capacity'
 	)
 
 	parser.add_argument('--cp2',
 		type=float,
 		dest='cp2',
 		default=0.5,
-		help='simulation parameter'
+		help='Phase 2 specific heat capacity'
 	)
 
 	parser.add_argument('--L',
 		type=float,
 		dest='L',
 		default=1.0,
-		help='simulation parameter'
+		help='Latent heat of fusion'
 	)
 
 	parser.add_argument('--eps',
 		type=float,
 		dest='eps',
 		default=1e-6,
-		help='simulation parameter'
+		help='factor to adjsut values for sensitivity analysis'
 	)
 
 	parser.add_argument('--style',

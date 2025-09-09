@@ -23,12 +23,14 @@ class Run:
 		self.dxdt = dxdt
 		self.nthreads = nthreads
 		self.debug = debug
-		self.interactive= interactive
+		self.interactive = interactive # flag to avoid extra computations when running in jupyter notebooks
 		self.kwargs = kwargs
 		self._exes = {}
 
+		# save current directory for reference
 		self.od = os.getcwd()
 
+		# prepare required directories for runs
 		if not os.path.exists(f'{self.od}/runs'):
 			os.mkdir(f'{self.od}/runs')
 
@@ -48,20 +50,25 @@ class Run:
 
 		stylef = kwargs.pop('stylef', None)
 		if not self.interactive:
+			# build required executables
 			self.build()
 
 			os.chdir(self.wd)
 
+			# perform all computations
 			self.run(**kwargs)
 
-			print(self.dxdt)
-			
+			# post-process results
 			Visualizer(self.prog, self.dxdt, stylef=stylef)
 			os.chdir(self.od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
 	# unsure how to deal with this race condition yet
+	#
+	# stdio output from build commands are saved to a file for later reference
 	def build(self):
+		# we use precompiler flags to set certain options in the code
+		# this code block gets the current flags from the Makefile
 		with open("Makefile", "r") as f:
 			while line := f.readline():
 				if line.startswith("CXXFLAGS"):
@@ -69,11 +76,13 @@ class Run:
 
 		for x in self.xs:
 			for t in self.ts:
+				# set custom pre-compiler flags
 				if self.debug:
 					flags = f'CXXFLAGS=-Wall -O0 -g -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 				else:
 					flags = f'{flags_base} -DRUN_SCRIPT -DX_ORDER={x} -DT_ORDER={t}'
 
+				# delete existing build artefacts to ensure proper compilation
 				subprocess.run(["make", "mostlyclean-compile"])
 
 				try:
@@ -86,14 +95,18 @@ class Run:
 						)
 				except subprocess.CalledProcessError:
 					print(f"Build failed with X={x} T={t}")
+					# print stdio output in case of error
 					with open(f"{self.wd}/build_{x}_{t}.stdout", "r") as f:
 						print(f.read())
 					raise
 
+				# save all executables with different names to avoid clashing filenames
 				prog_name = f'{self.prog}_{x}_{t}'
 				os.rename(self.prog, f'{self.wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
+	# wrapper for actual command that gets run
+	# this method also handles the command line arguments that need to be passed to the executable
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None, **kwargs):
 		nxargs = ('--nx', str(nx))
 		dtargs = ('--dt', str(dt)) if dt is not None else ('--vardt')
@@ -101,17 +114,20 @@ class Run:
 		tshiftargs = ('--tshift', str(tshift) if tshift is not None else "0.0")
 		write_freqargs = ('--write-freq', str(write_freq) if write_freq is not None else "1")
 
+		if 'dname' not in kwargs.keys():
+			kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
+
 		translated_kwargs = []
 		for key, value in kwargs.items():
-			if key == 'tshift' or value is None or key == 'eps':
+			if key in ['eps'] or value is None:
 				continue
+
 			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
+		# call executable with command line argumets
 		try:
-			if 'dname' not in kwargs.keys():
-				kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
 			with open(f'{kwargs["dname"]}.stdout', 'w') as f:
 				subprocess.run(
 					[f'./{self._exes[(x, t)]}', *nxargs, *dtargs, *tstepsargs, *tshiftargs, *write_freqargs, *translated_kwargs], 
@@ -125,7 +141,10 @@ class Run:
 				print(f.read())
 			raise
 	
+	# method that organises and performs required runs in parallel
+	# will run all permutations of options passed to the program, with small adjustments for type of computation
 	def run(self, tshift=None, **kwargs):
+		# calculate max number of CPUs usable/available
 		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
@@ -139,9 +158,11 @@ class Run:
 			f.write(f'dxdt: {self.dxdt}\n')
 			f.write(f'kwargs: {self.kwargs}')
 
+		# run processes in parallel
 		futures = {}
 		wf = None
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
+			# for dt error analysis
 			if 't' in self.dxdt:
 				max_dt = max(self.dts)
 				if tshift is None:
@@ -155,6 +176,7 @@ class Run:
 								tsteps = self.tsteps / dt
 								wf = max_dt / dt
 								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, tsteps, tshift=tshift, write_freq=wf, **kwargs)
+			# for sensitivity analysis
 			elif 's' in self.dxdt:
 				for x in self.xs:
 					for t in self.ts:
@@ -167,6 +189,7 @@ class Run:
 									kwargs_cp[v] *= (1.0 + kwargs_cp['eps'])
 									kwargs_cp['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs_cp["k1"]:9.7f}_{kwargs_cp["k2"]:9.7f}_{kwargs_cp["rho1"]:9.7f}_{kwargs_cp["rho2"]:9.7f}_{kwargs_cp["cp1"]:9.7f}_{kwargs_cp["cp2"]:9.7f}'
 									futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs_cp)
+			# for all other run types
 			else:
 				for x in self.xs:
 					for t in self.ts:
@@ -174,6 +197,7 @@ class Run:
 							for dt in self.dts:
 								futures[(x, t, nx, dt)] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs)
 			
+			# Check for process completion
 			while True:
 				if len(futures.items()) == 0:
 					break
@@ -192,9 +216,3 @@ class Run:
 					del futures[key]
 
 				time.sleep(1)
-
-def trial(xs, ts, **kwargs):
-	print('in trial')
-	print(xs)
-	print(ts)
-	print(kwargs)
