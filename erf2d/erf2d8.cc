@@ -190,10 +190,6 @@ class Erf2DProblem : public Problem {
 
 			Vector<double> x(2);
 			Vector<double> u(1);
-			Vector<double> v(1);
-
-			Vector<double> s(2);
-			Vector<double> flux(2);
 
 			// set positions of nodes in past history values
 			for (unsigned long int n = 0; n < nnode; n++)
@@ -215,6 +211,7 @@ class Erf2DProblem : public Problem {
 			doc_step(step, tsteps);
 			step++;
 
+			// set past values for initial conditions and interface positions
 			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((uint) t);
 
@@ -325,6 +322,7 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
+		// save simulation data to file
 		void doc_step(const unsigned int &timestep, const unsigned int &t = 0) {
 			double time = time_pt()->time(t);
 			unsigned long int nnode = mesh_pt()->nnode();
@@ -335,6 +333,7 @@ class Erf2DProblem : public Problem {
 
 			double tot_error = 0.0;
 
+			// save current step information
 			char fname[512];
 			sprintf(fname, "%s/steps/step%u.dat", info.directory().c_str(), info.number());
 			FILE *file = fopen(fname, "w");
@@ -352,6 +351,7 @@ class Erf2DProblem : public Problem {
 			
 			tot_error = sqrt(tot_error) / nnode;
 
+			// save errors and interface positions in seperate file (has information from all timesteps)
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
 			fprintf(file, "%16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface());
