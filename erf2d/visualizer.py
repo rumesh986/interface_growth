@@ -14,6 +14,7 @@ import scipy.optimize as scopt
 
 # import cProfile
 
+# Class to store parameters for each run
 class _Config:
 	def __init__(self, file):
 		self.nx = 0
@@ -50,125 +51,9 @@ class _Config:
 	@property
 	def title(self):
 		return self._title
- 
+
+# class to hold results from each run
 class _RunData:
-	def __init__(
-		self, 
-		inp_folder,
-		out_folder,
-		solnf='solns/soln', 
-		exact_solnf='exact_solns/exact_soln', 
-		errorf='errors/error',
-		configf='config',
-		ext='dat'
-	):
-		self.inp_folder = inp_folder
-		self.out_folder = out_folder
-		self.solnf = solnf
-		self.exact_solnf = exact_solnf
-		self.errorf = errorf
-		self.ext = ext
-
-		self._exact_solns = None
-		self._solns = None
-		self._errors = None
-
-		self.config = _Config(f'{self.inp_folder}/{configf}')
-		self.data = pd.DataFrame()
-
-		try:
-			self.times = np.fromfile(f'{self.inp_folder}/times.{self.ext}', sep='\n')
-		except FileNotFoundError:
-			raise Exception("Time data not availble")
-		
-		self.interface = None
-		if os.path.exists(f'{self.inp_folder}/interface.{self.ext}'):
-			self.interface = np.fromfile(f'{self.inp_folder}/interface.{self.ext}', sep='\n')
-			
-	@property
-	def title(self):
-		return self.config.title
-	
-	@property
-	def errors(self):
-		if not self._errors:
-			self._errors = self._read_series(self.errorf)#, ignore_history=True)
-		return self._errors
-	
-	@property
-	def solns(self):
-		if not self._solns:
-			self._solns = self._read_series(self.solnf)
-		return self._solns
-	
-	@property
-	def exact_solns(self):
-		if not self._exact_solns:
-			self._exact_solns = self._read_series(self.exact_solnf)
-		return self._exact_solns
-	
-	@property
-	def error_norms(self):
-		abs_errors = np.array([np.linalg.norm(x['error']) for x in self.errors])
-		abs_errors /= len(self.errors[0]['error'])
-
-		return abs_errors
-	
-	@property
-	def error_max(self):
-		node = np.argmax(np.fabs(self.errors[1]['error'][1:])) + 1
-		errors = np.array([df['error'][node] for df in self.errors])
-		exact_vals = np.array([df['u'][node] for df in self.exact_solns])
-		mask = exact_vals != 0.0
-		# skip_steps = int(self.config.t_shift / self.config.dt)+1
-		skip_steps = self.config.t_order + 1
-
-		abs_errors = np.fabs(errors)
-		# rel_errors = abs_errors[mask[skip_steps:]] / np.fabs(exact_vals)[mask][skip_steps:]
-		rel_errors = abs_errors[mask] / np.fabs(exact_vals[mask])
-
-		return abs_errors, rel_errors, self.errors[0]['x'][node]
-	
-	@property
-	def total_error_norm(self):
-		errors = self.error_norms
-
-		return np.linalg.norm(errors) / len(errors)
-
-	def _read_file(self, ftype, index):
-		file = f'{self.inp_folder}/{ftype}{index}.{self.ext}'
-
-		if ftype == self.errorf:
-			cols = ['x', 'y', 'norm', 'error']
-		else:
-			cols = ['x', 'y', 'u']
-
-		data = []
-		with open(file, 'r') as f:
-			while line := f.readline():
-				if not line.startswith('ZONE'):
-					data.append([float(x) for x in line.split()])
-
-		return pd.DataFrame(data, columns=cols)
-
-	def _read_series(self, ftype, ignore_history=False):
-		data = []
-		for i, t in enumerate(self.times):
-			# ignore data set in initial condition (including history values)
-			if ignore_history and t <= self.config.t_shift:
-				continue
-			_data = self._read_file(ftype, i)
-			_data['time'] = t
-
-			data.append(_data)
-		
-		return data
-
-	def create_outdir(self):
-		if not os.path.exists(self.out_folder):
-			os.mkdir(self.out_folder)
-
-class _RunData2:
 	_STEP_HEADERS = ['x', 'y', 'exact', 'u', 'error']
 	_OVERALL_HEADERS = ['time', 'error', 'interface']
 
@@ -222,9 +107,11 @@ class _RunData2:
 	def error_norms(self):
 		return self.results['error']
 	
+	# get errors at one spatial node
+	# node at which errors is max at a certain step is chosen
 	@property
 	def error_max(self):
-		node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1
+		node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1 # node at highest error some steps after start of simulation
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact != 0.0
@@ -234,29 +121,34 @@ class _RunData2:
 
 		return abs_errors, rel_errors, self.errors[0]['x'][node]
 	
+	# normalized error for whole run
 	@property
 	def total_error_norm(self):
 		return np.linalg.norm(self.results['error'])/len(self.results['error'])
 
+	# create folder to store plots
 	def create_outdir(self):
 		if not os.path.exists(self.out_folder):
 			os.mkdir(self.out_folder)
 
+# Main class to handle post-processing
 class Visualizer:
 	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False):
 		self.prefix = prefix
 		self.dxdt = dxdt
 		self.resd = resd
 		self.outd = outd
-		self.interactive = interactive
-		self.report = stylef == 'report.mplstyle'
+		self.interactive = interactive # flag to avoid extra computations when running in jupyter notebooks
+		self.report = stylef == 'report.mplstyle' # check if figures should be optimized for reports
 
 		self.runs = []
 		self._markers = ['+', 'o', 'x', '*', '.', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
+		# set stylesheet for plots
 		plt.style.use(f'../../{stylef}')
 
+		# prepare run data
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
 			if not os.path.isdir(rund):
@@ -264,12 +156,14 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData2(rund, f'{self.outd}/{rundir}', self.dxdt != 's'))
+			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', self.dxdt != 's'))
 		
+		# create output directories if needed
 		if 'a' in self.dxdt:
 			for run in self.runs:
 				run.create_outdir()
 		
+		# perform all post-processing if run in script mode
 		if not self.interactive:
 			self.prepare_pd()
 			for rtype in self.dxdt:
@@ -278,16 +172,21 @@ class Visualizer:
 					case x if x in 'bxt': self.plot_analysis(x)
 					case 's': self.sensitivity_analysis()
 
+	# collect information about all runs, needed for analysis processing
 	def prepare_pd(self):
 		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
 		config = lambda inp: (inp.x_order, inp.t_order, 1/inp.nx, inp.dt)
 
 		for i, run in enumerate(self.runs):
 			x_order, t_order, dx, dt = config(run.config)
+			# get largest dx for dx analysis
+			# phase 1 of the final step is assumed to have the largest dx of the simulation
+			# phase 1 is the growing phase (solid phase)
 			if 'x' in self.dxdt:
 				dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
 			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
 
+	# post-processing for individual runs (part of 'a' type runs)
 	def _make(self, run):
 		try:
 			# self.make_anims(run)
@@ -305,12 +204,17 @@ class Visualizer:
 		except:
 			raise Exception(f"Crashing while processing {run.config}")
 
+	# post-processing for individual runs (part of 'a' type runs)
+	# runs post-processing for each run in parallel
 	def standard(self):
 		with ProcessPoolExecutor(max_workers=10) as executor:
 			for run, thread in zip(self.runs, executor.map(self._make, self.runs)):
 				print(f'Standard processing for \n{run.config}')
 		self.plot_interfaces()
 
+	# creates a figure with two subplots
+	# one subplot shows how the norm of the total error changes with each timestep
+	# second subplot shows how the error changes at a particular spatial point
 	def plot_errors(self, run):
 		plt.cla()
 
@@ -318,7 +222,8 @@ class Visualizer:
 		abs_max_err, rel_max_err, pos = run.error_max
 
 		fig, (norm_ax, max_ax) = plt.subplots(1,2, figsize=(10, 5))
-		fig.suptitle(f'Errors ({run.title})')
+		if not self.report:
+			fig.suptitle(f'Errors ({run.title})')
 
 		norm_ax.semilogy(norm_err)
 		
@@ -341,6 +246,7 @@ class Visualizer:
 			
 		plt.close(fig)
 	
+	# similar to previous function but only plots how the norm of error changes with each timestep (for reports)
 	def plot_error_norms(self, run):
 		plt.cla()
 
@@ -361,21 +267,25 @@ class Visualizer:
 			
 		plt.close(fig)
 	
+	# plots the position of the interface against time
+	# also does some curve fitting to estimate the value of D_eff
 	def plot_interface(self, run):
+		# expected functional form for curve fitting
 		def f(x, a, b):
 			return np.sqrt(x * a) + b
 
 		plt.cla()
 
 		fig, ax = plt.subplots(1)
-
 		ax.plot(run.times, run.interface, label='Interface position')
 
 		try:
+			# perform curve-fitting and plot results
 			optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 			x_ref = np.linspace(run.times.iloc[0], run.times.iloc[-1])
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
+			print(f'{run.title} D_eff = {optimal[0]}')
 			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
 		except:
 			print("Failed to fit h-curve")
@@ -394,6 +304,8 @@ class Visualizer:
 		
 		plt.close()
 	
+	# plot interfaces from all runs in one plot
+	# mostly just test code
 	def plot_interfaces(self):
 		def f(x, a, b):
 			return np.sqrt(x*a) + b
@@ -421,6 +333,7 @@ class Visualizer:
 		if not self.report:
 			ax.set_title('Interface position with time')
 
+		# move legend outside plot
 		box=ax.get_position()
 		ax.set_position([box.x0, box.y0 + box.height * 0.05, box.width, box.height * 0.95])
 		ax.legend(loc='upper center', bbox_to_anchor=(0.5,-0.05), ncol=3, prop={'size': 8})
@@ -432,8 +345,10 @@ class Visualizer:
 		
 		plt.close()
 	
+	# plot temperature profile at different steps in one figure (for report)
 	@mpl.rc_context({'font.size': 20})
 	def subplot_surf_prof(self, run):
+		# function to extract data from middle of simulation (get 1D profile from the 2D data)
 		def _extract_data(data):
 			ys = data['y'].unique()
 			ref_y = ys[ys.shape[0] //2]
@@ -446,7 +361,7 @@ class Visualizer:
 
 		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(14,10), layout="compressed")
 
-		num_frames = len(run.solns) // 4
+		num_frames = len(run.solns) // 4 # stride for timesteps to choose which frames to plot
 
 		for i, ax in enumerate(axs.flatten()):
 			data = _extract_data(run.solns[i*num_frames])
@@ -471,6 +386,7 @@ class Visualizer:
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
 		plt.close(fig)
 	
+	# plot node positions at different steps in one figure (for report)
 	@mpl.rc_context({'font.size': 20})
 	def subplot_mesh(self, run):
 		plt.cla()
@@ -492,6 +408,8 @@ class Visualizer:
 		fig.savefig(f'{run.out_folder}/{self.prefix}-meshes.png')
 		plt.close(fig)
 
+	# helper method to reshape the data into 2D for easy access
+	# function has been optimised to reduce time with pandas operations
 	def _reshape_2D_data(self, data, key):
 		xs = data['x'].unique()
 		ys = data['y'].unique()
@@ -517,6 +435,7 @@ class Visualizer:
 		
 		return xs, ys, u
 	
+	# plot surface animation of numerical, analytical results and errors
 	def make_surf_anims(self, run):
 		def _plot_surface(ax, data, key):
 			xs, ys, us = self._reshape_2D_data(data, key)
@@ -565,6 +484,7 @@ class Visualizer:
 		anim = ArtistAnimation(fig, artists)
 		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')
 
+	# plot surface animation of only numerical results
 	def make_results_surf(self, run):
 		plt.cla()
 
@@ -592,6 +512,7 @@ class Visualizer:
 		anim = ArtistAnimation(fig, artists)
 		anim.save(f'{run.out_folder}/{self.prefix}-soln.mp4')
 
+	# plot cross-section of the 2D surface (easier to visualize for the 1D problem)
 	def make_surf_profile_anim(self, run):
 		def _extract_data(data):
 			ys = data['y'].unique()
@@ -665,6 +586,7 @@ class Visualizer:
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
 		plt.close(fig)
 
+	# plot 1D data (for older erf code that was run with 1D elements)
 	def make_anims(self, run):
 		def _update(n):
 			time_text.set_text(f't={run.times[n]}')
@@ -721,7 +643,9 @@ class Visualizer:
 		anim.save(f'{run.out_folder}/{self.prefix}-results.mp4')	
 		plt.close(fig)
 
+	# perform and plot error analysis
 	def plot_analysis(self, rtype):
+		# helper function to get legend entries
 		def _legend(x, t):
 			ret = None
 			if (rtype == 'x'):
@@ -734,7 +658,6 @@ class Visualizer:
 				ret = f'BDF {t}'
 			return ret
 
-		self.plot_interfaces()
 		match rtype:
 			case 'x':
 				xlabel = 'dx'
@@ -773,7 +696,6 @@ class Visualizer:
 			'yscale': 'log',
 			'ylim': [self._pd['error'].min() * 1e-1, self._pd['error'].max() * 1e1],
 			'xlim': [self._pd[xlabel].min() * 0.8, self._pd[xlabel].max() * 1.2],
-			# 'title': title
 		})
 
 		marker_i = 0
@@ -785,9 +707,10 @@ class Visualizer:
 				ax.scatter(df[xlabel], df['error'], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
 				marker_i += 1
 
+		# plot reference lines
+		# lines are made to intersect the point at the largest dx/dt
 		ref_orders = self._pd[ref_order].unique()
 		ref_orders.sort()
-
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
@@ -797,6 +720,7 @@ class Visualizer:
 		if not self.report:
 			fig.suptitle(title)
 
+		# put legend outside axis
 		box=ax.get_position()
 		ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
 		plt.tight_layout()
@@ -808,6 +732,7 @@ class Visualizer:
 
 		plt.close(fig)
 	
+	# plot results of sensitivity analysis
 	def sensitivity_analysis(self):
 		def f(x, a, b):
 			return np.sqrt(x*a) + b
@@ -816,6 +741,7 @@ class Visualizer:
 		table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity'])
 		for i, run in enumerate(self.runs):
 			try:
+				# calculate D_eff (quantity of interest in sensitivity analysis)
 				optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 				params = run.config.params
 				table.loc[i] = ['', params['k1'], params['k2'], params['rho1'], params['rho2'], params['cp1'], params['cp2'], params['L'], optimal[0], 0.0]
@@ -829,6 +755,7 @@ class Visualizer:
 		for k in keys:
 			orig[k] = table[k].min()
 
+		# find run with mean parameter values (not shifted to calculate sensitivity)
 		orig_row = table[
 			(table['k1'] == orig['k1']) & 
 			(table['k2'] == orig['k2']) & 
@@ -839,6 +766,7 @@ class Visualizer:
 			(table['L'] == orig['L'])
 		]
 
+		# proper display names for each parameter
 		key_names = {
 			'k1': r'$\lambda_s$',
 			'k2': r'$\lambda_l$',
@@ -849,7 +777,7 @@ class Visualizer:
 			'L': r'$\mathcal{L}_f$'
 		}
 
-		sensitivity = {}
+		# calculate sensitivities
 		for k in keys:
 			index = table.index[table[k] == table[k].max()]
 			h = table.loc[index, k] - orig_row[k].iloc[0]
@@ -858,6 +786,7 @@ class Visualizer:
 			table.loc[index, 'sensitivity'] = (table.loc[index, 'deff'] - orig_row['deff'].iloc[0]) / h
 			table.loc[index, 'scaled_sensitivity'] = table.loc[index, k] * table.loc[index, 'sensitivity']
 
+		# filter and sort data for plotting
 		filtered_table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity', 'scaled_sensitivity'])
 		for i, k in enumerate(key_names.keys()):
 			filtered_table.loc[i] = table[table['key'] == key_names[k]].iloc[0]
@@ -871,6 +800,7 @@ class Visualizer:
 	
 		plt.savefig(f'{self.outd}/{self.prefix}-sensitivity.png')
 
+# simple way to run visualizer for debug purposes outside of proper runs
 if __name__ =='__main__':
 	assert len(sys.argv) == 3
 	assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
