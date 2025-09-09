@@ -221,16 +221,6 @@ class _RunData2:
 	@property
 	def error_norms(self):
 		return self.results['error']
-		# abs_errors = np.array([np.linalg.norm(x['error']) for x in self.errors])
-		# abs_errors /= len(self.errors[0]['error'])
-
-		# if np.all(np.equal(abs_errors, self.results['error'])):
-		# 	print("Yup its all equal")
-		# else:
-		# 	print("There appears to be some difference")
-		# 	print(f"Mag: {np.linalg.norm(abs_errors - self.results['error'])}")
-		# 	print(np.c_[self.results['error'], abs_errors])
-		# return abs_errors
 	
 	@property
 	def error_max(self):
@@ -259,12 +249,12 @@ class Visualizer:
 		self.resd = resd
 		self.outd = outd
 		self.interactive = interactive
+		self.report = stylef == 'report.mplstyle'
 
 		self.runs = []
 		self._markers = ['+', 'o', 'x', '*', '.', 'D', '^', 'v']
 		self._linestyles = ['-', '--', ':']
 
-		stylef='report.mplstyle'
 		plt.style.use(f'../../{stylef}')
 
 		for rundir in os.listdir(self.resd):
@@ -313,7 +303,7 @@ class Visualizer:
 				self.plot_interface(run)
 
 		except:
-			raise Exception(f"Crashing for some reason {run.config}")
+			raise Exception(f"Crashing while processing {run.config}")
 
 	def standard(self):
 		with ProcessPoolExecutor(max_workers=10) as executor:
@@ -355,25 +345,14 @@ class Visualizer:
 		plt.cla()
 
 		norm_err = run.error_norms
-		# abs_max_err, rel_max_err, pos = run.error_max
 
 		fig, ax = plt.subplots(1)
-		# fig.suptitle(f'Errors ({run.title})')
-
 		ax.semilogy(norm_err)
-		print(f'{run.title=} max error={norm_err.max()} at {norm_err.argmax()}')
-		
 		ax.set_xlabel('Timestep')
 		ax.set_ylabel('Norm of Error at timestep')
-		# ax.set_title('L2 norm of errors')
 
-		# max_ax.semilogy(abs_max_err, label='Absolute')
-		# max_ax.semilogy(rel_max_err, label='Relative')
-		
-		# max_ax.legend()
-		# max_ax.set_xlabel('Timestep')
-		# max_ax.set_ylabel('Error magnitude')
-		# max_ax.set_title(f'Magnitude of errors at x={pos}')
+		if not self.report:
+			ax.set_title('L2 norm of errors')
 
 		plt.savefig(f'{run.out_folder}/{self.prefix}-error_norms.png')
 
@@ -404,7 +383,9 @@ class Visualizer:
 		ax.legend()
 		ax.set_xlabel('time')
 		ax.set_ylabel('interface posiion h(t)')
-		# ax.set_title('Interface position with time')
+
+		if not self.report:
+			ax.set_title('Interface position with time')
 
 		fig.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
@@ -436,7 +417,9 @@ class Visualizer:
 
 		ax.set_xlabel('time')
 		ax.set_ylabel('Interface position $h(t)$')
-		ax.set_title('Interface position with time')
+
+		if not self.report:
+			ax.set_title('Interface position with time')
 
 		box=ax.get_position()
 		ax.set_position([box.x0, box.y0 + box.height * 0.05, box.width, box.height * 0.95])
@@ -481,20 +464,20 @@ class Visualizer:
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
 		
-		# fig.suptitle('Temperature Profiles')
+		if not self.report:
+			fig.suptitle('Temperature Profiles')
+		
 		plt.tight_layout()
 		fig.savefig(f'{run.out_folder}/{self.prefix}-surf_prof.png')
 		plt.close(fig)
 	
 	@mpl.rc_context({'font.size': 20})
 	def subplot_mesh(self, run):
-		print("Im here in subplot_mesh")
 		plt.cla()
 		
 		fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(14,10), layout="compressed")
 
 		num_frames = len(run.exact_solns) // 4
-		print(num_frames)
 
 		for i, ax in enumerate(axs.flatten()):
 			data = run.exact_solns[i*num_frames]
@@ -811,6 +794,9 @@ class Visualizer:
 			max_point = df.loc[df[xlabel] == df[xlabel].max()]
 			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=fr'$\mathcal{{O}}({rtype}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
 
+		if not self.report:
+			fig.suptitle(title)
+
 		box=ax.get_position()
 		ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
 		plt.tight_layout()
@@ -872,19 +858,17 @@ class Visualizer:
 			table.loc[index, 'sensitivity'] = (table.loc[index, 'deff'] - orig_row['deff'].iloc[0]) / h
 			table.loc[index, 'scaled_sensitivity'] = table.loc[index, k] * table.loc[index, 'sensitivity']
 
-		print(table)
-
 		filtered_table = pd.DataFrame(columns=['key', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'deff', 'sensitivity', 'scaled_sensitivity'])
 		for i, k in enumerate(key_names.keys()):
-			print(table.columns)
-			print(filtered_table.columns)
-			print(len(table[table['key'] == key_names[k]]))
 			filtered_table.loc[i] = table[table['key'] == key_names[k]].iloc[0]
 
 		plt.plot(filtered_table['key'], filtered_table['scaled_sensitivity'].abs())
 		plt.xlabel('Parameters')
 		plt.ylabel('Scaled sensitivities')
-		# plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
+
+		if not self.report:
+			plt.title(r"Scaled sensitivities of $D_{\mathrm{eff}}$")
+	
 		plt.savefig(f'{self.outd}/{self.prefix}-sensitivity.png')
 
 if __name__ =='__main__':
