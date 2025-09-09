@@ -42,7 +42,7 @@
 
 	Go ahead and get a cup of coffee as this takes a significant amount of time on the hetmathsys nodes.
 
-> [!Notice]
+> [!note]
 >
 > Use the `--jobs=n` flag to use multiple cores for the build to make it faster
 
