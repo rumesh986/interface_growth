@@ -29,6 +29,9 @@ class Run:
 
 		self.od = os.getcwd()
 
+		if not os.path.exists(f'{self.od}/runs'):
+			os.mkdir(f'{self.od}/runs')
+
 		if self.debug:
 			print("Working in debug directory")
 			self.wd = f'{self.od}/runs/debug/'
