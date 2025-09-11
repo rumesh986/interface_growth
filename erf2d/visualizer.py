@@ -98,6 +98,12 @@ class _RunData:
 				self.solns.append(data[['time', 'x', 'y', 'u']])
 
 				self.data.append(data)
+		else:
+			i = len(self.results['time']) - 1
+
+			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+			data['time'] = self.results['time'].values[-1]
+			self.solns.append(data[['time', 'x', 'y', 'u']])
 
 	@property
 	def title(self):
@@ -156,7 +162,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', self.dxdt != 's'))
+			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', 'a' in self.dxdt))
 		
 		# create output directories if needed
 		if 'a' in self.dxdt:
