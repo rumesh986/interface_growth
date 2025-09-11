@@ -14,6 +14,13 @@ if __name__ == '__main__':
 		help="Name of program to run"
 	)
 
+	parser.add_argument('--name',
+		type=str,
+		dest='dname',
+		default=None,
+		help='Name of directory to store data'
+	)
+
 	parser.add_argument('--xs', '--x',
 		nargs='+', 
 		type=int,

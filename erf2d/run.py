@@ -13,7 +13,7 @@ import numpy as np
 from visualizer import Visualizer
 
 class Run:
-	def __init__(self, prog, xs, ts, nxs, dts, tsteps, dxdt, nthreads, debug=False, interactive=False, **kwargs):
+	def __init__(self, prog, xs, ts, nxs, dts, tsteps, dxdt, nthreads, dname=None, debug=False, interactive=False, **kwargs):
 		self.prog = prog
 		self.xs = [xs] if isinstance(xs, int) else xs
 		self.ts = [ts] if isinstance(ts, int) else ts
@@ -33,20 +33,26 @@ class Run:
 		# prepare required directories for runs
 		if not os.path.exists(f'{self.od}/runs'):
 			os.mkdir(f'{self.od}/runs')
-
-		if self.debug:
-			print("Working in debug directory")
+		
+		if debug:
 			self.wd = f'{self.od}/runs/debug/'
-			shutil.rmtree(f'{self.wd}/RESLT/')
-			os.mkdir(f'{self.wd}/RESLT')
 		else:
-			self.wd = f'{self.od}/runs/{datetime.today().strftime("%d-%m-%Y_%H:%M:%S")}'
-			os.mkdir(f'{self.wd}')
-			os.mkdir(f'{self.wd}/RESLT')
-			os.mkdir(f'{self.wd}/imgs')
+			if dname is None:
+				self.wd = f'{self.od}/runs/{datetime.today().strftime("%Y-%m-%d_%H:%M:%S")}'
+			else:
+				self.wd = f'{self.od}/runs/{dname}'
+		
+		print(f"Working in {self.wd}")
 
-		print(f'__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
-		# print(f'Running in directorys: {self.wd}')
+		for path in [self.wd, f'{self.wd}/imgs']:
+			if not os.path.exists(path):
+				os.mkdir(path)
+
+		if os.path.exists(f'{self.wd}/RESLT'):
+			shutil.rmtree(f'{self.wd}/RESLT')
+		os.mkdir(f'{self.wd}/RESLT')
+
+		print(f'Run.__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 
 		stylef = kwargs.pop('stylef', None)
 		if not self.interactive:
