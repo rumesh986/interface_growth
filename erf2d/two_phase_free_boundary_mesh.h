@@ -29,7 +29,7 @@ class FreeBoundaryGeometry : public GeomObject {
 			// assume impulsive conditions
 			for (unsigned int t = 0; t < ts_pt->nprev_values(); t++) {
 				data_pt[0]->set_value(t, 0, x0);
-				data_pt[0]->set_value(t, 1, x1);
+				data_pt[0]->set_value(t, free_boundary_index, x1);
 				data_pt[0]->set_value(t, 2, x2);
 				data_pt[0]->set_value(t, 3, y0);
 				data_pt[0]->set_value(t, 4, y1);
@@ -142,8 +142,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 
 	protected:
 		void fill_in_generic_residual_contribution(Vector<double>& residuals, DenseMatrix<double>& jacobian, bool compute_jacobian) {
-			unsigned ndofs = ndof();
-
+			unsigned int ndofs = ndof();
 			if (ndofs == 0) return;
 
 			int free_boundary_local_eqn_number = internal_local_eqn(geometry_index, free_boundary_index);
@@ -151,8 +150,19 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
+			double dhdt = 0.0;
+			for (unsigned int t = 0; t < interface_ts_pt->ntstorage(); t++) {
+				double x1 = interface_data_pt->value(t, free_boundary_index);
+				double weight = interface_ts_pt->weight(1, t);
+				double prod = x1 * weight;
+				dhdt += prod;
+				if (!compute_jacobian)
+					printf("t=%u x1=%8.6f weight=%8.6f prod=%8.6f dhdt=%8.6f computed=%8.6f\n", t, x1, weight, prod, dhdt, interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index));
+			}
+
 			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
-			printf("Factor: %8.6f dhdt=%8.6f\n", factor, interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index));
+			if (!compute_jacobian)
+				printf("Factor: %8.6f dhdt=%8.6f res=%8.6f\n", factor, interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index), residuals[free_boundary_local_eqn_number]);
 			if (compute_jacobian) {
 				printf("Computing jacobian\n");
 				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor;//interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index);

@@ -244,6 +244,11 @@ class Erf2DProblem : public Problem {
 				domain->set_interface(new_h);
 				bulk_mesh_pt->node_update();
 
+				// for (unsigned int n = 0; n < nnode; n++) {
+				// 	MacroElementNodeUpdateNode *node_pt = dynamic_cast<MacroElementNodeUpdateNode *>(bulk_mesh_pt->node_pt(n));
+				// 	node_update_ic(t, node_pt);
+				// }
+
 				// mesh_pt()->node_update() only moves the nodes for current timestep
 				// when setting initial condition, we need to move the nodes ourselves
 				// the below code has been adapted from mesh_pt()->node_update()
@@ -355,6 +360,22 @@ class Erf2DProblem : public Problem {
 				for (unsigned j = 0; j < 2; j++) {
 					flux[j] += elem->nodal_value(t, l, u_nodal_index) * dpsidx(l, j);
 				}
+			}
+		}
+
+		void node_update_ic(const unsigned int &t, MacroElementNodeUpdateNode *node_pt) {
+			static unsigned long int error_count = 0;
+			if (node_pt->node_update_element_pt() == 0)  {
+				printf("We might still have problems!! %lu / %lu\n", error_count, t*bulk_mesh_pt->nnode());
+				error_count++;
+			} else {
+				Vector<double> x_new(2), s_local(2);
+				s_local = node_pt->s_in_node_update_element();
+				node_pt->node_update_element_pt()->get_x(t, s_local, x_new);
+				for (unsigned int i = 0; i < 2; i++) {
+					node_pt->x(t, i) = x_new[i];
+				}
+				
 			}
 		}
 };
