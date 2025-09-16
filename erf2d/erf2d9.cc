@@ -444,12 +444,15 @@ int main(int argc, char **argv) {
 
 	// set approximate starting point for interface based on previous runs
 	xs[1] = sqrt(1.26 * t_shift);
+	
+	for (int i = 0; i < 2; i++) D[i] = k[i]/(Cp[i]*rho[i]);
 
 	printf("Problem Def:\n");
 	printf("\tk1=%8.6f k2=%8.6f\n", k[0], k[1]);
 	printf("\trho1=%8.6f rho2=%8.6f\n", rho[0], rho[1]);
 	printf("\tCp1=%8.6f Cp2=%8.6f\n", Cp[0], Cp[1]);
 	printf("\tD1=%8.6f D2=%8.6f\n", D[0], D[1]);
+	printf("\tL=%8.6f\n", L);
 
 	auto problem = Erf2DProblem<QUnsteadyHeatElement<2,X_ORDER>>(Nx, Ny, t_steps, dt, t_shift, info);
 
@@ -480,8 +483,6 @@ int main(int argc, char **argv) {
 	fclose(file);
 
 	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;
-
-	exit(0);
 
 	for (uint t = 0; t < t_steps; t++) {
 		problem.unsteady_newton_solve(dt);
