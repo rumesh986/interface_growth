@@ -86,11 +86,12 @@ class Erf2DProblem : public Problem {
 
 			// TimeStepper *domain_ts_pt = new BDF<T_ORDER>;
 
-			FreeBoundaryGeometry *geometry_object = new FreeBoundaryGeometry(xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
+			// FreeBoundaryGeometry *geometry_object = new FreeBoundaryGeometry(xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
 
 			domain = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], rho[0] * L, time_stepper_pt());
 
-			bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, geometry_object, time_stepper_pt());
+			bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, domain, time_stepper_pt());
+			// bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, geometry_object, time_stepper_pt());
 			bulk_mesh_pt->setup_boundary_element_info();
 			add_sub_mesh(bulk_mesh_pt);
 			

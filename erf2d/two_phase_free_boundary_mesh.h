@@ -190,7 +190,11 @@ class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
 					this->convert_to_boundary_node(node);
 					this->add_boundary_node(4, node);
 				}
-				
+			}
+
+			for (unsigned int e = 0; e < (nx1+nx2)*ny; e++) {
+				EL *elem = dynamic_cast<EL *>(this->element_pt(e));
+
 				Vector<GeomObject *> geom_object_pt(1);
 				geom_object_pt[0] = geometry;
 
