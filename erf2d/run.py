@@ -9,6 +9,8 @@ from datetime import datetime
 from concurrent.futures import wait, ProcessPoolExecutor
 
 import numpy as np
+from scipy.optimize import newton
+from scipy.special import erf
 
 from visualizer import Visualizer
 
@@ -111,6 +113,30 @@ class Run:
 				os.rename(self.prog, f'{self.wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
+	def get_De(self, k1, k2, rho1, rho2, cp1, cp2, L, **kwargs):
+		def func(x):
+			D1 = k1/(rho1*cp1)
+			D2 = k2/(rho2*cp2)
+			Ts = -1.0
+			Tm = 0.0
+			Tl = 1.0
+
+			return rho1*L*np.emath.sqrt(x) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
+		
+		De = newton(func, k1/(rho1*cp1))
+
+		if (not np.isclose(func(De), 0.0)):
+			print("Trying with D2")
+			De = newton(func, k2/(rho2*cp2))
+		
+		De = np.real(De)
+			
+		print(f'f({De}) = {func(De)}')
+
+		if func(De) is None:
+			raise Exception("De is problem")
+		return De
+
 	# wrapper for actual command that gets run
 	# this method also handles the command line arguments that need to be passed to the executable
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None, **kwargs):
@@ -123,6 +149,10 @@ class Run:
 		if 'dname' not in kwargs.keys():
 			kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
 
+		# ke = self.get_ke(kwargs['k1'], kwargs['k2'], kwargs['rho1'], kwargs['rho2'], kwargs['cp1'], kwargs['cp2'], kwargs['L'])
+		De = self.get_De(**kwargs)
+		kwargs['De'] = De
+
 		translated_kwargs = []
 		for key, value in kwargs.items():
 			if key in ['eps'] or value is None:
@@ -130,6 +160,7 @@ class Run:
 
 			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
+		print(translated_kwargs)
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
 		# call executable with command line argumets

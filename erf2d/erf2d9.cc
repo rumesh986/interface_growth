@@ -9,15 +9,17 @@
 
 #ifndef RUN_SCRIPT
 #define X_ORDER 2
-#define T_ORDER 4
+#define T_ORDER 1
 #endif
 
 double k[2] = {1.0, 0.5};
 double rho[2] = {1.0, 0.5};
 double Cp[2] = {1.0, 0.5};
 
-double D[2] {k[0]/(Cp[0]*rho[0]), k[1]/(Cp[1]*rho[1])};
+double D[3] {k[0]/(Cp[0]*rho[0]), k[1]/(Cp[1]*rho[1]), 0.0};
 double L = 1.0;
+
+bool ic_set = false;
 
 static const double T_s = -1.0;
 static const double T_m = 0.0;
@@ -26,7 +28,7 @@ static const double T_l = 1.0;
 double xs[3] = {-1.0, 0.025, 1.0};
 static const double ys[2] = {0.0, 1.0};
 
-FreeBoundaryElement *domain;
+FreeBoundaryElement *geometry;
 
 void no_flux_fct(const double &t, const Vector<double> &x, double &flux) {
 	flux = 0.0;
@@ -38,11 +40,26 @@ void get_source(const double &t, const Vector<double> &x, double &source) {
 
 // analytical solution
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
-	double h = domain->get_interface();
-	if (x[0] < h) {
-		u[0] = T_s + (T_m-T_s)/(1+erf(h/(2*sqrt(D[0]*t)))) * (1 + erf(x[0]/(2*sqrt(D[0]*t))));
+	// double h = geometry->get_interface();
+	// if (x[0] < h) {
+	// 	u[0] = T_s + (T_m-T_s)/(1+erf(h/(2*sqrt(D[0]*t)))) * (1 + erf(x[0]/(2*sqrt(D[0]*t))));
+	// } else {
+	// 	u[0] = T_l - (T_l-T_m)/(1-erf(h/(2*sqrt(D[1]*t)))) * (1 - erf(x[0]/(2*sqrt(D[1]*t))));
+	// }
+
+	double h = 0.0;
+	if (ic_set) {
+		h = (D[2] == 0.0) ? geometry->get_interface() : sqrt(D[2] * t);
 	} else {
-		u[0] = T_l - (T_l-T_m)/(1-erf(h/(2*sqrt(D[1]*t)))) * (1 - erf(x[0]/(2*sqrt(D[1]*t))));
+		h = geometry->get_interface();
+	}
+
+	if (x[0] < h) {
+		double erf_iface = erf(h/(2*sqrt(D[0]*t)));
+		u[0] = ((T_m - T_s)*erf(x[0]/(2*sqrt(D[0]*t))) + T_m + T_s *erf_iface)/(1+erf_iface);
+	} else {
+		double erf_iface = erf(h/(2*sqrt(D[1]*t)));
+		u[0] = ((T_l- T_m)*erf(x[0]/(2*sqrt(D[1]*t))) + T_m - T_l*erf_iface)/(1-erf_iface);
 	}
 }
 
@@ -72,6 +89,8 @@ class Erf2DProblem : public Problem {
 	
 		TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>> *bulk_mesh_pt;
 		Mesh *geometry_mesh_pt;
+
+		FreeBoundaryDomain *domain;
 	public:
 		Erf2DProblem(
 			unsigned int nx_,
@@ -88,16 +107,19 @@ class Erf2DProblem : public Problem {
 
 			// FreeBoundaryGeometry *geometry_object = new FreeBoundaryGeometry(xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
 
-			domain = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], rho[0] * L, time_stepper_pt());
+			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], rho[0] * L, time_stepper_pt());
+			domain = new FreeBoundaryDomain(geometry, nx1, nx2, ny);
 
-			bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, domain, time_stepper_pt());
+			printf("x0=%8.6f x1=%8.6f x2=%8.6f\n", geometry->x0(), geometry->x1(), geometry->x2());
+
+			bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, geometry, domain, time_stepper_pt());
 			// bulk_mesh_pt = new TwoPhaseFreeBoundaryMesh<MacroElementNodeUpdateElement<EL>>(nx1, nx2, ny, geometry_object, time_stepper_pt());
 			bulk_mesh_pt->setup_boundary_element_info();
 			add_sub_mesh(bulk_mesh_pt);
 			
 
 			geometry_mesh_pt = new Mesh;
-			geometry_mesh_pt->add_element_pt(domain);
+			geometry_mesh_pt->add_element_pt(geometry);
 			add_sub_mesh(geometry_mesh_pt);
 
 			build_global_mesh();
@@ -131,8 +153,9 @@ class Erf2DProblem : public Problem {
 
 			assign_eqn_numbers();
 
-			// linear_solver_pt()->disable_doc_time();
-			// disable_info_in_newton_solve();
+			linear_solver_pt()->disable_doc_time();
+			disable_info_in_newton_solve();
+			max_newton_iterations() = 1e5;
 			max_residuals() = 1e7;
 		}
 
@@ -181,12 +204,12 @@ class Erf2DProblem : public Problem {
 					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 					elem->get_flux(s, flux);
 
-					tot_flux += k[1] * flux[0];
+					tot_flux -= k[1] * flux[0];
 				}
 			}
 
-			double old_int = domain->get_interface();
-			domain->set_flux(flux[0]);
+			printf("Setting total flux to %8.6f\n", tot_flux / ny);
+			geometry->set_flux(tot_flux / ny);
 			bulk_mesh_pt->node_update();
 			printf("Moved interface from %8.6f to %8.6f\n", old_int, domain->get_interface());
 		}
@@ -226,22 +249,29 @@ class Erf2DProblem : public Problem {
 				//
 				// update_interface
 				//
-				double tot_flux = 0.0;
-				for (unsigned long int e = 0; e < nelems; e++) {
-					int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-					if (face_index == 1) {
-						EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-						get_flux_ic(t+1, elem, s, flux);
-						tot_flux += k[0] * flux[0];
-					} else if (face_index == -1) {
-						EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-						get_flux_ic(t+1, elem, s, flux);
-						tot_flux += k[1] * flux[0];
+				double new_h = 0.0;
+				if (D[2] == 0.0) {
+					double tot_flux = 0.0;
+					for (unsigned long int e = 0; e < nelems; e++) {
+						int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+						if (face_index == 1) {
+							EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+							get_flux_ic(t+1, elem, s, flux);
+							tot_flux += k[0] * flux[0];
+						} else if (face_index == -1) {
+							EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+							get_flux_ic(t+1, elem, s, flux);
+							tot_flux += k[1] * flux[0];
+						}
 					}
+					double v = tot_flux / (rho[0] * L * ny);
+					new_h = geometry->get_interface() + v*dt;
+					// printf("IC %u: v=%8.6f x_old=%8.6f x_new=%8.6f\n", t, v, geometry->get_interface(), new_h);
+				} else {
+					new_h = sqrt(D[2] * time);
 				}
-				double v = tot_flux / (rho[0] * L * ny);
-				double new_h = domain->get_interface() + v*dt;
-				domain->set_interface(new_h);
+				geometry->set_interface(new_h);
+				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
 				bulk_mesh_pt->node_update();
 
 				// for (unsigned int n = 0; n < nnode; n++) {
@@ -296,6 +326,7 @@ class Erf2DProblem : public Problem {
 			}
 
 			time_pt()->time() = t_shift;
+			ic_set = true;
 		}
 
 		void doc_step(const unsigned int &timestep, const unsigned int &t = 0) {
@@ -327,10 +358,10 @@ class Erf2DProblem : public Problem {
 
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface());
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time));
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error = %e interface = %8.6f\n", timestep, time, tot_error, domain->get_interface());
+			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, geometry->get_interface(), sqrt(D[2]*time));
 			info.number()++;
 		}
 
@@ -406,6 +437,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--cp1", &Cp[0]);
 	CommandLineArgs::specify_command_line_flag("--cp2", &Cp[1]);
 	CommandLineArgs::specify_command_line_flag("--L", &L);
+	CommandLineArgs::specify_command_line_flag("--De", &D[2]);
 	CommandLineArgs::specify_command_line_flag("--dname", &dname, "doc");
 
 	CommandLineArgs::parse_and_assign();
@@ -464,7 +496,8 @@ int main(int argc, char **argv) {
 	}
 
 	// set approximate starting point for interface based on previous runs
-	xs[1] = sqrt(1.26 * t_shift);
+	double _interface_time = t_shift - T_ORDER*dt;
+	xs[1] = (D[2] == 0.0) ? sqrt(1.26 * _interface_time) : sqrt(D[2] * _interface_time);
 	
 	for (int i = 0; i < 2; i++) D[i] = k[i]/(Cp[i]*rho[i]);
 
@@ -472,7 +505,7 @@ int main(int argc, char **argv) {
 	printf("\tk1=%8.6f k2=%8.6f\n", k[0], k[1]);
 	printf("\trho1=%8.6f rho2=%8.6f\n", rho[0], rho[1]);
 	printf("\tCp1=%8.6f Cp2=%8.6f\n", Cp[0], Cp[1]);
-	printf("\tD1=%8.6f D2=%8.6f\n", D[0], D[1]);
+	printf("\tD1=%8.6f D2=%8.6f De=%8.6f\n", D[0], D[1], D[2]);
 	printf("\tL=%8.6f\n", L);
 
 	auto problem = Erf2DProblem<QUnsteadyHeatElement<2,X_ORDER>>(Nx, Ny, t_steps, dt, t_shift, info);
@@ -511,7 +544,7 @@ int main(int argc, char **argv) {
 		if (t % write_freq == 0)
 			problem.doc_step(t+prev_steps);
 
-		double x_int = domain->get_interface();
+		double x_int = geometry->get_interface();
 
 		if (x_int >= xs[2] || isnan(x_int)) {
 			printf("Interface reached right boundary, exiting...\n");

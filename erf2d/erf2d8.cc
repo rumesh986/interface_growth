@@ -41,8 +41,11 @@ double Cp2 = 0.5;
 
 double D1 = k1 / (Cp1 * rho1);
 double D2 = k2 / (Cp2 * rho2);
+double De = 0.0;
 
 double L = 1.0;
+
+bool ic_set = false;
 
 static const double Ts = -1.0;
 static const double Tm = 0.0;
@@ -83,11 +86,25 @@ unordered_map<unsigned int, FluxFctPt> neumann_boundaries = {
 
 // analytical solution
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
-	double h = domain->get_interface();
-	if (x[0] < h) {
-		u[0] = Ts + (Tm-Ts)/(1+erf(h/(2*sqrt(D1*t)))) * (1 + erf(x[0]/(2*sqrt(D1*t))));
+	// double h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
+	double h = 0.0;
+	if (ic_set) {
+		h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
 	} else {
-		u[0] = Tfr - (Tfr-Tm)/(1-erf(h/(2*sqrt(D2*t)))) * (1 - erf(x[0]/(2*sqrt(D2*t))));
+		h = domain->get_interface();
+	}
+	// if (x[0] < h) {
+	// 	u[0] = Ts + (Tm-Ts)/(1+erf(h/(2*sqrt(D1*t)))) * (1 + erf(x[0]/(2*sqrt(D1*t))));
+	// } else {
+	// 	u[0] = Tfr - (Tfr-Tm)/(1-erf(h/(2*sqrt(D2*t)))) * (1 - erf(x[0]/(2*sqrt(D2*t))));
+	// }
+
+	if (x[0] < h) {
+		double erf_iface = erf(h/(2*sqrt(D1*t)));
+		u[0] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts *erf_iface)/(1+erf_iface);
+	} else {
+		double erf_iface = erf(h/(2*sqrt(D2*t)));
+		u[0] = ((Tfr- Tm)*erf(x[0]/(2*sqrt(D2*t))) + Tm - Tfr*erf_iface)/(1-erf_iface);
 	}
 }
 
@@ -230,6 +247,7 @@ class Erf2DProblem : public Problem {
 			}
 
 			time_pt()->time() = t_shift;
+			ic_set = true;
 		}
 
 		// method that calculates next interface position and actually moves the interface between timesteps
@@ -257,7 +275,7 @@ class Erf2DProblem : public Problem {
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
 
-					tot_flux += k2 * flux[0];
+					tot_flux -= k2 * flux[0];
 				}
 			}
 
@@ -354,10 +372,10 @@ class Erf2DProblem : public Problem {
 			// save errors and interface positions in seperate file (has information from all timesteps)
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface());
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface(), sqrt(De*time));
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error = %e interface = %8.6f\n", timestep, time, tot_error, domain->get_interface());
+			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, domain->get_interface(), sqrt(De*time));
 			info.number()++;
 		}
 
@@ -417,6 +435,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--cp1", &Cp1);
 	CommandLineArgs::specify_command_line_flag("--cp2", &Cp2);
 	CommandLineArgs::specify_command_line_flag("--L", &L);
+	CommandLineArgs::specify_command_line_flag("--De", &De);
 	CommandLineArgs::specify_command_line_flag("--dname", &dname, "doc");
 
 	CommandLineArgs::parse_and_assign();
@@ -475,13 +494,17 @@ int main(int argc, char **argv) {
 	}
 
 	// set approximate starting point for interface based on previous runs
-	x1 = sqrt(1.26 * t_shift);
+	// x1 = sqrt(1.26 * t_shift);
+
+	double _interface_time = t_shift - T_ORDER*dt;
+	x1 = (De == 0.0) ? sqrt(1.26 * _interface_time) : sqrt(De * _interface_time);
+
 
 	printf("Problem Def:\n");
 	printf("\tk1=%8.6f k2=%8.6f\n", k1, k2);
 	printf("\trho1=%8.6f rho2=%8.6f\n", rho1, rho2);
 	printf("\tCp1=%8.6f Cp2=%8.6f\n", Cp1, Cp2);
-	printf("\tD1=%8.6f D2=%8.6f\n", D1, D2);
+	printf("\tD1=%8.6f D2=%8.6f  De=%8.6f\n", D1, D2, De);
 
 	auto problem = Erf2DProblem<RefineableQUnsteadyHeatElement<2,X_ORDER>>(Nx, Ny, t_steps, dt, t_shift, info);
 

@@ -120,9 +120,11 @@ class FreeBoundaryElement : public GeneralisedElement,
 			internal_data_pt(geometry_index)->unpin(free_boundary_index);
 		}
 
-		void set_flux(const unsigned int &t, const double &flux) {external_data_pt(flux_index)->set_value(t, 0, flux);}
+		void set_flux(const unsigned int &t, const double &flux) {
+			external_data_pt(flux_index)->set_value(t, 0, flux);
+		}
+		
 		void set_flux(const double &flux) {
-			printf("Setting flux to %8.6f\n", flux);
 			set_flux(0, flux);
 		}
 
@@ -150,26 +152,89 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			double dhdt = 0.0;
-			for (unsigned int t = 0; t < interface_ts_pt->ntstorage(); t++) {
-				double x1 = interface_data_pt->value(t, free_boundary_index);
-				double weight = interface_ts_pt->weight(1, t);
-				double prod = x1 * weight;
-				dhdt += prod;
-				if (!compute_jacobian)
-					printf("t=%u x1=%8.6f weight=%8.6f prod=%8.6f dhdt=%8.6f computed=%8.6f\n", t, x1, weight, prod, dhdt, interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index));
-			}
+			residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
+			// residuals[free_boundary_local_eqn_number] = interface_ts_pt->time_pt()->dt() * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0) / factor);
 
-			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
-			if (!compute_jacobian)
-				printf("Factor: %8.6f dhdt=%8.6f res=%8.6f\n", factor, interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index), residuals[free_boundary_local_eqn_number]);
-			if (compute_jacobian) {
-				printf("Computing jacobian\n");
-				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor;//interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index);
-			}
+			// if (!compute_jacobian)
+			// 	printf("h_t=%8.6f beta=%8.6f dt=%8.6f res=%8.6f\n", interface_data_pt->value(1, free_boundary_index), external_data_pt(flux_index)->value(0), interface_ts_pt->time_pt()->dt(), residuals[free_boundary_local_eqn_number]);
+
+			if (compute_jacobian)
+				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = 1.0;
 		}
 };
 
+class FreeBoundaryDomain : public Domain {
+	private:
+		FreeBoundaryElement * geometry;
+		const unsigned int nelems;
+		const unsigned int nx1;
+		const unsigned int nx2;
+		const unsigned int nx;
+		const unsigned int ny;
+	
+	public:
+		FreeBoundaryDomain(
+			FreeBoundaryElement *geom,
+			unsigned int nx1,
+			unsigned int nx2,
+			unsigned int ny
+		) : geometry(geom), nelems((nx1+nx2)*ny), nx1(nx1), nx2(nx2), nx(nx1+nx2), ny(ny) {
+
+			Macro_element_pt.resize(nelems);
+
+			for (unsigned int i = 0; i < nelems; i++)
+				Macro_element_pt[i] = new QMacroElement<2>(this, i);
+		}
+
+		void macro_element_boundary(
+			const unsigned int &t, 
+			const unsigned int &macro_i, 
+			const unsigned int &dir, 
+			const Vector<double> &zeta, 
+			Vector<double> &r) 
+		{
+			using namespace QuadTreeNames;
+
+			const double h = geometry->get_interface();
+
+			const unsigned int yi = macro_i / nx;
+			const unsigned int xi = macro_i % nx;
+
+			const double dx1 = (h - geometry->x0()) / (double) nx1;
+			const double dx2 = (geometry->x2() - h) / (double) nx2;
+			const double dy = 1.0 / (double) ny;
+
+			bool growing = xi < nx1;
+
+			double trans_x = 0.5 * (zeta[0] + 1.0);
+
+			double start = (growing) ? geometry->x0() + ((double) xi) * dx1 : h + ((double) (xi - nx1)) * dx2;
+			double end = (growing) ? geometry->x0() + ((double) (xi + 1)) * dx1 : h + ((double) (xi - nx1 + 1)) * dx2;
+			double x = start + trans_x * (end - start);
+
+			switch (dir) {
+				case N:
+					r[0] = x;
+					r[1] = ((double) (yi + 1)) * dy;
+					break;
+				case E:
+					r[0] = end;
+					r[1] = (trans_x + ((double) yi)) * dy;
+					break;
+				case S:
+					r[0] = x;
+					r[1] = ((double) yi) * dy;
+					break;
+				case W:
+					r[0] = start;
+					r[1] = (trans_x + ((double) yi)) * dy;
+					break;
+				default:
+					printf("Invalid direction given to FreeBoundaryDomani\n");
+					return;
+			}
+		}
+};
 
 template<class EL>
 class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
@@ -182,6 +247,7 @@ class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
 			const unsigned int &nx2,
 			const unsigned int &ny,
 			FreeBoundaryGeometry *geometry,
+			FreeBoundaryDomain *domain,
 			TimeStepper *timestepper = &Mesh::Default_TimeStepper
 		) : RectangularQuadMesh<EL>(nx1+nx2, ny, geometry->x0(), geometry->x2(), geometry->y0(), geometry->y1(), timestepper), 
 			ts_pt(timestepper) {
@@ -202,8 +268,23 @@ class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
 				}
 			}
 
+			Vector<double> s(2), r(2);
+
 			for (unsigned int e = 0; e < (nx1+nx2)*ny; e++) {
 				EL *elem = dynamic_cast<EL *>(this->element_pt(e));
+
+				elem->set_macro_elem_pt(domain->macro_element_pt(e));
+				for (unsigned int n = 0; n < elem->nnode(); n++) {
+					elem->local_fraction_of_node(n, s);
+
+					s[0] = 2.0 * s[0] - 1.0;
+					s[1] = 2.0 * s[1] - 1.0;
+
+					domain->macro_element_pt(e)->macro_map(s, r);
+
+					for (unsigned int i = 0; i < 2; i++)
+						elem->node_pt(n)->x(i) = r[i];
+				}
 
 				Vector<GeomObject *> geom_object_pt(1);
 				geom_object_pt[0] = geometry;

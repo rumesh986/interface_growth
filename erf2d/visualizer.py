@@ -55,7 +55,8 @@ class _Config:
 # class to hold results from each run
 class _RunData:
 	_STEP_HEADERS = ['x', 'y', 'exact', 'u', 'error']
-	_OVERALL_HEADERS = ['time', 'error', 'interface']
+	_OVERALL_HEADERS = ['time', 'error', 'interface', 'expected_interface']
+	# _OVERALL_HEADERS = ['time', 'error', 'interface']
 
 	def __init__(
 		self,
@@ -196,14 +197,14 @@ class Visualizer:
 	def _make(self, run):
 		try:
 			# self.make_anims(run)
-			# self.plot_errors(run)
-			self.plot_error_norms(run)
+			self.plot_errors(run)
+			# self.plot_error_norms(run)
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
-			# self.make_surf_profile_anim(run)
-			self.subplot_surf_prof(run)
-			self.subplot_mesh(run)
+			self.make_surf_profile_anim(run)
+			# self.subplot_surf_prof(run)
+			# self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
 
@@ -295,6 +296,9 @@ class Visualizer:
 			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
 		except:
 			print("Failed to fit h-curve")
+
+		if 'expected_interface' in run.results.columns:
+			plt.plot(run.results['time'], run.results['expected_interface'], label='analytical', ls=':')
 
 		ax.legend()
 		ax.set_xlabel('time')
@@ -401,12 +405,17 @@ class Visualizer:
 
 		num_frames = len(run.exact_solns) // 4
 
+		mesh_pos = np.zeros((run.config.nx+1, 4))
+
 		for i, ax in enumerate(axs.flatten()):
 			data = run.exact_solns[i*num_frames]
+			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
 
 			ax.scatter(data['x'], data['y'])
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
 			ax.set_title(f't={run.times[i*num_frames]}')
+		
+		print(mesh_pos)
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Y')
@@ -548,6 +557,10 @@ class Visualizer:
 			if run.interface is not None:
 				line_interface.set_xdata([run.interface[n]])
 				diff_interface.set_xdata([run.interface[n]])
+			
+			if 'expected_interface' in run.results.columns:
+				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
+				diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
 
 			diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
 		
@@ -572,6 +585,10 @@ class Visualizer:
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 			diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		
+		if 'expected_interface' in run.results.columns:
+			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+			diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
 		
 		for pos in run.config.fixed_pos:
 			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
