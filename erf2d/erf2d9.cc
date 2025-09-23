@@ -48,18 +48,27 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	// }
 
 	double h = 0.0;
+	double h_ana = 0.0;
 	if (ic_set) {
 		h = (D[2] == 0.0) ? geometry->get_interface() : sqrt(D[2] * t);
+		h_ana = sqrt(D[2] * t);
 	} else {
 		h = geometry->get_interface();
+		h_ana = sqrt(D[2] * t);
 	}
 
 	if (x[0] < h) {
 		double erf_iface = erf(h/(2*sqrt(D[0]*t)));
-		u[0] = ((T_m - T_s)*erf(x[0]/(2*sqrt(D[0]*t))) + T_m + T_s *erf_iface)/(1+erf_iface);
+		u[0] = ((T_m - T_s)*erf(x[0]/(2*sqrt(D[0]*t))) + T_m + T_s*erf_iface)/(1+erf_iface);
+
+		erf_iface = erf(h_ana/(2*sqrt(D[0]*t)));
+		u[1] = ((T_m - T_s)*erf(x[0]/(2*sqrt(D[0]*t))) + T_m + T_s*erf_iface)/(1+erf_iface);
 	} else {
 		double erf_iface = erf(h/(2*sqrt(D[1]*t)));
-		u[0] = ((T_l- T_m)*erf(x[0]/(2*sqrt(D[1]*t))) + T_m - T_l*erf_iface)/(1-erf_iface);
+		u[0] = ((T_l - T_m)*erf(x[0]/(2*sqrt(D[1]*t))) + T_m - T_l*erf_iface)/(1-erf_iface);
+
+		erf_iface = erf(h_ana/(2*sqrt(D[1]*t)));
+		u[1] = ((T_l - T_m)*erf(x[0]/(2*sqrt(D[1]*t))) + T_m - T_l*erf_iface)/(1-erf_iface);
 	}
 }
 
@@ -271,6 +280,7 @@ class Erf2DProblem : public Problem {
 				} else {
 					new_h = sqrt(D[2] * time);
 				}
+
 				geometry->set_interface(new_h);
 				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
 				bulk_mesh_pt->node_update();
@@ -335,7 +345,7 @@ class Erf2DProblem : public Problem {
 			unsigned long int nnode = bulk_mesh_pt->nnode();
 
 			Vector<double> x(2);
-			Vector<double> exact_u(1);
+			Vector<double> exact_u(2);
 			Vector<double> numerical_u(1);
 
 			double tot_error = 0.0;
@@ -348,18 +358,21 @@ class Erf2DProblem : public Problem {
 				bulk_mesh_pt->node_pt(n)->value(t, numerical_u);
 				get_exact_u(time, x, exact_u);
 
-				double error = numerical_u[0] - exact_u[0];
+				double error = numerical_u[0] - exact_u[1];
 				tot_error += error * error;
 
-				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[0], numerical_u[0], error);
+				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[1], numerical_u[0], error);
 			}
 			fclose(file);
 
 			tot_error = sqrt(tot_error) / nnode;
 
+			double max_elem_size, min_elem_size;
+			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
+
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time));
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.4f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time), max_elem_size);
 			fclose(file);
 
 			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, geometry->get_interface(), sqrt(D[2]*time));

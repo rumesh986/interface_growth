@@ -373,10 +373,13 @@ class Erf2DProblem : public Problem {
 			
 			tot_error = sqrt(tot_error) / nnode;
 
+			double max_elem_size, min_elem_size;
+			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
+
 			// save errors and interface positions in seperate file (has information from all timesteps)
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface(), sqrt(De*time));
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface(), sqrt(De*time), max_elem_size);
 			fclose(file);
 
 			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, domain->get_interface(), sqrt(De*time));

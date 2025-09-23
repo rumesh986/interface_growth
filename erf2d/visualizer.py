@@ -55,7 +55,7 @@ class _Config:
 # class to hold results from each run
 class _RunData:
 	_STEP_HEADERS = ['x', 'y', 'exact', 'u', 'error']
-	_OVERALL_HEADERS = ['time', 'error', 'interface', 'expected_interface']
+	_OVERALL_HEADERS = ['time', 'error', 'interface', 'expected_interface', 'dx']
 	# _OVERALL_HEADERS = ['time', 'error', 'interface']
 
 	def __init__(
@@ -190,7 +190,8 @@ class Visualizer:
 			# phase 1 of the final step is assumed to have the largest dx of the simulation
 			# phase 1 is the growing phase (solid phase)
 			if 'x' in self.dxdt:
-				dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
+				# dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
+				dx = run.results['dx'].values.max()
 			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
 
 	# post-processing for individual runs (part of 'a' type runs)
@@ -336,6 +337,10 @@ class Visualizer:
 			ax.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')
 		except:
 			print("Failed to fit interface curve")
+		
+		if 'expected_interface' in self.runs[0].results.columns:
+			plt.plot(self.runs[0].results['time'], self.runs[0].results['expected_interface'], label='analytical', ls=':')
+
 
 		ax.set_xlabel('time')
 		ax.set_ylabel('Interface position $h(t)$')
