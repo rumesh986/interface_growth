@@ -189,7 +189,20 @@ class Erf2DProblem : public Problem {
 		void actions_before_newton_solve() {};
 		void actions_after_newton_solve() {};
 
-		void actions_before_implicit_timestep() {};
+		void actions_before_implicit_timestep() {
+			Vector<double> x(2), u(1);
+
+			double time = time_pt()->time();
+
+			for (unsigned int b : analytical_boundaries) {
+				unsigned long int nnode = bulk_mesh_pt->nboundary_node(b);
+				for (unsigned long int n = 0; n < nnode; n++) {
+					bulk_mesh_pt->boundary_node_pt(b, n)->position(x);
+					get_exact_u(time, x, u);
+					bulk_mesh_pt->boundary_node_pt(b,n)->set_value(0, u[1]);
+				}
+			}
+		}
 		void actions_after_implicit_timestep() {};
 
 		void actions_before_newton_convergence_check() {
