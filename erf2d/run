@@ -66,6 +66,13 @@ if __name__ == '__main__':
 		default='a',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt\ns: sensitivity analysis"
 	)
+	
+	parser.add_argument('--ref',
+		type=str,
+		dest='reference',
+		default=None,
+		help='Reference run to compare against for analysys'
+	)
 
 	parser.add_argument('--nthreads',
 		type=int,

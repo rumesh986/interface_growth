@@ -63,6 +63,7 @@ class _RunData:
 		inp_folder,
 		out_folder,
 		load_data=True,
+		reference=None,
 		stepsf='steps/step',
 		configf='config',
 		resultsf='results',
@@ -100,11 +101,65 @@ class _RunData:
 
 				self.data.append(data)
 		else:
-			i = len(self.results['time']) - 1
+			if reference is None:
+				i = len(self.results['time']) - 1
 
-			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
-			data['time'] = self.results['time'].values[-1]
-			self.solns.append(data[['time', 'x', 'y', 'u']])
+				data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+				data['time'] = self.results['time'].values[-1]
+				self.solns.append(data[['time', 'x', 'y', 'u']])
+			else:
+				step = reference.config.nx // self.config.nx
+				count = 0
+				print(f"Reference nx = {reference.config.nx} self nx = {self.config.nx} step = {step}")
+				for i, t in enumerate(reference.times):
+					if t not in self.times.values:
+						continue
+
+					data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+					data['time'] = t
+
+					ref_data = reference.solns[i]
+
+					# print(reference.solns[i]['u'].values.size)
+					# print(data['u'].values.size)
+
+					xerrors = np.zeros(data.shape[0])
+					errors = np.zeros(data.shape[0])
+					count2 = 0
+					for j, y in enumerate(data['y'].unique()):
+						# print(f"[{i=}] Working at y = {y}")
+						df = data.loc[data['y'] == y]
+						ref_df = ref_data.loc[ref_data['y'] == y]
+						# print(df)
+						# print(ref_df)
+						for k, x in enumerate(df['x']):
+							# index = np.argmin(np.fabs(x - ref_data['x'].values))
+							dfindex = df.index[df['x'] == x].tolist()[0]
+							index = (ref_df['x'] - x).abs().idxmin()
+
+							# print(f'{k=} {dfindex=} {index=}')
+							errors[count2] = data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']
+							# print(f'error at {x=} {y=} = {data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']} | {errors[count2]}')
+							if not (np.isclose(data.loc[dfindex, 'x'], ref_data.loc[index, 'x']) and np.isclose(data.loc[dfindex, 'y'], ref_data.loc[index, 'y'])):
+								# print("Some nodal difference")
+								# print(f'\t\tdata x = {data.loc[dfindex, 'x']} reference x = {ref_data.loc[index, 'x']} difference = {data.loc[dfindex, 'x'] - ref_data.loc[index, 'x']}')
+								# print(f'\t\tdata y = {data.loc[dfindex, 'y']} reference y = {ref_data.loc[index, 'y']} difference = {data.loc[dfindex, 'y'] - ref_data.loc[index, 'y']}')
+								xerrors[count2] = np.sqrt(np.sum(np.square([data.loc[dfindex, 'x'] - ref_data.loc[index, 'x'],
+																	data.loc[dfindex, 'y'], ref_data.loc[index, 'y']])))
+
+							# print(f"Closest node to {x} is at {reference.solns[i]['x'][mask[count2]]} difference = {x - reference.solns[i]['x'][]}")
+							count2 += 1
+
+					# return
+					# print(mask)
+					# error = data['u'].values - reference.solns[i]['u'].values[mask]
+					# print(data['x'].values - reference.solns[i]['x'].values[mask])
+					print(f'xerrors: {np.linalg.norm(xerrors)}')
+					# print(errors)
+					self.results['error'][count] = np.linalg.norm(errors)
+					count += 1
+				
+				print(self.results)
 
 	@property
 	def title(self):
@@ -145,7 +200,7 @@ class _RunData:
 
 # Main class to handle post-processing
 class Visualizer:
-	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False):
+	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False, reference=None):
 		self.prefix = prefix
 		self.dxdt = dxdt
 		self.resd = resd
@@ -160,6 +215,13 @@ class Visualizer:
 		# set stylesheet for plots
 		plt.style.use(f'../../{stylef}')
 
+		self.reference = None
+		if reference is not None:
+			for rundir in os.listdir(f'../../{reference}/{self.resd}'):
+				rund = f'../../{reference}/{self.resd}/{rundir}'
+				if os.path.isdir(rund):
+					self.reference = _RunData(rund, f'{self.outd}/reference', True)
+
 		# prepare run data
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
@@ -168,7 +230,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', 'a' in self.dxdt))
+			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', 'a' in self.dxdt, reference=self.reference))
 		
 		# create output directories if needed
 		if 'a' in self.dxdt:
@@ -418,8 +480,10 @@ class Visualizer:
 		mesh_pos = np.zeros((run.config.nx+1, 4))
 
 		for i, ax in enumerate(axs.flatten()):
+			# data = run.exact_solns[i]
 			data = run.exact_solns[i*num_frames]
 			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
+			# print(f'time in col {i}={run.times[i]}')
 
 			ax.scatter(data['x'], data['y'])
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
@@ -678,6 +742,7 @@ class Visualizer:
 
 	# perform and plot error analysis
 	def plot_analysis(self, rtype):
+		# self.plot_interfaces()
 		# helper function to get legend entries
 		def _legend(x, t):
 			ret = None

@@ -72,7 +72,7 @@ class Run:
 				raise
 
 			# post-process results
-			Visualizer(self.prog, self.dxdt, stylef=stylef)
+			Visualizer(self.prog, self.dxdt, stylef=stylef, reference=kwargs['reference'])
 			os.chdir(self.od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
