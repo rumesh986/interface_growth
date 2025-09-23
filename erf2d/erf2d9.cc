@@ -184,11 +184,8 @@ class Erf2DProblem : public Problem {
 		void actions_after_implicit_timestep() {};
 
 		void actions_before_newton_convergence_check() {
-			Vector<double> s(2);
+			// Vector<double> s(2);
 			Vector<double> flux(2);
-
-			s[0] = 1.0;
-			s[1] = 0.0;
 
 			double tot_flux = 0.0;
 			
@@ -196,11 +193,15 @@ class Erf2DProblem : public Problem {
 			for (unsigned long int e = 0; e < nelems; e++) {
 				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
 				if (face_index == 1) {
+					Vector<double> s = {1.0, 0.0};
+
 					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 					elem->get_flux(s, flux);
 
 					tot_flux += k[0] * flux[0];
 				} else if (face_index == -1) {
+					Vector<double> s = {-1.0, 0.0};
+
 					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 					elem->get_flux(s, flux);
 

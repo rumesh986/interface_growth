@@ -86,19 +86,20 @@ unordered_map<unsigned int, FluxFctPt> neumann_boundaries = {
 
 // analytical solution
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
-	// double h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
-	double h = 0.0;
-	if (ic_set) {
-		h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
-	} else {
-		h = domain->get_interface();
-	}
+	// double h = domain->get_interface();
 	// if (x[0] < h) {
 	// 	u[0] = Ts + (Tm-Ts)/(1+erf(h/(2*sqrt(D1*t)))) * (1 + erf(x[0]/(2*sqrt(D1*t))));
 	// } else {
 	// 	u[0] = Tfr - (Tfr-Tm)/(1-erf(h/(2*sqrt(D2*t)))) * (1 - erf(x[0]/(2*sqrt(D2*t))));
 	// }
 
+	double h = 0.0;
+	if (ic_set) {
+		h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
+	} else {
+		h = domain->get_interface();
+	}
+	
 	if (x[0] < h) {
 		double erf_iface = erf(h/(2*sqrt(D1*t)));
 		u[0] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts *erf_iface)/(1+erf_iface);
@@ -252,11 +253,11 @@ class Erf2DProblem : public Problem {
 
 		// method that calculates next interface position and actually moves the interface between timesteps
 		void update_interface(const unsigned int &t = 0, bool ic = false) {
-			Vector<double> s(2);
+			// Vector<double> s(2);
 			Vector<double> flux(2);
 
-			s[0] = 1.0;
-			s[1] = 0.0;
+			// s[0] = 1.0;
+			// s[1] = 0.0;
 
 			double tot_flux = 0.0;
 
@@ -265,12 +266,14 @@ class Erf2DProblem : public Problem {
 				// only choose fluxes in the horizontal direction
 				int face_index = mesh_pt()->face_index_at_boundary(4, e);
 				if (face_index == 1) {
+					Vector<double> s = {1.0, 0.0};
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
 
 					tot_flux += k1 * flux[0];
 				} else if (face_index == -1) {
+					Vector<double> s = {-1.0, 0.0};
 					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
 					if (ic) get_flux_ic(t+1, elem, s, flux);
 					else 	elem->get_flux(s, flux);
@@ -292,6 +295,7 @@ class Erf2DProblem : public Problem {
 			if (ic) {
 				std::map<Node *, bool> node_handled;
 				Vector<double> r(2);
+				Vector<double> s(2);
 
 				unsigned long int nelems = Nx*Ny;
 				unsigned long int nnode_total = mesh_pt()->nnode();
