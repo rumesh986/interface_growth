@@ -221,20 +221,52 @@ class Erf2DProblem : public Problem {
 					elem->get_flux(s, flux);
 
 					tot_flux += k[0] * flux[0];
+					// printf("left flux0: %8.6f scaled: %8.6f total: %8.6f\n", flux[0], k[0]*flux[0], tot_flux);
 				} else if (face_index == -1) {
 					Vector<double> s = {-1.0, 0.0};
 
 					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 					elem->get_flux(s, flux);
 
+					// printf("right element flux left edge: %8.6f ", flux[0]);
+					// s[0] = 1.0;
+					// elem->get_flux(s, flux);
+					// printf("right edge: %8.6f\n", flux[0]);
+
 					tot_flux -= k[1] * flux[0];
+					// printf("right flux0: %8.6f scaled: %8.6f total: %8.6f\n", flux[0], k[1]*flux[0], tot_flux);
 				}
 			}
 
 			printf("Setting total flux to %8.6f\n", tot_flux / ny);
 			geometry->set_flux(tot_flux / ny);
 			bulk_mesh_pt->node_update();
-			printf("Moved interface from %8.6f to %8.6f\n", old_int, domain->get_interface());
+
+			// unsigned long int err_cnt = 0;
+			// Vector<double> s_loc(2), x_new(2);
+
+			// for (unsigned int e = 0; e < nx*ny; e++) {
+			// 	EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->element_pt(e));
+			// 	unsigned int nnode = elem->nnode();
+			// 	for (unsigned int n = 0; n < nnode; n++) {
+			// 		MacroElementNodeUpdateNode *node = dynamic_cast<MacroElementNodeUpdateNode *>(elem->node_pt(n));
+			// 		if (node->node_update_element_pt() == 0) {
+			// 			err_cnt++;	
+			// 		} else {
+			// 			s_loc = node->s_in_node_update_element();
+			// 			node->node_update_element_pt()->get_x(0, s_loc, x_new);
+
+			// 			for (unsigned int i = 0; i < 2; i++) {
+			// 				if (node->x(i) != x_new[i]) printf("Got difference in e=%u n=%u", e, n);
+			// 				node->x(i) = x_new[i];
+			// 			}
+			// 		}
+			// 	}
+			// 	if (elem->macro_elem_pt() == 0) {
+			// 		printf("No Macro element found for e=%u\n", e);
+			// 	}
+			// }
+			// printf("Error count: %lu / %lu\n", err_cnt, bulk_mesh_pt->nnode());
 		}
 
 		void set_initial_condition() {
@@ -385,7 +417,7 @@ class Erf2DProblem : public Problem {
 
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.4f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time), max_elem_size);
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time), max_elem_size);
 			fclose(file);
 
 			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, geometry->get_interface(), sqrt(D[2]*time));

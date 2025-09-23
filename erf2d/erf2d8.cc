@@ -379,7 +379,7 @@ class Erf2DProblem : public Problem {
 			// save errors and interface positions in seperate file (has information from all timesteps)
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface(), sqrt(De*time), max_elem_size);
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, domain->get_interface(), sqrt(De*time), max_elem_size);
 			fclose(file);
 
 			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, domain->get_interface(), sqrt(De*time));

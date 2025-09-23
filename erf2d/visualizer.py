@@ -118,7 +118,12 @@ class _RunData:
 	# node at which errors is max at a certain step is chosen
 	@property
 	def error_max(self):
-		node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1 # node at highest error some steps after start of simulation
+		try:
+			node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1 # node at highest error some steps after start of simulation
+		except:
+			print("Not enough steps, choosing first available step")
+			node = np.argmax(np.fabs(self.errors[0]['error'][1:])) + 1 # node at highest error at start of simulation
+
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact != 0.0

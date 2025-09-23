@@ -64,7 +64,12 @@ class Run:
 			os.chdir(self.wd)
 
 			# perform all computations
-			self.run(**kwargs)
+			try:
+				self.run(**kwargs)
+			except:
+				os.chdir(self.od)
+				shutil.rmtree(self.wd)
+				raise
 
 			# post-process results
 			Visualizer(self.prog, self.dxdt, stylef=stylef)
