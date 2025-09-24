@@ -111,51 +111,63 @@ class _RunData:
 				step = reference.config.nx // self.config.nx
 				count = 0
 				print(f"Reference nx = {reference.config.nx} self nx = {self.config.nx} step = {step}")
-				for i, t in enumerate(reference.times):
-					if t not in self.times.values:
-						continue
 
-					data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+				# for i, t in enumerate(reference.times):
+				# 	if t not in self.times.values:
+				# 		continue
+
+				# 	data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+				# 	data['time'] = t
+
+				# 	ref_data = reference.solns[i]
+
+				# 	xerrors = np.zeros(data.shape[0])
+				# 	errors = np.zeros(data.shape[0])
+				# 	count2 = 0
+				# 	for j, y in enumerate(data['y'].unique()):
+				# 		df = data.loc[data['y'] == y]
+				# 		ref_df = ref_data.loc[ref_data['y'] == y]
+				# 		for k, x in enumerate(df['x']):
+				# 			dfindex = df.index[df['x'] == x].tolist()[0]
+				# 			try:
+				# 				index = (ref_df['x'] - x).abs().idxmin()
+				# 			except:
+				# 				print(self.config)
+				# 				print(y)
+				# 				print(ref_data)
+
+				# 			errors[count2] = data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']
+				# 			if not (np.isclose(data.loc[dfindex, 'x'], ref_data.loc[index, 'x']) and np.isclose(data.loc[dfindex, 'y'], ref_data.loc[index, 'y'])):
+				# 				xerrors[count2] = np.sqrt(np.sum(np.square([data.loc[dfindex, 'x'] - ref_data.loc[index, 'x'],
+				# 													data.loc[dfindex, 'y'], ref_data.loc[index, 'y']])))
+				# 			count2 += 1
+
+				# 	print(f'[{count}] xerrors: {np.linalg.norm(xerrors)}')
+				# 	self.results['error'][count] = np.linalg.norm(errors)
+				# 	count += 1
+				
+				count = 0
+				for t, time in enumerate(reference.times):
+					if time not in self.times.values:
+						continue
+					
+					# print(f'[{self.config.nx}] {t =}')
+					data = pd.read_csv(f'{inp_folder}/{stepsf}{t}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
 					data['time'] = t
 
-					ref_data = reference.solns[i]
+					_, _, ref_2d = self._reshape_2D_data(reference.solns[t], 'u')
+					_, _, data_2d = self._reshape_2D_data(data, 'u')
 
-					# print(reference.solns[i]['u'].values.size)
-					# print(data['u'].values.size)
+					_, _, ref_2dx = self._reshape_2D_data(reference.solns[t], 'x')
+					_, _, data_2dx = self._reshape_2D_data(data, 'x')
 
-					xerrors = np.zeros(data.shape[0])
-					errors = np.zeros(data.shape[0])
-					count2 = 0
-					for j, y in enumerate(data['y'].unique()):
-						# print(f"[{i=}] Working at y = {y}")
-						df = data.loc[data['y'] == y]
-						ref_df = ref_data.loc[ref_data['y'] == y]
-						# print(df)
-						# print(ref_df)
-						for k, x in enumerate(df['x']):
-							# index = np.argmin(np.fabs(x - ref_data['x'].values))
-							dfindex = df.index[df['x'] == x].tolist()[0]
-							index = (ref_df['x'] - x).abs().idxmin()
+					errors = np.zeros(data_2d.shape)
+					xerrors = np.zeros(data_2d.shape)
+					for i in range(data_2d.shape[1]):
+						errors[:, i] = data_2d[:, i] - ref_2d[:, i*step]
+						xerrors[:, i] = data_2dx[:, i] - ref_2dx[:, i*step]
 
-							# print(f'{k=} {dfindex=} {index=}')
-							errors[count2] = data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']
-							# print(f'error at {x=} {y=} = {data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']} | {errors[count2]}')
-							if not (np.isclose(data.loc[dfindex, 'x'], ref_data.loc[index, 'x']) and np.isclose(data.loc[dfindex, 'y'], ref_data.loc[index, 'y'])):
-								# print("Some nodal difference")
-								# print(f'\t\tdata x = {data.loc[dfindex, 'x']} reference x = {ref_data.loc[index, 'x']} difference = {data.loc[dfindex, 'x'] - ref_data.loc[index, 'x']}')
-								# print(f'\t\tdata y = {data.loc[dfindex, 'y']} reference y = {ref_data.loc[index, 'y']} difference = {data.loc[dfindex, 'y'] - ref_data.loc[index, 'y']}')
-								xerrors[count2] = np.sqrt(np.sum(np.square([data.loc[dfindex, 'x'] - ref_data.loc[index, 'x'],
-																	data.loc[dfindex, 'y'], ref_data.loc[index, 'y']])))
-
-							# print(f"Closest node to {x} is at {reference.solns[i]['x'][mask[count2]]} difference = {x - reference.solns[i]['x'][]}")
-							count2 += 1
-
-					# return
-					# print(mask)
-					# error = data['u'].values - reference.solns[i]['u'].values[mask]
-					# print(data['x'].values - reference.solns[i]['x'].values[mask])
-					print(f'xerrors: {np.linalg.norm(xerrors)}')
-					# print(errors)
+					print(f'[{self.config.nx}][{t}] errors={np.linalg.norm(errors)} xerrors={np.linalg.norm(xerrors)}')
 					self.results['error'][count] = np.linalg.norm(errors)
 					count += 1
 				
@@ -197,6 +209,33 @@ class _RunData:
 	def create_outdir(self):
 		if not os.path.exists(self.out_folder):
 			os.mkdir(self.out_folder)
+
+	# helper method to reshape the data into 2D for easy access
+	# function has been optimised to reduce time with pandas operations
+	def _reshape_2D_data(self, data, key):
+		xs = data['x'].unique()
+		ys = data['y'].unique()
+		u = np.zeros((len(ys), len(xs)))
+		
+		# the loop below has some odd pandas operations, this was done to optimize it
+		# pandas seems to be pretty slow and you can get a significant speedup by changing how you interact with it
+		for j, y in enumerate(ys):
+			# optimized way of filtering dataframe
+			mask1 = data['y'].values == y
+			d2 = pd.DataFrame(data.values[mask1], data.index[mask1], data.columns)
+			for i, x in enumerate(xs):
+				# access by index to avoid creating another dataframe
+				mask2 = np.isclose(d2['x'].values, x)
+				# print(f'{j} {i} {mask2}')
+				try:
+					index = mask2.nonzero()[0][0]
+				except IndexError:
+					print(f"{j=} {i=}")
+					raise Exception("Its failing again")
+
+				u[j,i] = d2[key].iloc[index]
+		
+		return xs, ys, u
 
 # Main class to handle post-processing
 class Visualizer:
@@ -900,8 +939,10 @@ class Visualizer:
 
 # simple way to run visualizer for debug purposes outside of proper runs
 if __name__ =='__main__':
-	assert len(sys.argv) == 3
-	assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
-	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
+	# assert len(sys.argv) == 3
+	# assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
+	# assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	vis = Visualizer(sys.argv[1], sys.argv[2])
+	# vis = Visualizer(sys.argv[1], sys.argv[2])
+	os.chdir(sys.argv[1])
+	vis = Visualizer(sys.argv[2], 'x', reference='runs/reference')
