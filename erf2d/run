@@ -49,7 +49,7 @@ if __name__ == '__main__':
 		nargs='+', 
 		type=float,
 		dest='dts',
-		default=1e-2,
+		default=1e-4,
 		help='timesteps to simulate with, accepts multiple in list'
 	)
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
 	parser.add_argument('--tshift',
 		type=float,
 		dest='tshift',
-		default=0.0,
+		default=0.001,
 		help='time to start from'
 	)
 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
 	parser.add_argument('--k2',
 		type=float,
 		dest='k2',
-		default=0.5,
+		default=0.25,
 		help='Phase 2 thermal conductivity'
 	)
 
@@ -118,7 +118,7 @@ if __name__ == '__main__':
 	parser.add_argument('--rho2',
 		type=float,
 		dest='rho2',
-		default=0.5,
+		default=2.0,
 		help='Phase 2 density'
 	)
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
 	parser.add_argument('--cp2',
 		type=float,
 		dest='cp2',
-		default=0.5,
+		default=0.25,
 		help='Phase 2 specific heat capacity'
 	)
 
