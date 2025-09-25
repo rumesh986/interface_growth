@@ -29,6 +29,8 @@ class Run:
 		self.kwargs = kwargs
 		self._exes = {}
 
+		self._cleanup = False
+
 		# save current directory for reference
 		self.od = os.getcwd()
 
@@ -46,7 +48,13 @@ class Run:
 		
 		print(f"Working in {self.wd}")
 
-		for path in [self.wd, f'{self.wd}/imgs']:
+		# make run directory and set cleanup flag
+		if not os.path.exists(self.wd):
+			self._cleanup = True
+			os.mkdir(self.wd)
+
+		# make remaining directories
+		for path in [f'{self.wd}/imgs']:
 			if not os.path.exists(path):
 				os.mkdir(path)
 
@@ -68,7 +76,8 @@ class Run:
 				self.run(**kwargs)
 			except:
 				os.chdir(self.od)
-				shutil.rmtree(self.wd)
+				if self._cleanup:
+					shutil.rmtree(self.wd)
 				raise
 
 			# post-process results
