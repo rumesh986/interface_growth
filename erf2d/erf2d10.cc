@@ -13,9 +13,9 @@
 #define T_ORDER 1
 #endif
 
-double k[2] = {1.0, 0.5};
-double rho[2] = {1.0, 0.5};
-double Cp[2] = {1.0, 0.5};
+double k[2] = {1.0, 0.25};
+double rho[2] = {1.0, 2.0};
+double Cp[2] = {1.0, 0.25};
 
 double D[3] {k[0]/(Cp[0]*rho[0]), k[1]/(Cp[1]*rho[1]), 0.0};
 double L = 1.0;
@@ -117,9 +117,8 @@ class Erf2DProblem : public Problem {
 			printf("x0=%8.6f x1=%8.6f x2=%8.6f\n", geometry->x0(), geometry->x1(), geometry->x2());
 
 			bulk_mesh_pt = new TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>>(nx1, nx2, ny, geometry, time_stepper_pt());
-			// bulk_mesh_pt->setup_boundary_element_info();
+			bulk_mesh_pt->setup_boundary_element_info();
 			add_sub_mesh(bulk_mesh_pt);
-			
 
 			geometry_mesh_pt = new Mesh;
 			geometry_mesh_pt->add_element_pt(geometry);
@@ -157,9 +156,14 @@ class Erf2DProblem : public Problem {
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
 			printf("NDOF: %lu\n", ndof());
 
-			// linear_solver_pt()->disable_doc_time();
-			// disable_info_in_newton_solve();
-			// max_newton_iterations() = 1e5;
+			// for (unsigned int e = 0; e < nx*ny; e++) {
+			// 	printf("[%u] ngeom=%u\n", e, dynamic_cast<SpineElement<EL>*>(bulk_mesh_pt->element_pt(e))->ngeom_data());
+			// }
+
+			linear_solver_pt()->disable_doc_time();
+			disable_info_in_newton_solve();
+			// newton_solver_tolerance() = 1e-9;
+			max_newton_iterations() = 1e5;
 			// max_residuals() = 1e7;
 		}
 
@@ -201,11 +205,9 @@ class Erf2DProblem : public Problem {
 		void actions_after_implicit_timestep() {};
 
 		void actions_before_newton_convergence_check() {
-			// Vector<double> s(2);
 			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
-			
 			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
 			for (unsigned long int e = 0; e < nelems; e++) {
 				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
@@ -216,52 +218,24 @@ class Erf2DProblem : public Problem {
 					elem->get_flux(s, flux);
 
 					tot_flux += k[0] * flux[0];
-					// printf("left flux0: %8.6f scaled: %8.6f total: %8.6f\n", flux[0], k[0]*flux[0], tot_flux);
 				} else if (face_index == -1) {
 					Vector<double> s = {-1.0, 0.0};
 
 					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 					elem->get_flux(s, flux);
 
-					// printf("right element flux left edge: %8.6f ", flux[0]);
-					// s[0] = 1.0;
-					// elem->get_flux(s, flux);
-					// printf("right edge: %8.6f\n", flux[0]);
-
 					tot_flux -= k[1] * flux[0];
-					// printf("right flux0: %8.6f scaled: %8.6f total: %8.6f\n", flux[0], k[1]*flux[0], tot_flux);
 				}
 			}
 
 			printf("Setting total flux to %8.6f\n", tot_flux / ny);
 			geometry->set_flux(tot_flux / ny);
+
+			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
+			}
+
 			bulk_mesh_pt->node_update();
-
-			// unsigned long int err_cnt = 0;
-			// Vector<double> s_loc(2), x_new(2);
-
-			// for (unsigned int e = 0; e < nx*ny; e++) {
-			// 	EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->element_pt(e));
-			// 	unsigned int nnode = elem->nnode();
-			// 	for (unsigned int n = 0; n < nnode; n++) {
-			// 		MacroElementNodeUpdateNode *node = dynamic_cast<MacroElementNodeUpdateNode *>(elem->node_pt(n));
-			// 		if (node->node_update_element_pt() == 0) {
-			// 			err_cnt++;	
-			// 		} else {
-			// 			s_loc = node->s_in_node_update_element();
-			// 			node->node_update_element_pt()->get_x(0, s_loc, x_new);
-
-			// 			for (unsigned int i = 0; i < 2; i++) {
-			// 				if (node->x(i) != x_new[i]) printf("Got difference in e=%u n=%u", e, n);
-			// 				node->x(i) = x_new[i];
-			// 			}
-			// 		}
-			// 	}
-			// 	if (elem->macro_elem_pt() == 0) {
-			// 		printf("No Macro element found for e=%u\n", e);
-			// 	}
-			// }
-			// printf("Error count: %lu / %lu\n", err_cnt, bulk_mesh_pt->nnode());
 		}
 
 		void set_initial_condition() {
@@ -324,11 +298,6 @@ class Erf2DProblem : public Problem {
 				geometry->set_interface(new_h);
 				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
 				bulk_mesh_pt->node_update();
-
-				// for (unsigned int n = 0; n < nnode; n++) {
-				// 	MacroElementNodeUpdateNode *node_pt = dynamic_cast<MacroElementNodeUpdateNode *>(bulk_mesh_pt->node_pt(n));
-				// 	node_update_ic(t, node_pt);
-				// }
 
 				// mesh_pt()->node_update() only moves the nodes for current timestep
 				// when setting initial condition, we need to move the nodes ourselves
@@ -445,22 +414,6 @@ class Erf2DProblem : public Problem {
 				for (unsigned j = 0; j < 2; j++) {
 					flux[j] += elem->nodal_value(t, l, u_nodal_index) * dpsidx(l, j);
 				}
-			}
-		}
-
-		void node_update_ic(const unsigned int &t, MacroElementNodeUpdateNode *node_pt) {
-			static unsigned long int error_count = 0;
-			if (node_pt->node_update_element_pt() == 0)  {
-				printf("We might still have problems!! %lu / %lu\n", error_count, t*bulk_mesh_pt->nnode());
-				error_count++;
-			} else {
-				Vector<double> x_new(2), s_local(2);
-				s_local = node_pt->s_in_node_update_element();
-				node_pt->node_update_element_pt()->get_x(t, s_local, x_new);
-				for (unsigned int i = 0; i < 2; i++) {
-					node_pt->x(t, i) = x_new[i];
-				}
-				
 			}
 		}
 };
