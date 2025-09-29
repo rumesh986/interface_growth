@@ -9,7 +9,7 @@ using namespace oomph;
 class FreeBoundaryGeometry : public GeomObject {
 	protected:
 		Vector<Data *> data_pt;
-		unsigned int free_boundary_index = 1;
+		const unsigned int free_boundary_index = 1;
 
 		bool destroy_geom_data = false;
 		TimeStepper *ts_pt;
@@ -335,6 +335,10 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 
 			construct_spines();
 
+			for (unsigned int n = 0; n < nnode(); n++) {
+				spine_node_update(node_pt(n));
+			}
+
 			this->setup_boundary_element_info();
 		}
 
@@ -344,9 +348,10 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			Spine_pt.reserve(nspine);
 
 			// loop through vertical elements
-			for (unsigned int yi = 0; yi < ny; yi++) {
+			unsigned int yi = 0;
+			for (yi = 0; yi < ny-1; yi++) {
 				// loop through nodes in vertical direction
-				for (unsigned int s = 0; s < np; s++) {
+				for (unsigned int s = 0; s < np-1; s++) {
 					// create spine and set parameters
 					Spine *spine = new Spine(geometry->x1());
 					spine->spine_height_pt()->pin(0);
@@ -359,8 +364,9 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 					spine->set_geom_object_pt(geom_object_pt);
 
 					// loop through nodes in phase 1
-					for (unsigned int xi = 0; xi < nx1; xi++) {
-						for (unsigned n = 0; n < np; n++) {
+					unsigned int xi = 0;
+					for (xi = 0; xi < nx1-1; xi++) {
+						for (unsigned n = 0; n < np-1; n++) {
 							SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
 							node_pt->spine_pt() = spine;
 							node_pt->fraction() = ((double)xi + (double)n/(double)(np-1)) / (double)nx1;
@@ -369,9 +375,19 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 						}
 					}
 
+					// do all nodes in last element in phase 1
+					xi = nx1-1;
+					for (unsigned n = 0; n < np; n++) {
+						SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+						node_pt->spine_pt() = spine;
+						node_pt->fraction() = ((double)xi + (double)n/(double)(np-1)) / (double)nx1;
+						node_pt->spine_mesh_pt() = this;
+						node_pt->node_update_fct_id() = 0;
+					}
+
 					// loop through nodes in phase 2
-					for (unsigned int xi = nx1; xi < nx; xi++) {
-						for (unsigned n = 0; n < np; n++) {
+					for (unsigned int xi = nx1; xi < nx-1; xi++) {
+						for (unsigned n = 0; n < np-1; n++) {
 							SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
 							node_pt->spine_pt() = spine;
 							node_pt->fraction() = ((double)(xi-nx1) + (double)n/(double)(np-1)) / (double)nx2;
@@ -379,8 +395,77 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 							node_pt->node_update_fct_id() = 1;
 						}
 					}
+
+					// do all nodes in last element in phase 2
+					xi = nx-1;
+					for (unsigned n = 0; n < np; n++) {
+						SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+						node_pt->spine_pt() = spine;
+						node_pt->fraction() = ((double)(xi-nx1) + (double)n/(double)(np-1)) / (double)nx2;
+						node_pt->spine_mesh_pt() = this;
+						node_pt->node_update_fct_id() = 1;
+					}
 				}
 			}
+
+			yi = ny-1;
+			for (unsigned int s = 0; s < np; s++) {
+				// create spine and set parameters
+				Spine *spine = new Spine(geometry->x1());
+				spine->spine_height_pt()->pin(0);
+				Spine_pt.push_back(spine);
+
+				Vector<double> parameters = {((double)yi + (double)s/(double)(np-1)) / (double)ny};
+				spine->set_geom_parameter(parameters);
+
+				Vector<GeomObject *> geom_object_pt = {geometry};
+				spine->set_geom_object_pt(geom_object_pt);
+
+				// loop through nodes in phase 1
+				unsigned int xi = 0;
+				for (xi = 0; xi < nx1-1; xi++) {
+					for (unsigned n = 0; n < np-1; n++) {
+						SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+						node_pt->spine_pt() = spine;
+						node_pt->fraction() = ((double)xi + (double)n/(double)(np-1)) / (double)nx1;
+						node_pt->spine_mesh_pt() = this;
+						node_pt->node_update_fct_id() = 0;
+					}
+				}
+
+				// do all nodes in last element in phase 1
+				xi = nx1-1;
+				for (unsigned n = 0; n < np; n++) {
+					SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+					node_pt->spine_pt() = spine;
+					node_pt->fraction() = ((double)xi + (double)n/(double)(np-1)) / (double)nx1;
+					node_pt->spine_mesh_pt() = this;
+					node_pt->node_update_fct_id() = 0;
+				}
+
+				// loop through nodes in phase 2
+				for (unsigned int xi = nx1; xi < nx-1; xi++) {
+					for (unsigned n = 0; n < np-1; n++) {
+						SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+						node_pt->spine_pt() = spine;
+						node_pt->fraction() = ((double)(xi-nx1) + (double)n/(double)(np-1)) / (double)nx2;
+						node_pt->spine_mesh_pt() = this;
+						node_pt->node_update_fct_id() = 1;
+					}
+				}
+
+				// do all nodes in last element in phase 2
+				xi = nx-1;
+				for (unsigned n = 0; n < np; n++) {
+					SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+					node_pt->spine_pt() = spine;
+					node_pt->fraction() = ((double)(xi-nx1) + (double)n/(double)(np-1)) / (double)nx2;
+					node_pt->spine_mesh_pt() = this;
+					node_pt->node_update_fct_id() = 1;
+				}
+			}
+
+			printf("Created %lu/%u spines\n\n", Spine_pt.size(), nspine);
 		}
 
 		void spine_node_update(SpineNode *node_pt) {
