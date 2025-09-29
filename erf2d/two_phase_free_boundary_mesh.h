@@ -153,14 +153,18 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
+			double dt = interface_ts_pt->time_pt()->dt();
+
+			// residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
 			// residuals[free_boundary_local_eqn_number] = interface_ts_pt->time_pt()->dt() * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0) / factor);
+			// residuals[free_boundary_local_eqn_number] = factor * dt * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0));
+			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
 
 			// if (!compute_jacobian)
 			// 	printf("h_t=%8.6f beta=%8.6f dt=%8.6f res=%8.6f\n", interface_data_pt->value(1, free_boundary_index), external_data_pt(flux_index)->value(0), interface_ts_pt->time_pt()->dt(), residuals[free_boundary_local_eqn_number]);
 
 			if (compute_jacobian)
-				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = 1.0;
+				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor * interface_ts_pt->weight(1, 0);
 		}
 };
 
