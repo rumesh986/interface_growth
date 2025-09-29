@@ -68,7 +68,8 @@ class FreeBoundaryGeometry : public GeomObject {
 		void set_interface(double &x) {x1() = x;}
 
 		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
-			r[0] = x0(t) + (x2(t) - x0(t)) * zeta[0];
+			// r[0] = x0(t) + (x2(t) - x0(t)) * zeta[0];
+			r[0] = x1(t);
 			r[1] = y0(t) + (y1(t) - y0(t)) * zeta[1];
 
 			printf("FreeBoundaryGeometry - position: zeta0: %8.6f zeta1: %8.6f\n", zeta[0], zeta[1]);
@@ -146,7 +147,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 		void fill_in_generic_residual_contribution(Vector<double>& residuals, DenseMatrix<double>& jacobian, bool compute_jacobian) {
 			unsigned int ndofs = ndof();
 			if (ndofs == 0) return;
-
+			
 			int free_boundary_local_eqn_number = internal_local_eqn(geometry_index, free_boundary_index);
 
 			Data *interface_data_pt = internal_data_pt(geometry_index);
@@ -293,6 +294,99 @@ class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
 			}
 			
 			this->setup_boundary_element_info();
+		}
+};
+
+template<class EL>
+class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
+									  public SpineMesh {
+	private:
+		unsigned int nx1, nx2, nx, ny;
+		FreeBoundaryGeometry *geometry;
+		TimeStepper *ts_pt;
+	
+	public:
+		TwoPhaseFreeBoundarySpineMesh(
+			const unsigned int &nx1,
+			const unsigned int &nx2,
+			const unsigned int &ny,
+			FreeBoundaryGeometry *geometry,
+			TimeStepper *timestepper = &Mesh::Default_TimeStepper
+		) : RectangularQuadMesh<EL>(nx1+nx2, ny, geometry->x0(), geometry->x2(), geometry->y0(), geometry->y1(), timestepper),
+			nx1(nx1), nx2(nx2), nx(nx1+nx2), ny(ny), geometry(geometry), ts_pt(timestepper) {
+
+			// set interface nodes
+			this->set_nboundary(5);
+			for (unsigned int e = 0; e < ny; e++) {
+				EL *elem = dynamic_cast<EL *>(this->element_pt(nx1*(1+e) + nx2*e));
+				unsigned int nnode = elem->nnode_1d();
+
+				for (unsigned int n = 0; n < nnode; n++) {
+					Node *node = elem->node_pt(nnode*n);
+
+					this->convert_to_boundary_node(node);
+					this->add_boundary_node(4, node);
+				}
+			}
+
+			construct_spines();
+
+			this->setup_boundary_element_info();
+		}
+
+		void construct_spines() {
+			unsigned int np = finite_element_pt(0)->nnode_1d();
+			unsigned int nspine = (np - 1) * ny + 1;
+			Spine_pt.reserve(nspine);
+
+			// loop through vertical elements
+			for (unsigned int yi = 0; yi < ny; yi++) {
+				// loop through nodes in vertical direction
+				for (unsigned int s = 0; s < np; s++) {
+					// create spine and set parameters
+					Spine *spine = new Spine(geometry->x1());
+					spine->spine_height_pt()->pin(0);
+					Spine_pt.push_back(spine);
+
+					Vector<double> parameters = {((double)yi + (double)s/(double)(np-1)) / (double)ny};
+					spine->set_geom_parameter(parameters);
+
+					Vector<GeomObject *> geom_object_pt = {geometry};
+					spine->set_geom_object_pt(geom_object_pt);
+
+					// loop through nodes in phase 1
+					for (unsigned int xi = 0; xi < nx1; xi++) {
+						for (unsigned n = 0; n < np; n++) {
+							SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+							node_pt->spine_pt() = spine;
+							node_pt->fraction() = ((double)xi + (double)n/(double)(np-1)) / (double)nx1;
+							node_pt->spine_mesh_pt() = this;
+							node_pt->node_update_fct_id() = 0;
+						}
+					}
+
+					// loop through nodes in phase 2
+					for (unsigned int xi = nx1; xi < nx; xi++) {
+						for (unsigned n = 0; n < np; n++) {
+							SpineNode *node_pt = element_node_pt(yi*nx + xi, s*np + n);
+							node_pt->spine_pt() = spine;
+							node_pt->fraction() = ((double)(xi-nx1) + (double)n/(double)(np-1)) / (double)nx2;
+							node_pt->spine_mesh_pt() = this;
+							node_pt->node_update_fct_id() = 1;
+						}
+					}
+				}
+			}
+		}
+
+		void spine_node_update(SpineNode *node_pt) {
+			switch (node_pt->node_update_fct_id()) {
+				case 0: node_pt->x(0) = geometry->x0() + node_pt->fraction() * (geometry->x1() - geometry->x0());	break;
+				case 1: node_pt->x(0) = geometry->x1() + node_pt->fraction() * (geometry->x2() - geometry->x1());	break;
+				default:
+					printf("Invalid node update function\n");
+					break;
+			}
 		}
 };
 
