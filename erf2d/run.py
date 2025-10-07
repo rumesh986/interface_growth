@@ -174,8 +174,8 @@ class Run:
 			kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
 
 		# ke = self.get_ke(kwargs['k1'], kwargs['k2'], kwargs['rho1'], kwargs['rho2'], kwargs['cp1'], kwargs['cp2'], kwargs['L'])
-		De = self.get_De(**kwargs)
-		kwargs['De'] = De
+		# De = self.get_De(**kwargs)
+		# kwargs['De'] = De
 
 		translated_kwargs = []
 		for key, value in kwargs.items():
@@ -184,7 +184,7 @@ class Run:
 
 			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
-		print(translated_kwargs)
+		# print(translated_kwargs)
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
 		# call executable with command line argumets
@@ -209,6 +209,8 @@ class Run:
 		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
+
+		kwargs['De'] = self.get_De(**kwargs)
 		
 		with open('config', 'w') as f:
 			f.write(f'xs: {self.xs}\n')
@@ -249,6 +251,7 @@ class Run:
 									kwargs_cp = kwargs.copy()
 									kwargs_cp[v] *= (1.0 + kwargs_cp['eps'])
 									kwargs_cp['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs_cp["k1"]:9.7f}_{kwargs_cp["k2"]:9.7f}_{kwargs_cp["rho1"]:9.7f}_{kwargs_cp["rho2"]:9.7f}_{kwargs_cp["cp1"]:9.7f}_{kwargs_cp["cp2"]:9.7f}'
+									kwargs_cp['De'] = self.get_De(**kwargs_cp)
 									futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs_cp)
 			# for all other run types
 			else:
