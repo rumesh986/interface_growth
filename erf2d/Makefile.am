@@ -1,6 +1,6 @@
 # Name of executables: The prefix "noinst" means the executables don't
 # have to be installed anywhere.
-noinst_PROGRAMS=erf2d1 erf2d2 erf2d3 erf2d4 erf2d5 erf2d6 erf2d7 erf2d3p1 erf2d3p2 erf2d8 erf2d9 erf2d10
+noinst_PROGRAMS=erf2d1 erf2d2 erf2d3 erf2d4 erf2d5 erf2d6 erf2d7 erf2d3p1 erf2d3p2 erf2d8 erf2d9 erf2d10 erf2d11
 
 #---------------------------------------------------------------------------
 
@@ -17,6 +17,7 @@ erf2d3p2_SOURCES = erf2d3p2.cc two_layer_mesh.h three_layer_mesh.h
 erf2d8_SOURCES = erf2d8.cc two_layer_mesh.h
 erf2d9_SOURCES = erf2d9.cc two_phase_free_boundary_mesh.h
 erf2d10_SOURCES = erf2d10.cc two_phase_free_boundary_mesh.h
+erf2d11_SOURCES = erf2d11.cc two_phase_free_boundary_mesh.h
 
 # Required libraries: Only the "generic" and "poisson" libraries, 
 # which are accessible via the general library directory which 
@@ -55,6 +56,7 @@ erf2d3p2_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d8_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d9_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 erf2d10_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
+erf2d11_LDADD = -L@libdir@ -lunsteady_heat -lgeneric $(EXTERNAL_LIBS) $(FLIBS)
 
 #---------------------------------------------------------------------------
 
