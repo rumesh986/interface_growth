@@ -93,19 +93,43 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	// 	u[0] = Tfr - (Tfr-Tm)/(1-erf(h/(2*sqrt(D2*t)))) * (1 - erf(x[0]/(2*sqrt(D2*t))));
 	// }
 
+	// double h = 0.0;
+	// if (ic_set) {
+	// 	h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
+	// } else {
+	// 	h = domain->get_interface();
+	// }
+	
+	// if (x[0] < h) {
+	// 	double erf_iface = erf(h/(2*sqrt(D1*t)));
+	// 	u[0] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts *erf_iface)/(1+erf_iface);
+	// } else {
+	// 	double erf_iface = erf(h/(2*sqrt(D2*t)));
+	// 	u[0] = ((Tfr- Tm)*erf(x[0]/(2*sqrt(D2*t))) + Tm - Tfr*erf_iface)/(1-erf_iface);
+	// }
+
 	double h = 0.0;
+	double h_ana = 0.0;
 	if (ic_set) {
 		h = (De == 0.0) ? domain->get_interface() : sqrt(De * t);
+		h_ana = sqrt(De * t);
 	} else {
 		h = domain->get_interface();
+		h_ana = sqrt(De * t);
 	}
-	
+
 	if (x[0] < h) {
 		double erf_iface = erf(h/(2*sqrt(D1*t)));
-		u[0] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts *erf_iface)/(1+erf_iface);
+		u[0] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts*erf_iface)/(1+erf_iface);
+
+		erf_iface = erf(h_ana/(2*sqrt(D1*t)));
+		u[1] = ((Tm - Ts)*erf(x[0]/(2*sqrt(D1*t))) + Tm + Ts*erf_iface)/(1+erf_iface);
 	} else {
 		double erf_iface = erf(h/(2*sqrt(D2*t)));
-		u[0] = ((Tfr- Tm)*erf(x[0]/(2*sqrt(D2*t))) + Tm - Tfr*erf_iface)/(1-erf_iface);
+		u[0] = ((Tfr - Tm)*erf(x[0]/(2*sqrt(D2*t))) + Tm - Tfr*erf_iface)/(1-erf_iface);
+
+		erf_iface = erf(h_ana/(2*sqrt(D2*t)));
+		u[1] = ((Tfr - Tm)*erf(x[0]/(2*sqrt(D2*t))) + Tm - Tfr*erf_iface)/(1-erf_iface);
 	}
 }
 
@@ -259,32 +283,42 @@ class Erf2DProblem : public Problem {
 			// s[0] = 1.0;
 			// s[1] = 0.0;
 
+			double time = time_pt()->time(t);
+
 			double tot_flux = 0.0;
+			double new_h = 0.0;
+			double v = 0.0;
 
-			unsigned long int nelems = mesh_pt()->nboundary_element(4);
-			for (unsigned long int e = 0; e < nelems; e++) {
-				// only choose fluxes in the horizontal direction
-				int face_index = mesh_pt()->face_index_at_boundary(4, e);
-				if (face_index == 1) {
-					Vector<double> s = {1.0, 0.0};
-					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-					if (ic) get_flux_ic(t+1, elem, s, flux);
-					else 	elem->get_flux(s, flux);
-
-					tot_flux += k1 * flux[0];
-				} else if (face_index == -1) {
-					Vector<double> s = {-1.0, 0.0};
-					EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
-					if (ic) get_flux_ic(t+1, elem, s, flux);
-					else 	elem->get_flux(s, flux);
-
-					tot_flux -= k2 * flux[0];
+			if (ic && De != 0) {
+				new_h = sqrt(De * time);
+				v = new_h - domain->get_interface() / dt;
+			} else {
+				unsigned long int nelems = mesh_pt()->nboundary_element(4);
+				for (unsigned long int e = 0; e < nelems; e++) {
+					// only choose fluxes in the horizontal direction
+					int face_index = mesh_pt()->face_index_at_boundary(4, e);
+					if (face_index == 1) {
+						Vector<double> s = {1.0, 0.0};
+						EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+						if (ic) get_flux_ic(t+1, elem, s, flux);
+						else 	elem->get_flux(s, flux);
+	
+						tot_flux += k1 * flux[0];
+					} else if (face_index == -1) {
+						Vector<double> s = {-1.0, 0.0};
+						EL *elem = dynamic_cast<EL *>(mesh_pt()->boundary_element_pt(4, e));
+						if (ic) get_flux_ic(t+1, elem, s, flux);
+						else 	elem->get_flux(s, flux);
+	
+						tot_flux -= k2 * flux[0];
+					}
 				}
+	
+				// calculate dh/dt and new interface position
+				v = tot_flux / (rho1 * L * Ny);
+				new_h = domain->get_interface() + v * dt;
 			}
 
-			// calculate dh/dt and new interface position
-			double v = tot_flux / (rho1 * L * Ny);
-			double new_h = domain->get_interface() + v * dt;
 
 			domain->set_interface(new_h);
 			mesh_pt()->node_update();
@@ -350,7 +384,7 @@ class Erf2DProblem : public Problem {
 			unsigned long int nnode = mesh_pt()->nnode();
 
 			Vector<double> x(2);
-			Vector<double> exact_u(1);
+			Vector<double> exact_u(2);
 			Vector<double> numerical_u(1);
 
 			double tot_error = 0.0;
@@ -364,10 +398,10 @@ class Erf2DProblem : public Problem {
 				mesh_pt()->node_pt(n)->value(t, numerical_u);
 				get_exact_u(time, x, exact_u);
 
-				double error = numerical_u[0] - exact_u[0];
+				double error = numerical_u[0] - exact_u[1];
 				tot_error += error * error;
 
-				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[0], numerical_u[0], error);
+				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[1], numerical_u[0], error);
 			}
 			fclose(file);
 			
