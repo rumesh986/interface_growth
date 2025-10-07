@@ -48,17 +48,11 @@ class FreeBoundaryGeometry : public GeomObject {
 			}
 		}
 
-		double& x0(const unsigned int &t) const {return *data_pt[0]->value_pt(t, 0);}
-		double& x1(const unsigned int &t) const {return *data_pt[0]->value_pt(t, free_boundary_index);}
-		double& x2(const unsigned int &t) const {return *data_pt[0]->value_pt(t, 2);}
-		double& y0(const unsigned int &t) const {return *data_pt[0]->value_pt(t, 3);}
-		double& y1(const unsigned int &t) const {return *data_pt[0]->value_pt(t, 4);}
-
-		double& x0() const {return x0(0);}
-		double& x1() const {return x1(0);}
-		double& x2() const {return x2(0);}
-		double& y0() const {return y0(0);}
-		double& y1() const {return y1(0);}
+		double& x0(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, 0);}
+		double& x1(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, free_boundary_index);}
+		double& x2(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, 2);}
+		double& y0(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, 3);}
+		double& y1(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, 4);}
 
 		unsigned int ngeom_data() const {return data_pt.size();}
 
@@ -70,9 +64,10 @@ class FreeBoundaryGeometry : public GeomObject {
 		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
 			// r[0] = x0(t) + (x2(t) - x0(t)) * zeta[0];
 			r[0] = x1(t);
-			r[1] = y0(t) + (y1(t) - y0(t)) * zeta[1];
+			// r[1] = y0(t) + (y1(t) - y0(t)) * zeta[1];
 
-			printf("FreeBoundaryGeometry - position: zeta0: %8.6f zeta1: %8.6f\n", zeta[0], zeta[1]);
+			// printf("FreeBoundaryGeometry - position: zeta0: %8.6f\n", zeta[0]);
+			// printf("FreeBoundaryGeometry - position: zeta0: %8.6f zeta1: %8.6f\n", zeta[0], zeta[1]);
 		}
 
 		void position(const Vector<double> &zeta, Vector<double> &r) const {
@@ -105,7 +100,8 @@ class FreeBoundaryElement : public GeneralisedElement,
 			unpin_free_boundary();
 
 			flux_data_pt = new Data(ts_pt, 1);
-			flux_data_pt->set_value(0, 0.0);
+
+			for (unsigned int t = 0; t < ts_pt->nprev_values(); t++) flux_data_pt->set_value(t, 0.0);
 			flux_data_pt->pin_all();
 
 			flux_index = add_external_data(flux_data_pt);
@@ -158,7 +154,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			// residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
 			// residuals[free_boundary_local_eqn_number] = interface_ts_pt->time_pt()->dt() * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0) / factor);
 			// residuals[free_boundary_local_eqn_number] = factor * dt * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0));
-			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
+			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0, 0);
 
 			// if (!compute_jacobian)
 			// 	printf("h_t=%8.6f beta=%8.6f dt=%8.6f res=%8.6f\n", interface_data_pt->value(1, free_boundary_index), external_data_pt(flux_index)->value(0), interface_ts_pt->time_pt()->dt(), residuals[free_boundary_local_eqn_number]);
@@ -469,9 +465,16 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 		}
 
 		void spine_node_update(SpineNode *node_pt) {
+			FreeBoundaryGeometry *geom = dynamic_cast<FreeBoundaryGeometry *>(node_pt->spine_pt()->geom_object_pt(0));
+			double frac = node_pt->fraction();
+			Vector<double> zeta(1), r(1);
+
+			zeta[0] = 0.0;
+			geom->position(zeta, r);
+
 			switch (node_pt->node_update_fct_id()) {
-				case 0: node_pt->x(0) = geometry->x0() + node_pt->fraction() * (geometry->x1() - geometry->x0());	break;
-				case 1: node_pt->x(0) = geometry->x1() + node_pt->fraction() * (geometry->x2() - geometry->x1());	break;
+				case 0: node_pt->x(0) = geom->x0() + frac * (r[0] - geom->x0());	break;
+				case 1: node_pt->x(0) = r[0] + frac * (geom->x2() - r[0]);	break;
 				default:
 					printf("Invalid node update function\n");
 					break;

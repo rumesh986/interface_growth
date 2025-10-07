@@ -292,11 +292,13 @@ class Visualizer:
 
 		for i, run in enumerate(self.runs):
 			x_order, t_order, dx, dt = config(run.config)
-			# get largest dx for dx analysis
-			# phase 1 of the final step is assumed to have the largest dx of the simulation
-			# phase 1 is the growing phase (solid phase)
 			if 'x' in self.dxdt:
+				# get largest dx for dx analysis
+				# phase 1 of the final step is assumed to have the largest dx of the simulation
+				# phase 1 is the growing phase (solid phase)
 				# dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
+
+				# In newer versions, the maximum element size (calculated by oomph-lib) is stored in the results file
 				dx = run.results['dx'].values.max()
 			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
 
@@ -309,11 +311,12 @@ class Visualizer:
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
-			self.make_surf_profile_anim(run)
 			# self.subplot_surf_prof(run)
 			# self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
+			
+			self.make_surf_profile_anim(run)
 
 		except:
 			raise Exception(f"Crashing while processing {run.config}")
@@ -390,8 +393,8 @@ class Visualizer:
 
 		plt.cla()
 
-		fig, ax = plt.subplots(1)
-		ax.plot(run.times, run.interface, label='Interface position')
+		fig, (iface_ax, err_ax) = plt.subplots(2, figsize=(7,10))
+		iface_ax.plot(run.times, run.interface, label='Interface position')
 
 		try:
 			# perform curve-fitting and plot results
@@ -400,19 +403,25 @@ class Visualizer:
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			print(f'{run.title} D_eff = {optimal[0]}')
-			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
 		except:
 			print("Failed to fit h-curve")
 
 		if 'expected_interface' in run.results.columns:
-			plt.plot(run.results['time'], run.results['expected_interface'], label='analytical', ls=':')
-
-		ax.legend()
-		ax.set_xlabel('time')
-		ax.set_ylabel('interface posiion h(t)')
+			iface_ax.plot(run.results['time'], run.results['expected_interface'], label='analytical', ls=':')
+			err_ax.plot(run.results['time'], run.results['expected_interface'] - run.interface, label='Error')
+			
+		iface_ax.legend()
+		iface_ax.set_xlabel('time')
+		iface_ax.set_ylabel('interface posiion h(t)')
+		
+		# err_ax.set_yscale('log')
+		err_ax.set_xlabel('Time')
+		err_ax.set_ylabel('Error')
 
 		if not self.report:
-			ax.set_title('Interface position with time')
+			iface_ax.set_title('Interface position with time')
+			err_ax.set_title('Error in interface position')
 
 		fig.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
@@ -519,10 +528,10 @@ class Visualizer:
 		mesh_pos = np.zeros((run.config.nx+1, 4))
 
 		for i, ax in enumerate(axs.flatten()):
-			# data = run.exact_solns[i]
-			data = run.exact_solns[i*num_frames]
+			data = run.exact_solns[i]
+			# data = run.exact_solns[i*num_frames]
 			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
-			# print(f'time in col {i}={run.times[i]}')
+			print(f'time in col {i}={run.times[i]}')
 
 			ax.scatter(data['x'], data['y'])
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
@@ -710,6 +719,7 @@ class Visualizer:
 
 		prof_ax.legend(loc='upper left')
 		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_xlim([-1.0, 1.0])
 		prof_ax.set_ylabel('Temperature-ish')
 		prof_ax.set_title('Temperature profile')
 
@@ -787,9 +797,9 @@ class Visualizer:
 			ret = None
 			if (rtype == 'x'):
 				match x:
-					case 2: ret = "Linear" 
-					case 3: ret = "Quadratic"
-					case 4: ret = "Cubic"
+					case 2: ret = f"Linear BDF{t}"
+					case 3: ret = f"Quadratic BDF{t}"
+					case 4: ret = f"Cubic BDF{t}"
 					case _: raise Exception("Unknown element order")
 			else:
 				ret = f'BDF {t}'
@@ -943,6 +953,6 @@ if __name__ =='__main__':
 	# assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
 	# assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	# vis = Visualizer(sys.argv[1], sys.argv[2])
 	os.chdir(sys.argv[1])
-	vis = Visualizer(sys.argv[2], 'x', reference='runs/reference')
+	vis = Visualizer(sys.argv[2], sys.argv[3])
+	# vis = Visualizer(sys.argv[2], 'x', reference='runs/reference')
