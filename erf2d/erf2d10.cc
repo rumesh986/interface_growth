@@ -40,6 +40,8 @@ void get_source(const double &t, const Vector<double> &x, double &source) {
 }
 
 // analytical solution
+// u[0] -> solution with interface in current position (from numerical solution)
+// u[1] -> solution with interface position from analytical solution
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	// double h = geometry->get_interface();
 	// if (x[0] < h) {
@@ -163,7 +165,7 @@ class Erf2DProblem : public Problem {
 			linear_solver_pt()->disable_doc_time();
 			disable_info_in_newton_solve();
 			// newton_solver_tolerance() = 1e-9;
-			max_newton_iterations() = 1e5;
+			max_newton_iterations() = 1e2;
 			// max_residuals() = 1e7;
 		}
 
@@ -185,10 +187,11 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
-		void actions_before_newton_solve() {};
+		// void actions_before_newton_solve() {};
 		void actions_after_newton_solve() {};
 
-		void actions_before_implicit_timestep() {
+		// void actions_before_implicit_timestep() {
+		void actions_before_newton_solve() {
 			Vector<double> x(2), u(2);
 
 			double time = time_pt()->time();
@@ -204,7 +207,8 @@ class Erf2DProblem : public Problem {
 		}
 		void actions_after_implicit_timestep() {};
 
-		void actions_before_newton_convergence_check() {
+		// void actions_before_newton_convergence_check() {
+		void actions_before_newton_step() {
 			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
@@ -228,9 +232,11 @@ class Erf2DProblem : public Problem {
 				}
 			}
 
-			printf("Setting total flux to %8.6f\n", tot_flux / ny);
+			printf("Setting total flux to %8.6f interface at %16.14f\n", tot_flux / ny, geometry->get_interface());
 			geometry->set_flux(tot_flux / ny);
+		}
 
+		void actions_after_newton_step() {
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
@@ -285,7 +291,7 @@ class Erf2DProblem : public Problem {
 						} else if (face_index == -1) {
 							EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 							get_flux_ic(t+1, elem, s, flux);
-							tot_flux += k[1] * flux[0];
+							tot_flux -= k[1] * flux[0];
 						}
 					}
 					double v = tot_flux / (rho[0] * L * ny);
@@ -298,41 +304,6 @@ class Erf2DProblem : public Problem {
 				geometry->set_interface(new_h);
 				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
 				bulk_mesh_pt->node_update();
-
-				// mesh_pt()->node_update() only moves the nodes for current timestep
-				// when setting initial condition, we need to move the nodes ourselves
-				// the below code has been adapted from mesh_pt()->node_update()
-				// std::map<Node *, bool> node_handled;
-
-				// nelems = nx * ny;
-				
-				// // only work with each node once
-				// for (unsigned long int n = 0; n < nnode; n++) {
-				// 	Node *node_pt = bulk_mesh_pt->node_pt(n);
-				// 	node_handled[node_pt] = false;
-				// }
-
-				// for (unsigned long int e = 0; e < nelems; e++) {
-				// 	FiniteElement *elem_pt = dynamic_cast<FiniteElement *>(bulk_mesh_pt->element_pt(e));
-				// 	unsigned long int elem_nnode = elem_pt->nnode();
-				// 	for (unsigned long int n = 0; n < elem_nnode; n++) {
-				// 		Node *node_pt = elem_pt->node_pt(n);
-
-				// 		if (!node_handled[node_pt]) {
-				// 			elem_pt->local_coordinate_of_node(n, s);
-				// 			elem_pt->get_x(t, s, r);
-				// 			if (elem_pt->macro_elem_pt() == 0) {
-				// 				printf("We have big problems here !!!!\n\n");
-				// 			}
-
-				// 			for (int i = 0; i < 2; i++)
-				// 				node_pt->x(t, i) = r[i];
-							
-				// 			node_handled[node_pt] = true;
-				// 		}
-				// 	}
-				// }
-
 
 				for (unsigned long int n = 0; n < nnode; n++) {
 					bulk_mesh_pt->node_pt(n)->position(t, x);
@@ -384,7 +355,7 @@ class Erf2DProblem : public Problem {
 			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(D[2]*time), max_elem_size);
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error = %e interface = %8.6f expected = %8.6f\n", timestep, time, tot_error, geometry->get_interface(), sqrt(D[2]*time));
+			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%8.6f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(D[2] * time)), geometry->get_interface(), sqrt(D[2]*time));
 			info.number()++;
 		}
 

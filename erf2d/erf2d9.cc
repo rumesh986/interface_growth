@@ -82,8 +82,8 @@ Vector<unsigned int> pinned_boundaries = {
 };
 
 map<unsigned int, FluxFctPt> flux_boundaries = {
-	{0, no_flux_fct},
-	{2, no_flux_fct},
+	// {0, no_flux_fct},
+	// {2, no_flux_fct},
 };
 
 
@@ -160,12 +160,13 @@ class Erf2DProblem : public Problem {
 					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D[1];
 			}
 
-			assign_eqn_numbers();
+			// assign_eqn_numbers();
+			printf("Number of equations %lu\n", assign_eqn_numbers());
 
 			linear_solver_pt()->disable_doc_time();
 			disable_info_in_newton_solve();
-			max_newton_iterations() = 1e5;
-			max_residuals() = 1e7;
+			max_newton_iterations() = 1e2;
+			// max_residuals() = 1e7;
 		}
 
 		~Erf2DProblem() {
@@ -186,11 +187,12 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
-		void actions_before_newton_solve() {};
+		// void actions_before_newton_solve() {};
 		void actions_after_newton_solve() {};
 
-		void actions_before_implicit_timestep() {
-			Vector<double> x(2), u(1);
+		// void actions_before_implicit_timestep() {
+		void actions_before_newton_solve() {
+			Vector<double> x(2), u(2);
 
 			double time = time_pt()->time();
 
@@ -205,7 +207,8 @@ class Erf2DProblem : public Problem {
 		}
 		void actions_after_implicit_timestep() {};
 
-		void actions_before_newton_convergence_check() {
+		// void actions_before_newton_convergence_check() {
+		void actions_before_newton_step() {
 			// Vector<double> s(2);
 			Vector<double> flux(2);
 
@@ -240,6 +243,9 @@ class Erf2DProblem : public Problem {
 
 			printf("Setting total flux to %8.6f\n", tot_flux / ny);
 			geometry->set_flux(tot_flux / ny);
+		}
+
+		void actions_after_newton_step() {
 			bulk_mesh_pt->node_update();
 
 			// unsigned long int err_cnt = 0;
