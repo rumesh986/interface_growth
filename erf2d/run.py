@@ -138,11 +138,22 @@ class Run:
 			e1 = np.emath.sqrt(k1*rho1*cp1)
 			e2 = np.emath.sqrt(k2*rho2*cp2)
 
-			if self.prog == 'erf2d11':
-				return cp2*(Tm-Ts)/L - 0.5*np.emath.sqrt(np.pi*x/D2) * np.exp(0.25*x/D2) * ((e2/e1) + erf(0.5*x/D2))
-			else:
-				return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
-
+			match self.prog:
+				case 'erf2d11':
+					return cp2*(Tm-Ts)/L - 0.5*np.emath.sqrt(np.pi*x/D2) * np.exp(0.25*x/D2) * ((e2/e1) + erf(0.5*x/D2))
+				case 'erf2d12':
+					alpha = L / (cp1 * (Tm - Ts))
+					return 1 - alpha * np.emath.sqrt(0.25 * x * np.pi) * np.exp(0.25 * x) * erf(np.emath.sqrt(0.25 * x))
+				case 'erf2d13':
+					Tl = Tm
+					St = L / (cp1 * (Tl - Ts))
+					beta = x / D1
+					Tp = (Tl - Tm)/(Tl - Ts)
+					er = np.emath.sqrt((k2*rho2*cp2)/(k1*rho1*cp1))
+					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
+					# return 0.5 * St * np.emath.sqrt(np.pi * x / D1) - (1-Tp)*np.exp(-0.25 * x/D1)/(1+erf(0.5*np.emath.sqrt(x/D1))) + er * Tp * np.exp(-0.25*x/D2)/(1 - erf(0.5*np.emath.sqrt(x/D2)))
+				case _:
+					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
 
 			# return rho1*L*np.emath.sqrt(x) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
 			# return np.emath.sqrt(x) * np.exp(x/D2) - np.emath.sqrt(k1*rho1*cp1)*(-1.0*Ts)/(rho2*L)
