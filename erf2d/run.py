@@ -145,13 +145,11 @@ class Run:
 					alpha = L / (cp1 * (Tm - Ts))
 					return 1 - alpha * np.emath.sqrt(0.25 * x * np.pi) * np.exp(0.25 * x) * erf(np.emath.sqrt(0.25 * x))
 				case 'erf2d13':
-					Tl = Tm
 					St = L / (cp1 * (Tl - Ts))
 					beta = x / D1
 					Tp = (Tl - Tm)/(Tl - Ts)
 					er = np.emath.sqrt((k2*rho2*cp2)/(k1*rho1*cp1))
 					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
-					# return 0.5 * St * np.emath.sqrt(np.pi * x / D1) - (1-Tp)*np.exp(-0.25 * x/D1)/(1+erf(0.5*np.emath.sqrt(x/D1))) + er * Tp * np.exp(-0.25*x/D2)/(1 - erf(0.5*np.emath.sqrt(x/D2)))
 				case 'erf2d14':
 					St = L / (cp1 * (Tm - Ts))
 					T_l = (Tm - Tl) / (Tm - Ts)
@@ -161,8 +159,6 @@ class Run:
 				case _:
 					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
 
-			# return rho1*L*np.emath.sqrt(x) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
-			# return np.emath.sqrt(x) * np.exp(x/D2) - np.emath.sqrt(k1*rho1*cp1)*(-1.0*Ts)/(rho2*L)
 		
 		De = newton(func, k1/(rho1*cp1))
 
@@ -221,7 +217,7 @@ class Run:
 	
 	# method that organises and performs required runs in parallel
 	# will run all permutations of options passed to the program, with small adjustments for type of computation
-	def run(self, tshift=None, **kwargs):
+	def run(self, tshift=None, wf=None, **kwargs):
 		# calculate max number of CPUs usable/available
 		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
 		if (num_workers > self.nthreads):
@@ -240,7 +236,6 @@ class Run:
 
 		# run processes in parallel
 		futures = {}
-		wf = None
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
 			# for dt error analysis
 			if 't' in self.dxdt:
