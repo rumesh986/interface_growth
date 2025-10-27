@@ -81,6 +81,7 @@ class _RunData:
 			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)	
 			self.times = self.results['time']
 			self.interface = self.results['interface']
+			self.interface_errors = np.fabs(self.results['interface'] - self.results['expected_interface'])
 		except FileNotFoundError as e:
 			print("Results file not found")
 			raise e
@@ -111,40 +112,6 @@ class _RunData:
 				step = reference.config.nx // self.config.nx
 				count = 0
 				print(f"Reference nx = {reference.config.nx} self nx = {self.config.nx} step = {step}")
-
-				# for i, t in enumerate(reference.times):
-				# 	if t not in self.times.values:
-				# 		continue
-
-				# 	data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
-				# 	data['time'] = t
-
-				# 	ref_data = reference.solns[i]
-
-				# 	xerrors = np.zeros(data.shape[0])
-				# 	errors = np.zeros(data.shape[0])
-				# 	count2 = 0
-				# 	for j, y in enumerate(data['y'].unique()):
-				# 		df = data.loc[data['y'] == y]
-				# 		ref_df = ref_data.loc[ref_data['y'] == y]
-				# 		for k, x in enumerate(df['x']):
-				# 			dfindex = df.index[df['x'] == x].tolist()[0]
-				# 			try:
-				# 				index = (ref_df['x'] - x).abs().idxmin()
-				# 			except:
-				# 				print(self.config)
-				# 				print(y)
-				# 				print(ref_data)
-
-				# 			errors[count2] = data.loc[dfindex, 'u'] - ref_data.loc[index, 'u']
-				# 			if not (np.isclose(data.loc[dfindex, 'x'], ref_data.loc[index, 'x']) and np.isclose(data.loc[dfindex, 'y'], ref_data.loc[index, 'y'])):
-				# 				xerrors[count2] = np.sqrt(np.sum(np.square([data.loc[dfindex, 'x'] - ref_data.loc[index, 'x'],
-				# 													data.loc[dfindex, 'y'], ref_data.loc[index, 'y']])))
-				# 			count2 += 1
-
-				# 	print(f'[{count}] xerrors: {np.linalg.norm(xerrors)}')
-				# 	self.results['error'][count] = np.linalg.norm(errors)
-				# 	count += 1
 				
 				count = 0
 				for t, time in enumerate(reference.times):
@@ -204,6 +171,10 @@ class _RunData:
 	@property
 	def total_error_norm(self):
 		return np.linalg.norm(self.results['error'])/len(self.results['error'])
+
+	@property
+	def interface_error_norm(self):
+		return np.linalg.norm(self.interface_errors) / len(self.interface_errors)
 
 	# create folder to store plots
 	def create_outdir(self):
@@ -312,7 +283,8 @@ class Visualizer:
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
 			# self.subplot_surf_prof(run)
-			# self.subplot_mesh(run)
+			if run.config.nx == 10:
+				self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
 			
@@ -403,13 +375,18 @@ class Visualizer:
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			print(f'{run.title} D_eff = {optimal[0]}')
-			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.6e} * t}} + {optimal[1]:.2f}$')
 		except:
 			print("Failed to fit h-curve")
 
 		if 'expected_interface' in run.results.columns:
-			iface_ax.plot(run.results['time'], run.results['expected_interface'], label='analytical', ls=':')
-			err_ax.plot(run.results['time'], run.results['expected_interface'] - run.interface, label='Error')
+			if 'De' in run.config.params.keys():
+				label = fr'analytical $y=\sqrt{{{run.config.params["De"]:.6e} t}}$'
+			else:
+				label = 'analytical'
+			iface_ax.plot(run.results['time'], run.results['expected_interface'], label=label, ls=':')
+			err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
+			err_ax.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error')
 			
 		iface_ax.legend()
 		iface_ax.set_xlabel('time')
@@ -418,6 +395,7 @@ class Visualizer:
 		# err_ax.set_yscale('log')
 		err_ax.set_xlabel('Time')
 		err_ax.set_ylabel('Error')
+		err_ax.legend()
 
 		if not self.report:
 			iface_ax.set_title('Interface position with time')
@@ -528,8 +506,8 @@ class Visualizer:
 		mesh_pos = np.zeros((run.config.nx+1, 4))
 
 		for i, ax in enumerate(axs.flatten()):
-			data = run.exact_solns[i]
-			# data = run.exact_solns[i*num_frames]
+			# data = run.exact_solns[i]
+			data = run.exact_solns[i*num_frames]
 			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
 			print(f'time in col {i}={run.times[i]}')
 
@@ -660,7 +638,7 @@ class Visualizer:
 			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
 
 		def _update(n):
-			time_text.set_text(f't={run.times[n]}')
+			time_text.set_text(f't={run.times[n]:6.4f}')
 
 			data = _extract_data(run.solns[n])
 			exact_data = _extract_data(run.exact_solns[n])
@@ -709,7 +687,7 @@ class Visualizer:
 			diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 		
 		if 'expected_interface' in run.results.columns:
-			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
 			diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
 		
 		for pos in run.config.fixed_pos:
@@ -721,7 +699,14 @@ class Visualizer:
 		prof_ax.set_ylim([-1.5, 1.5])
 		prof_ax.set_xlim([-1.0, 1.0])
 		prof_ax.set_ylabel('Temperature-ish')
-		prof_ax.set_title('Temperature profile')
+
+		if self.report:
+			box = prof_ax.get_position()
+			prof_ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
+			plt.tight_layout()
+		else:
+			prof_ax.legend(loc='upper left')
+			prof_ax.set_title('Temperature profile')
 
 		diff_ax.set_xlabel('x')
 		diff_ax.set_ylabel('Error')
@@ -954,5 +939,6 @@ if __name__ =='__main__':
 	# assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
 	os.chdir(sys.argv[1])
+	# vis = Visualizer(sys.argv[2], sys.argv[3], stylef='report.mplstyle')
 	vis = Visualizer(sys.argv[2], sys.argv[3])
 	# vis = Visualizer(sys.argv[2], 'x', reference='runs/reference')
