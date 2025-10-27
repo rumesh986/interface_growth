@@ -101,7 +101,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 
 			flux_data_pt = new Data(ts_pt, 1);
 
-			for (unsigned int t = 0; t < ts_pt->nprev_values(); t++) flux_data_pt->set_value(t, 0.0);
+			for (unsigned int t = 0; t < ts_pt->nprev_values(); t++) flux_data_pt->set_value(t, 0, 0.0);
 			flux_data_pt->pin_all();
 
 			flux_index = add_external_data(flux_data_pt);
