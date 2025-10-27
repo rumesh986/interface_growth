@@ -473,8 +473,9 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			geom->position(zeta, r);
 
 			switch (node_pt->node_update_fct_id()) {
-				case 0: node_pt->x(0) = geom->x0() + frac * (r[0] - geom->x0());	break;
-				case 1: node_pt->x(0) = r[0] + frac * (geom->x2() - r[0]);	break;
+				// case 0: node_pt->x(0) = geom->x0() + frac * (r[0] - geom->x0());	break;
+				case 0: node_pt->x(0) = (1.0 - frac) * geom->x0() + frac * r[0];	break;
+				case 1: node_pt->x(0) = (1.0 - frac) * r[0] + frac * geom->x2();	break;
 				default:
 					printf("Invalid node update function\n");
 					break;
