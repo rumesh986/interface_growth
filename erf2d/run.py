@@ -152,6 +152,12 @@ class Run:
 					er = np.emath.sqrt((k2*rho2*cp2)/(k1*rho1*cp1))
 					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
 					# return 0.5 * St * np.emath.sqrt(np.pi * x / D1) - (1-Tp)*np.exp(-0.25 * x/D1)/(1+erf(0.5*np.emath.sqrt(x/D1))) + er * Tp * np.exp(-0.25*x/D2)/(1 - erf(0.5*np.emath.sqrt(x/D2)))
+				case 'erf2d14':
+					St = L / (cp1 * (Tm - Ts))
+					T_l = (Tm - Tl) / (Tm - Ts)
+					D = D1 / D2
+					k = k1 / k2
+					return 0.5 * St * np.emath.sqrt(np.pi * x) - (k * T_l * np.exp(-0.25 * x/D))/(np.emath.sqrt(D)*(1 - erf(0.5 * np.emath.sqrt(x/D)))) - np.exp(-0.25 * x)/erf(0.5*np.emath.sqrt(x))
 				case _:
 					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
 
