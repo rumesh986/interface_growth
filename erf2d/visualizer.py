@@ -253,12 +253,14 @@ class Visualizer:
 			for rtype in self.dxdt:
 				match rtype:
 					case 'a': self.standard()
-					case x if x in 'bxt': self.plot_analysis(x)
+					case x if x in 'ibxt': 
+						self.plot_interfaces()
+						self.plot_analysis(x)
 					case 's': self.sensitivity_analysis()
 
 	# collect information about all runs, needed for analysis processing
 	def prepare_pd(self):
-		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
+		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error', 'interface_error'])
 		config = lambda inp: (inp.x_order, inp.t_order, 1/inp.nx, inp.dt)
 
 		for i, run in enumerate(self.runs):
@@ -271,7 +273,7 @@ class Visualizer:
 
 				# In newer versions, the maximum element size (calculated by oomph-lib) is stored in the results file
 				dx = run.results['dx'].values.max()
-			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
+			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm, run.interface_error_norm]
 
 	# post-processing for individual runs (part of 'a' type runs)
 	def _make(self, run):
@@ -780,7 +782,7 @@ class Visualizer:
 		# helper function to get legend entries
 		def _legend(x, t):
 			ret = None
-			if (rtype == 'x'):
+			if (rtype in 'ix'):
 				match x:
 					case 2: ret = f"Linear BDF{t}"
 					case 3: ret = f"Quadratic BDF{t}"
@@ -793,25 +795,36 @@ class Visualizer:
 		match rtype:
 			case 'x':
 				xlabel = 'dx'
+				ylabel = 'error'
 				title = f'{self.prefix} dx error analysis'
 				fname = 'dx_errors'
-				label = 'order'
 				ref_order = 'x_order'
-				xs = np.logspace(0, -3)
+				ref_variable = 'x'
+				xs = np.logspace(0, -3.5)
 			case 'b':
 				xlabel = 'dx'
+				ylabel = 'error'
 				title = f'{self.prefix} dxdt error analysis'
 				fname = 'dxdt_errors'
-				label = 'order'
 				ref_order = 'x_order'
+				ref_variable = 'x'
 				xs = np.logspace(0, -3)
 			case 't':
 				xlabel = 'dt'
+				ylabel = 'error'
 				title = f'{self.prefix} dt error analysis'
 				fname = 'dt_errors'
-				label = 'BDF'
 				ref_order = 't_order'
+				ref_variable = 't'
 				xs = np.logspace(0, -4)
+			case 'i':
+				xlabel = 'dx'
+				ylabel = 'interface_error'
+				title = f'{self.prefix} dx (interface) error analysis'
+				fname = 'dx_errors_iface'
+				ref_order = 'x_order'
+				ref_variable = 'x'
+				xs = np.logspace(0, -3.5)
 			case _:
 				raise Exception("Unknown analysis type provided")
 
@@ -836,7 +849,7 @@ class Visualizer:
 				df = self._pd.loc[self._pd['x_order'] == x]
 				df = df.loc[df['t_order'] == t]
 
-				ax.scatter(df[xlabel], df['error'], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
+				ax.scatter(df[xlabel], df[ylabel], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
 				marker_i += 1
 
 		# plot reference lines
@@ -846,8 +859,9 @@ class Visualizer:
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
-			max_point = df.loc[df[xlabel] == df[xlabel].max()]
-			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=fr'$\mathcal{{O}}({rtype}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
+			max_point = df.loc[df[ylabel] == df[ylabel].min()]
+			# max_point = df.iloc[(df[xlabel] - 0.03).abs().argsort()[:1]]
+			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** (x-1) * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
 
 		if not self.report:
 			fig.suptitle(title)
@@ -863,6 +877,8 @@ class Visualizer:
 			plt.show()
 
 		plt.close(fig)
+
+		print(self._pd)
 	
 	# plot results of sensitivity analysis
 	def sensitivity_analysis(self):
