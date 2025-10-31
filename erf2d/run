@@ -45,6 +45,12 @@ if __name__ == '__main__':
 		help='Number of elements to simulate with, accepts multiple in list'
 	)
 
+	parser.add_argument('--ny',
+		type=int,
+		default=1,
+		help='Number of elements in y-direction of domain'
+	)
+
 	parser.add_argument('--dts', '--dt',
 		nargs='+', 
 		type=float,
@@ -59,9 +65,16 @@ if __name__ == '__main__':
 		help='Number of timesteps to simulate for, only single number'
 	)
 
+	parser.add_argument('--write_freq', '--wf', 
+		type=int,
+		dest='wf',
+		default=1,
+		help='Number of timesteps to wait for before saving results'
+	)
+
 	parser.add_argument('--type',
 		type=str,
-		choices=['a', 'x', 't', 'b', 's', 'ax', 'at', 'ab', 'as'],
+		choices=['a', 'x', 't', 'b', 'i', 's', 'ax', 'at', 'ab', 'ai', 'as'],
 		dest='dxdt',
 		default='a',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt\ns: sensitivity analysis"

@@ -368,6 +368,8 @@ class Visualizer:
 		plt.cla()
 
 		fig, (iface_ax, err_ax) = plt.subplots(2, figsize=(7,10))
+		err_ax2 = err_ax.twinx()
+		
 		iface_ax.plot(run.times, run.interface, label='Interface position')
 
 		try:
@@ -387,8 +389,10 @@ class Visualizer:
 			else:
 				label = 'analytical'
 			iface_ax.plot(run.results['time'], run.results['expected_interface'], label=label, ls=':')
-			err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
-			err_ax.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error')
+			abs_plot, = err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
+			rel_plot, = err_ax2.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error', c='C1')
+			
+			err_ax.legend(handles=[abs_plot, rel_plot])
 			
 		iface_ax.legend()
 		iface_ax.set_xlabel('time')
@@ -396,8 +400,8 @@ class Visualizer:
 		
 		# err_ax.set_yscale('log')
 		err_ax.set_xlabel('Time')
-		err_ax.set_ylabel('Error')
-		err_ax.legend()
+		err_ax.set_ylabel('Absolute Error')
+		err_ax2.set_ylabel('Relative error')
 
 		if not self.report:
 			iface_ax.set_title('Interface position with time')
@@ -839,7 +843,7 @@ class Visualizer:
 			'ylabel': 'Normalized Error',
 			'xscale': 'log',
 			'yscale': 'log',
-			'ylim': [self._pd['error'].min() * 1e-1, self._pd['error'].max() * 1e1],
+			'ylim': [self._pd[ylabel].min() * 1e-1, self._pd[ylabel].max() * 1e1],
 			'xlim': [self._pd[xlabel].min() * 0.8, self._pd[xlabel].max() * 1.2],
 		})
 
@@ -859,9 +863,16 @@ class Visualizer:
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
-			max_point = df.loc[df[ylabel] == df[ylabel].min()]
-			# max_point = df.iloc[(df[xlabel] - 0.03).abs().argsort()[:1]]
-			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** (x-1) * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
+			if rtype == 'i':
+				ref_power = 1.2
+			elif rtype == 'x' and x == 2:
+				ref_power = 2
+			else:
+				ref_power = x
+
+			# max_point = df.loc[df[ylabel] == df[ylabel].min()]
+			max_point = df.iloc[(df[xlabel] - 0.02).abs().argsort()[:1]]
+			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** ref_power * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{{{ref_power:.2f}}})$', linestyle='--', marker='', alpha=0.8)
 
 		if not self.report:
 			fig.suptitle(title)
