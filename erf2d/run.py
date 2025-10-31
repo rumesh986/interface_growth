@@ -153,8 +153,9 @@ class Run:
 				case 'erf2d14':
 					St = L / (cp1 * (Tm - Ts))
 					T_l = (Tm - Tl) / (Tm - Ts)
-					D = D1 / D2
-					k = k1 / k2
+					D = D2 / D1
+					k = k2 / k1
+					print(f'{St=} {T_l=} {D=} {k=}')
 					return 0.5 * St * np.emath.sqrt(np.pi * x) - (k * T_l * np.exp(-0.25 * x/D))/(np.emath.sqrt(D)*(1 - erf(0.5 * np.emath.sqrt(x/D)))) - np.exp(-0.25 * x)/erf(0.5*np.emath.sqrt(x))
 				case _:
 					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
@@ -166,6 +167,9 @@ class Run:
 			print("Trying with D2")
 			De = newton(func, k2/(rho2*cp2))
 		
+		if (not np.isclose(func(De), 0.0)):
+			raise Exception("Unable to get analytical De, check parameters")
+
 		De = np.real(De)
 			
 		print(f'f({De}) = {func(De)}')
