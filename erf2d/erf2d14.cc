@@ -628,7 +628,7 @@ int main(int argc, char **argv) {
 	for (uint t = 0; t < t_steps; t++) {
 		problem.unsteady_newton_solve(dt);
 
-		if (t % write_freq == 0)
+		if (t % write_freq == 0 || t == t_steps - 1)
 			problem.doc_step(t+prev_steps);
 
 		double x_int = geometry->get_interface();
