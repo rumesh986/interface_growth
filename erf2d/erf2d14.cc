@@ -30,7 +30,6 @@ bool ic_set = false;
 static const double T_s = -1.0;
 static const double T_m = 0.0;
 static const double T_l = 1.0;
-static const double T_p = (T_l - T_m) / (T_l - T_s);
 
 double xs[3] = {0.0, 0.025, 1.0};
 static const double ys[2] = {0.0, 0.0001};
@@ -49,14 +48,10 @@ void get_source(const double &t, const Vector<double> &x, double &source) {
 // u[0] -> solution with interface in current position (from numerical solution)
 // u[1] -> solution with interface position from analytical solution
 void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
-	double h = 0.0;
-	double h_ana = 0.0;
-	if (ic_set) {
-		h = (_D[2] == 0.0) ? geometry->get_interface() : sqrt(_D[2] * t);
-		h_ana = sqrt(_D[2] * t);
-	} else {
-		h = geometry->get_interface();
-		h_ana = sqrt(_D[2] * t);
+	double h = geometry->get_interface();
+	double h_ana = sqrt(_D[2] * t);
+	if (ic_set && _D[2] != 0.0) {
+		h = sqrt(_D[2] * t);
 	}
 
 	double trans_Tl = (T_m - T_l) / (T_m - T_s);
@@ -79,7 +74,6 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 		double erf_zeta = erf(0.5  * x[0] / sqrt(D * t));
 		double erf_iface = erf(0.5 * h_ana / sqrt(D * t));
 		u[1] = trans_Tl * (erf_zeta - erf_iface)/(1.0 - erf_iface);
-
 	}
 }
 
@@ -127,10 +121,8 @@ class Erf2DProblem : public Problem {
 
 			add_time_stepper_pt(new BDF<T_ORDER>);
 
-			iface_ts_pt = new BDF<2>;
+			iface_ts_pt = new BDF<1>;
 			add_time_stepper_pt(iface_ts_pt);
-
-			printf("1\n");
 
 			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], St, iface_ts_pt);
 
@@ -242,12 +234,12 @@ class Erf2DProblem : public Problem {
 			Vector<double> s(2);
 			// s[0] = -1.0;
 			s[1] = 0.0;
-			double factor = 0.0;
-
+			
 			for (unsigned long int e = 0; e < nelems; e++) {
 				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-
+				
+				double factor = 0.0;
 				if (face_index == 1) {
 					s[0] = 1.0;
 					factor = -1.0;
@@ -284,7 +276,6 @@ class Erf2DProblem : public Problem {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
 
-			printf("Updating nodal positions\n");
 			bulk_mesh_pt->node_update();
 		}
 
@@ -299,9 +290,9 @@ class Erf2DProblem : public Problem {
 			Vector<double> r(2);
 
 			unsigned int tsteps = time_stepper_pt()->nprev_values();
-			double start_iface_x = sqrt(_D[2] * time_pt()->time(tsteps));
-			geometry->set_interface(start_iface_x);
-			bulk_mesh_pt->node_update();
+			// double start_iface_x = sqrt(_D[2] * time_pt()->time(tsteps));
+			// geometry->set_interface(start_iface_x);
+			// bulk_mesh_pt->node_update();
 
 			for (unsigned long int n = 0; n < nnode; n++)
 				time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
@@ -400,15 +391,15 @@ class Erf2DProblem : public Problem {
 			double max_elem_size, min_elem_size;
 			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
 
-			double redim_time = time  / _D[0];
+			double redim_time = time / _D[0];
 
 			// printf("Max element size: %16.14f min element size: %16.14f\n", max_elem_size, min_elem_size);
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", redim_time, tot_error, geometry->get_interface(), sqrt(_D[0] * _D[2]*redim_time), max_elem_size/ys[1]);
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", redim_time, tot_error, geometry->get_interface(), sqrt(_D[2]*time), max_elem_size/ys[1]);
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%8.6f expected=%8.6f\n", timestep, redim_time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * redim_time)), geometry->get_interface(), sqrt(_D[2]*redim_time));
+			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%8.6f expected=%8.6f\n", timestep, redim_time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
 			info.number()++;
 		}
 
@@ -589,7 +580,7 @@ int main(int argc, char **argv) {
 	printf("\tk1=%8.6f k2=%8.6f\n", _k[0], _k[1]);
 	printf("\trho1=%8.6f rho2=%8.6f\n", _rho[0], _rho[1]);
 	printf("\tCp1=%8.6f Cp2=%8.6f\n", _Cp[0], _Cp[1]);
-	printf("\tD1=%e D2=%e De=%e\n", _D[0], _D[1], _D[2]);
+	printf("\tD1=%e D2=%e De=%e\n", _D[0], _D[1], _D[2] * _D[0]);
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", xs[0], xs[1], xs[2]);
 	printf("\tL=%8.6f D=%8.6f k=%8.6f St=%8.6f\n", L, D, k, St);
 
