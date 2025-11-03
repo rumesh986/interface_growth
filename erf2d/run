@@ -170,5 +170,11 @@ if __name__ == '__main__':
 		help='Stylesheet for matplotlib'
 	)
 
+	parser.add_argument('--water',
+		action='store_true',
+		default=False,
+		help="Use this flag to set the parameters to match water"
+	)
+
 	args = parser.parse_args()
 	run = Run(**vars(args))

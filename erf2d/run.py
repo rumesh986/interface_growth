@@ -62,6 +62,15 @@ class Run:
 			shutil.rmtree(f'{self.wd}/RESLT')
 		os.mkdir(f'{self.wd}/RESLT')
 
+		if kwargs['water']:
+			kwargs['k1'] = 2.22
+			kwargs['k2'] = 0.55575
+			kwargs['rho1'] = 916.2
+			kwargs['rho2'] = 999.89
+			kwargs['cp1'] = 2050.0
+			kwargs['cp2'] = 4220.0
+			kwargs['L'] = 334000.0
+
 		print(f'Run.__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 
 		stylef = kwargs.pop('stylef', None)
