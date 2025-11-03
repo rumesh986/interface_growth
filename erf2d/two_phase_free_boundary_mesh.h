@@ -149,7 +149,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			double dt = interface_ts_pt->time_pt()->dt();
+			// double dt = interface_ts_pt->time_pt()->dt();
 
 			// residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
 			// residuals[free_boundary_local_eqn_number] = interface_ts_pt->time_pt()->dt() * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0) / factor);

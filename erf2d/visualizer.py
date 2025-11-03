@@ -673,6 +673,7 @@ class Visualizer:
 		plt.cla()
 		
 		fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		# fig, prof_ax= plt.subplots(1, figsize=(10,5))
 
 		time_text = prof_ax.annotate(
 			f't={run.times[0]}',
@@ -701,9 +702,8 @@ class Visualizer:
 
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
 
-		prof_ax.legend(loc='upper left')
 		prof_ax.set_ylim([-1.5, 1.5])
-		prof_ax.set_xlim([-1.0, 1.0])
+		prof_ax.set_xlim([data['x'].min()-0.1, data['x'].max()])
 		prof_ax.set_ylabel('Temperature-ish')
 
 		if self.report:

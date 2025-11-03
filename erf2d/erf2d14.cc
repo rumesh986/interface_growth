@@ -31,7 +31,7 @@ static const double T_s = -1.0;
 static const double T_m = 0.0;
 static const double T_l = 1.0;
 
-double xs[3] = {0.0, 0.025, 1.0};
+double xs[3] = {0.0, 0.025, 3.0};
 static const double ys[2] = {0.0, 0.0001};
 
 FreeBoundaryElement *geometry;
