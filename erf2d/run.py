@@ -157,9 +157,15 @@ class Run:
 					k = k2 / k1
 					print(f'{St=} {T_l=} {D=} {k=}')
 					return 0.5 * St * np.emath.sqrt(np.pi * x) - (k * T_l * np.exp(-0.25 * x/D))/(np.emath.sqrt(D)*(1 - erf(0.5 * np.emath.sqrt(x/D)))) - np.exp(-0.25 * x)/erf(0.5*np.emath.sqrt(x))
+				case 'erf2d15':
+					delT = Tm - Ts
+					St = L / cp1 * delT
+					D = D2 / D1
+					k = k2 / k1
+					T_l = (Tl - Tm) / delT
+					return 0.5 * St * np.emath.sqrt(np.pi * x) - np.exp(-0.25 * x) / erf(0.5 * np.emath.sqrt(x)) + T_l * k * np.exp(-0.25 * x / D) / (np.emath.sqrt(D) * (1.0 - erf(0.5 * np.emath.sqrt(x / D))))
 				case _:
 					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
-
 		
 		De = newton(func, k1/(rho1*cp1))
 
@@ -195,11 +201,27 @@ class Run:
 		# kwargs['De'] = De
 
 		translated_kwargs = []
-		for key, value in kwargs.items():
-			if key in ['eps'] or value is None:
-				continue
+		if self.prog == 'erf2d15':
+			D1 = kwargs['k1']/(kwargs['rho1']*kwargs['cp1'])
+			D2 = kwargs['k2']/(kwargs['rho2']*kwargs['cp2'])
+			St = kwargs['L'] / kwargs['cp1']
 
-			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
+			translated_kwargs.extend(['--k', str(kwargs['k2']/kwargs['k1'])])
+			translated_kwargs.extend(['--D', str(D2/D1)])
+			translated_kwargs.extend(['--De', str(kwargs['De'])])
+			translated_kwargs.extend(['--St', str(St)])
+
+			for key, value in kwargs.items():
+				if key in ['eps', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'water'] or value is None:
+					continue
+
+				translated_kwargs.extend([f'--{key}', str(value)])
+		else:
+			for key, value in kwargs.items():
+				if key in ['eps'] or value is None:
+					continue
+
+				translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
 		# print(translated_kwargs)
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
