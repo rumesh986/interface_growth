@@ -161,11 +161,10 @@ class Run:
 					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
 				case 'erf2d14':
 					St = L / (cp1 * (Tm - Ts))
-					T_l = (Tm - Tl) / (Tm - Ts)
+					T_l = (Tl - Tm) / (Tm - Ts)
 					D = D2 / D1
 					k = k2 / k1
-					print(f'{St=} {T_l=} {D=} {k=}')
-					return 0.5 * St * np.emath.sqrt(np.pi * x) - (k * T_l * np.exp(-0.25 * x/D))/(np.emath.sqrt(D)*(1 - erf(0.5 * np.emath.sqrt(x/D)))) - np.exp(-0.25 * x)/erf(0.5*np.emath.sqrt(x))
+					return 0.5 * St * np.emath.sqrt(np.pi * x) - np.exp(-0.25 * x) / erf(0.5 * np.emath.sqrt(x)) + T_l * k * np.exp(-0.25 * x / D) / (np.emath.sqrt(D) * (1.0 - erf(0.5 * np.emath.sqrt(x / D))))
 				case 'erf2d15':
 					delT = Tm - Ts
 					St = L / cp1 * delT

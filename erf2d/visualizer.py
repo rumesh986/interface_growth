@@ -790,7 +790,7 @@ class Visualizer:
 		plt.close(fig)
 
 	# perform and plot error analysis
-	def plot_analysis(self, rtype):
+	def plot_analysis(self):
 		# self.plot_interfaces()
 		# helper function to get legend entries
 		def _legend(x, t):

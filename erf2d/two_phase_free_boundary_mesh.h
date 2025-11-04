@@ -6,6 +6,8 @@
 
 using namespace oomph;
 
+// geometry object for (pseudo 1D) phase change problem
+// Just stores boundary locations, including interface
 class FreeBoundaryGeometry : public GeomObject {
 	protected:
 		Vector<Data *> data_pt;
@@ -62,12 +64,7 @@ class FreeBoundaryGeometry : public GeomObject {
 		void set_interface(double &x) {x1() = x;}
 
 		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
-			// r[0] = x0(t) + (x2(t) - x0(t)) * zeta[0];
 			r[0] = x1(t);
-			// r[1] = y0(t) + (y1(t) - y0(t)) * zeta[1];
-
-			// printf("FreeBoundaryGeometry - position: zeta0: %8.6f\n", zeta[0]);
-			// printf("FreeBoundaryGeometry - position: zeta0: %8.6f zeta1: %8.6f\n", zeta[0], zeta[1]);
 		}
 
 		void position(const Vector<double> &zeta, Vector<double> &r) const {
@@ -75,6 +72,8 @@ class FreeBoundaryGeometry : public GeomObject {
 		}
 };
 
+// Combine FreeBoundaryGeometry with a GeneralisedElement
+// allows us to add an equation to the main FEM solver
 class FreeBoundaryElement : public GeneralisedElement, 
 							public FreeBoundaryGeometry {
 	private:
@@ -92,7 +91,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			const double x2,
 			const double y0,
 			const double y1,
-			const double factor_,
+			const double factor_, // This is the Stefan number
 			TimeStepper *timestepper = new Steady<0>
 		) : FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper), factor(factor_), ts_pt(timestepper) {
 
@@ -140,6 +139,8 @@ class FreeBoundaryElement : public GeneralisedElement,
 		}
 
 	protected:
+		// residual equation is set as St * dh/dt - flux = 0
+		// flux has to be set in before each newton step
 		void fill_in_generic_residual_contribution(Vector<double>& residuals, DenseMatrix<double>& jacobian, bool compute_jacobian) {
 			unsigned int ndofs = ndof();
 			if (ndofs == 0) return;
@@ -149,15 +150,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			// double dt = interface_ts_pt->time_pt()->dt();
-
-			// residuals[free_boundary_local_eqn_number] = interface_data_pt->value(0, free_boundary_index) - interface_data_pt->value(1, free_boundary_index) - interface_ts_pt->time_pt()->dt() * external_data_pt(flux_index)->value(0) / factor;
-			// residuals[free_boundary_local_eqn_number] = interface_ts_pt->time_pt()->dt() * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0) / factor);
-			// residuals[free_boundary_local_eqn_number] = factor * dt * (interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0));
 			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0, 0);
-
-			// if (!compute_jacobian)
-			// 	printf("h_t=%8.6f beta=%8.6f dt=%8.6f res=%8.6f\n", interface_data_pt->value(1, free_boundary_index), external_data_pt(flux_index)->value(0), interface_ts_pt->time_pt()->dt(), residuals[free_boundary_local_eqn_number]);
 
 			if (compute_jacobian)
 				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor * interface_ts_pt->weight(1, 0);
@@ -297,6 +290,7 @@ class TwoPhaseFreeBoundaryMesh : public RectangularQuadMesh<EL>,
 		}
 };
 
+// Spine based mesh to be used with FreeBoundaryElement / FreeBoundaryGeometry
 template<class EL>
 class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 									  public SpineMesh {
@@ -338,6 +332,8 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			this->setup_boundary_element_info();
 		}
 
+		// create spines and associate each node with a spine
+		// node_update_fct_id is used to differentiate between phases
 		void construct_spines() {
 			unsigned int np = finite_element_pt(0)->nnode_1d();
 			unsigned int nspine = (np - 1) * ny + 1;
@@ -464,6 +460,7 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			printf("Created %lu/%u spines\n\n", Spine_pt.size(), nspine);
 		}
 
+		// assign position for each node based on location of interface
 		void spine_node_update(SpineNode *node_pt) {
 			FreeBoundaryGeometry *geom = dynamic_cast<FreeBoundaryGeometry *>(node_pt->spine_pt()->geom_object_pt(0));
 			double frac = node_pt->fraction();
@@ -473,9 +470,8 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			geom->position(zeta, r);
 
 			switch (node_pt->node_update_fct_id()) {
-				// case 0: node_pt->x(0) = geom->x0() + frac * (r[0] - geom->x0());	break;
-				case 0: node_pt->x(0) = (1.0 - frac) * geom->x0() + frac * r[0];	break;
-				case 1: node_pt->x(0) = (1.0 - frac) * r[0] + frac * geom->x2();	break;
+				case 0: node_pt->x(0) = (1.0 - frac) * geom->x0() + frac * r[0];	break; // solid phase
+				case 1: node_pt->x(0) = (1.0 - frac) * r[0] + frac * geom->x2();	break; // liquid phase
 				default:
 					printf("Invalid node update function\n");
 					break;

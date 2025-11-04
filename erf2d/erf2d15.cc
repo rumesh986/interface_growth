@@ -14,6 +14,7 @@
 #define T_ORDER 1
 #endif
 
+// dimensionless parameters
 double k = 1.0;
 double D = 1.0;
 double De = 1.0;
@@ -21,8 +22,10 @@ double St = 1.0;
 
 bool ic_set = false;
 
+// boundary condition
 double Tl = 1.0;
 
+// simulation domain
 double xs[2] = {0.0, 3.0};
 double ys[2] = {0.0, 0.0001};
 
@@ -43,6 +46,7 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 	double h = geom_element->get_interface();
 	double h_ana = sqrt(De * t);
 	
+	// get values based on numerical position of interface
 	if (x[0] < h) {
 		double denom = 0.5 / sqrt(t);
 		u[0] = erf(x[0] * denom) / erf(h * denom) - 1.0;
@@ -51,6 +55,7 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 		u[0] = Tl * (erf(x[0] * denom) - erf(h * denom)) / (1.0 - erf(h * denom));
 	}
 
+	// get values based on analytical position of interface
 	if (x[0] < h_ana) {
 		double denom = 0.5 / sqrt(t);
 		u[1] = erf(x[0] * denom) / erf(h_ana * denom) - 1.0;
@@ -166,6 +171,7 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
+		// update boundary values to match (semi) infinite domain
 		void actions_before_implicit_timestep() {
 			Vector<double> x(2), u(2);
 
@@ -182,6 +188,7 @@ class Erf2DProblem : public Problem {
 		}
 		void actions_after_implicit_timestep() {};
 
+		// update flux at each newton step
 		void actions_before_newton_step() {
 			Vector<double> flux(2), flux_fd(2);
 
@@ -212,6 +219,7 @@ class Erf2DProblem : public Problem {
 			geom_element->set_flux(tot_flux / ny);
 		}
 
+		// set new interface position after each newton step
 		void actions_after_newton_step() {
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geom_element->x1();
@@ -247,9 +255,7 @@ class Erf2DProblem : public Problem {
 			for (int t = tsteps-1; t >= 0; t--) {
 				double time = time_pt()->time((unsigned int) t);
 
-				//
-				// update_interface
-				//
+				// analytical interface position
 				double new_h = sqrt(De * time);
 
 				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geom_element->get_interface(), new_h);
@@ -279,7 +285,7 @@ class Erf2DProblem : public Problem {
 			Vector<double> exact_u(2);
 			Vector<double> numerical_u(1);
 
-			double tot_error = 0.0;
+			double tot_error = 0.0; // L2 norm of errors
 
 			char fname[256];
 			sprintf(fname, "%s/steps/step%u.dat", info.directory().c_str(), info.number());
@@ -289,7 +295,7 @@ class Erf2DProblem : public Problem {
 				bulk_mesh_pt->node_pt(n)->value(t, numerical_u);
 				get_exact_u(time, x, exact_u);
 
-				double error = numerical_u[0] - exact_u[1];
+				double error = numerical_u[0] - exact_u[1]; // error in each node
 				tot_error += error * error;
 
 				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[1], numerical_u[0], error);
@@ -298,10 +304,10 @@ class Erf2DProblem : public Problem {
 
 			tot_error = sqrt(tot_error) / nnode;
 
+			// get element size for error analysis graphs
 			double max_elem_size, min_elem_size;
 			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
 
-			// printf("Max element size: %16.14f min element size: %16.14f\n", max_elem_size, min_elem_size);
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
 			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geom_element->get_interface(), sqrt(De*time), max_elem_size/ys[1]);
@@ -392,7 +398,7 @@ int main(int argc, char **argv) {
 	problem.initialise_dt(dt);
 	problem.set_initial_condition();
 
-		char config_fname[256];
+	char config_fname[256];
 	sprintf(config_fname, "%s/config", dname.c_str());
 
 	FILE *file = fopen(config_fname, "w");
@@ -415,11 +421,13 @@ int main(int argc, char **argv) {
 	for (unsigned int t = 0; t < t_steps; t++) {
 		problem.unsteady_newton_solve(dt);
 
+		// write data to file
 		if (t % wf == 0 || t == t_steps-1) 
 			problem.doc_step(t+prev_steps);
 		
 		double h = geom_element->get_interface();
 
+		// exit if interface is leaving domain or has problems
 		if (h >= xs[1] || isnan(h)) {
 			printf("Interface reached right boundary, exiting...\n");
 			break;
