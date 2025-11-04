@@ -2,7 +2,7 @@
 // moving interface
 // calculate as part of solution in newton iterations (hopefully)
 // move with spine meshes
-// using proper non-dimensionalized form
+// using proper non-dimensionalized form (without removing constants)
 
 #include <filesystem>
 
