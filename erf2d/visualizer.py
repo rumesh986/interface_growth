@@ -250,13 +250,22 @@ class Visualizer:
 		# perform all post-processing if run in script mode
 		if not self.interactive:
 			self.prepare_pd()
-			for rtype in self.dxdt:
-				match rtype:
-					case 'a': self.standard()
-					case x if x in 'ibxt': 
-						self.plot_interfaces()
-						self.plot_analysis(x)
-					case 's': self.sensitivity_analysis()
+
+			if 'a' in self.dxdt:
+				self.standard()
+			elif 's' in self.dxdt:
+				self.sensitivity_analysis()
+			else:
+				self.plot_interfaces()
+				self.plot_analysis()
+
+			# for rtype in self.dxdt:
+			# 	match rtype:
+			# 		case 'a': self.standard()
+			# 		case x if x in 'ibxt': 
+			# 			self.plot_interfaces()
+			# 			self.plot_analysis(x)
+			# 		case 's': self.sensitivity_analysis()
 
 	# collect information about all runs, needed for analysis processing
 	def prepare_pd(self):
@@ -785,52 +794,33 @@ class Visualizer:
 		# self.plot_interfaces()
 		# helper function to get legend entries
 		def _legend(x, t):
-			ret = None
-			if (rtype in 'ix'):
-				match x:
-					case 2: ret = f"Linear BDF{t}"
-					case 3: ret = f"Quadratic BDF{t}"
-					case 4: ret = f"Cubic BDF{t}"
-					case _: raise Exception("Unknown element order")
-			else:
-				ret = f'BDF {t}'
-			return ret
-
-		match rtype:
-			case 'x':
-				xlabel = 'dx'
-				ylabel = 'error'
-				title = f'{self.prefix} dx error analysis'
-				fname = 'dx_errors'
-				ref_order = 'x_order'
-				ref_variable = 'x'
-				xs = np.logspace(0, -3.5)
-			case 'b':
-				xlabel = 'dx'
-				ylabel = 'error'
-				title = f'{self.prefix} dxdt error analysis'
-				fname = 'dxdt_errors'
-				ref_order = 'x_order'
-				ref_variable = 'x'
-				xs = np.logspace(0, -3)
-			case 't':
-				xlabel = 'dt'
-				ylabel = 'error'
-				title = f'{self.prefix} dt error analysis'
-				fname = 'dt_errors'
-				ref_order = 't_order'
-				ref_variable = 't'
-				xs = np.logspace(0, -4)
-			case 'i':
-				xlabel = 'dx'
-				ylabel = 'interface_error'
-				title = f'{self.prefix} dx (interface) error analysis'
-				fname = 'dx_errors_iface'
-				ref_order = 'x_order'
-				ref_variable = 'x'
-				xs = np.logspace(0, -3.5)
-			case _:
-				raise Exception("Unknown analysis type provided")
+			match x:
+				case 2: return f"Linear BDF{t}"
+				case 3: return f"Quadratic BDF{t}"
+				case 4: return f"Cubic BDF{t}"
+				case _: raise Exception("Unknown element order")
+		
+		if 'x' in self.dxdt:
+			xlabel = 'dx'
+			ylabel = 'error'
+			title = f'{self.prefix} dx error analysis'
+			fname = 'dx_errors'
+			ref_order = 'x_order'
+			ref_variable = 'x'
+			xs = np.logspace(0, -3.5)
+		elif 't' in self.dxdt:
+			xlabel = 'dt'
+			ylabel = 'error'
+			title = f'{self.prefix} dt error analysis'
+			fname = 'dt_errors'
+			ref_order = 't_order'
+			ref_variable = 't'
+			xs = np.logspace(0, -4)
+		
+		if 'i' in self.dxdt:
+			ylabel = 'interface_error'
+			title += ' (interface)'
+			fname += '_iface'
 
 		x_orders = self._pd['x_order'].unique()
 		x_orders.sort()
@@ -863,10 +853,8 @@ class Visualizer:
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
-			if rtype == 'i':
+			if 'i' in self.dxdt:
 				ref_power = 1.2
-			elif rtype == 'x' and x == 2:
-				ref_power = 2
 			else:
 				ref_power = x
 
