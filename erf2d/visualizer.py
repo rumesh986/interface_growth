@@ -298,6 +298,7 @@ class Visualizer:
 				self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
+				self.plot_de(run)
 			
 			self.make_surf_profile_anim(run)
 
@@ -467,7 +468,26 @@ class Visualizer:
 			plt.show()
 		
 		plt.close()
-	
+
+	def plot_de(self, run):
+		def f(x, a, b):
+			return np.sqrt(x * a) + b
+
+		optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
+		
+		De = np.square(run.interface) / run.times
+		print(De)
+		print(run.config.params['De'])
+
+		plt.plot(De[4:], label='Instantaneous De')
+		plt.axhline(run.config.params['De'], c='C1', linestyle='--', label='Analytical')
+		plt.axhline(optimal[0], c='C2', linestyle='--', label='Numerical')
+		
+		plt.xlabel('time step')
+		plt.ylabel('$D_e$')
+		plt.legend()
+		plt.savefig(f'{run.out_folder}/{self.prefix}-de_conv.png')
+
 	# plot temperature profile at different steps in one figure (for report)
 	@mpl.rc_context({'font.size': 20})
 	def subplot_surf_prof(self, run):
