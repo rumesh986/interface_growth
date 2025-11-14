@@ -60,8 +60,11 @@ class FreeBoundaryGeometry : public GeomObject {
 
 		Data* geom_data_pt(const unsigned &j) {return data_pt[0];}
 		
-		double get_interface() {return x1();}
-		void set_interface(double &x) {x1() = x;}
+		double get_interface(const unsigned int &t) {return x1(t);}
+		double get_interface() {return get_interface(0);}
+
+		void set_interface(const unsigned int &t, double &x) {x1(t) = x;}
+		void set_interface(double &x) {set_interface(0, x);}
 
 		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
 			r[0] = x1(t);
