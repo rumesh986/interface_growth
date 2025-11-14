@@ -195,7 +195,7 @@ class Erf2DProblem : public Problem {
 		void actions_before_implicit_timestep() {
 			Vector<double> x(2), u(2);
 
-			double time = time_pt()->time() + dt;
+			double time = time_pt()->time();
 
 			for (unsigned int b : analytical_boundaries) {
 				unsigned long int nnode = bulk_mesh_pt->nboundary_node(b);
@@ -249,78 +249,150 @@ class Erf2DProblem : public Problem {
 		}
 
 		void set_initial_condition() {
-			time_pt()->time() = t_shift;
-			unsigned long int nnode = bulk_mesh_pt->nnode();
-
+			
 			Vector<double> x(2);
 			Vector<double> u(1);
 			Vector<double> s(2);
 			Vector<double> flux(2);
 			Vector<double> r(2);
 
+			// time_pt()->time() = t_shift;
+			
 			unsigned int tsteps = time_stepper_pt()->nprev_values();
-
+			unsigned long int nnode = bulk_mesh_pt->nnode();
+			unsigned int step = 0;
+			// time_pt()->time() = t_shift - tsteps * dt;
+			
 			for (unsigned long int n = 0; n < nnode; n++)
-				time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
+			time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
+			
+			double time = t_shift - tsteps*dt;
+			time_pt()->time() = time;
+			time_pt()->dt() = dt;
+			double h = sqrt(_D[2] * time);
 
-			for (unsigned long int n = 0; n < nnode; n++) {
-				bulk_mesh_pt->node_pt(n)->position(tsteps, x);
-				get_exact_u(time_pt()->time(tsteps), x, u);
-				bulk_mesh_pt->node_pt(n)->set_value(tsteps, 0, u[1]);
+			geometry->set_interface(h);
+			bulk_mesh_pt->node_update();
+
+			for (unsigned int n = 0; n < nnode; n++) {
+				bulk_mesh_pt->node_pt(n)->position(x);
+				get_exact_u(time, x, u);
+				bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
 			}
 
-			unsigned int step = 0;
-			doc_step(step, tsteps);
+			printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
+
+			doc_step(step);
 			step++;
 
-			s[0] = 1.0;
-			s[1] = 0.0;
-			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			for (int t = tsteps -1; t >= 0; t--) {
-				double time = time_pt()->time((unsigned int) t);
-
-				//
-				// update_interface
-				//
-				double new_h = 0.0;
-				if (_D[2] == 0.0) {
-					double tot_flux = 0.0;
-					for (unsigned long int e = 0; e < nelems; e++) {
-						int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-						if (face_index == 1) {
-							EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-							get_flux_ic(t+1, elem, s, flux);
-							tot_flux += _k[0] * flux[0];
-						} else if (face_index == -1) {
-							EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-							get_flux_ic(t+1, elem, s, flux);
-							tot_flux -= _k[1] * flux[0];
-						}
-					}
-					double v = tot_flux / (_rho[0] * L * ny);
-					new_h = geometry->get_interface() + v*dt;
-					// printf("IC %u: v=%8.6f x_old=%8.6f x_new=%8.6f\n", t, v, geometry->get_interface(), new_h);
-				} else {
-					new_h = sqrt(_D[2] * time);
-				}
-
-				printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
-				geometry->set_interface(new_h);
+			for (unsigned int t = 0; t < tsteps; t++) {
+				shift_time_values();
+				time += dt;
+				time_pt()->time() = time;
+				time_pt()->dt() = dt;
+				// time_pt()->time() = time + dt;
+				h = sqrt(_D[2] * time);
+				
+				geometry->set_interface(h);
 				bulk_mesh_pt->node_update();
 
-				for (unsigned long int n = 0; n < nnode; n++) {
-					bulk_mesh_pt->node_pt(n)->position(t, x);
+				for (unsigned int n = 0; n < nnode; n++) {
+					bulk_mesh_pt->node_pt(n)->position(x);
 					get_exact_u(time, x, u);
-					bulk_mesh_pt->node_pt(n)->set_value(t, 0, u[1]);
+					bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
 				}
 
-				printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
-				doc_step(step, t);
+				printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
+				doc_step(step);
 				step++;
 			}
 
-			time_pt()->time() = t_shift;
+			time_pt()->time() = time;
+
+			// for (int t = tsteps; t >= 0; t--) {
+			// 	double time = time_pt()->time((unsigned int) t);
+			// 	double h = sqrt(_D[2] * time);
+
+			// 	geometry->set_interface(t, h);
+			// 	geometry->set_interface(h);
+			// 	bulk_mesh_pt->node_update();
+
+			// 	for (unsigned int n = 0; n < nnode; n++) {
+			// 		bulk_mesh_pt->node_pt(n)->position(t, x);
+			// 		get_exact_u(time, x, u);
+			// 		bulk_mesh_pt->node_pt(n)->set_value(t, 0, u[1]);
+			// 	}
+
+			// 	printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
+			// 	doc_step(step, t);
+			// 	step++;
+			// }
+
+
+			// for (unsigned long int n = 0; n < nnode; n++) {
+			// 	bulk_mesh_pt->node_pt(n)->position(tsteps, x);
+			// 	get_exact_u(time_pt()->time(tsteps), x, u);
+			// 	bulk_mesh_pt->node_pt(n)->set_value(tsteps, 0, u[1]);
+			// }
+
+			// unsigned int step = 0;
+			// doc_step(step, tsteps);
+			// step++;
+
+			// s[0] = 1.0;
+			// s[1] = 0.0;
+			// unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
+
+			// for (int t = tsteps -1; t >= 0; t--) {
+			// 	double time = time_pt()->time((unsigned int) t);
+
+			// 	//
+			// 	// update_interface
+			// 	//
+			// 	double new_h = 0.0;
+			// 	if (_D[2] == 0.0) {
+			// 		double tot_flux = 0.0;
+			// 		for (unsigned long int e = 0; e < nelems; e++) {
+			// 			int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+			// 			if (face_index == 1) {
+			// 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+			// 				get_flux_ic(t+1, elem, s, flux);
+			// 				tot_flux += _k[0] * flux[0];
+			// 			} else if (face_index == -1) {
+			// 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+			// 				get_flux_ic(t+1, elem, s, flux);
+			// 				tot_flux -= _k[1] * flux[0];
+			// 			}
+			// 		}
+			// 		double v = tot_flux / (_rho[0] * L * ny);
+			// 		new_h = geometry->get_interface() + v*dt;
+			// 		// printf("IC %u: v=%8.6f x_old=%8.6f x_new=%8.6f\n", t, v, geometry->get_interface(), new_h);
+			// 	} else {
+			// 		new_h = sqrt(_D[2] * time);
+			// 	}
+
+			// 	printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
+			// 	geometry->set_interface(t, new_h);
+			// 	// geometry->set_interface(new_h); // this might be needed for the proper node update
+			// 	bulk_mesh_pt->node_update();
+
+			// 	for (unsigned long int n = 0; n < nnode; n++) {
+			// 		bulk_mesh_pt->node_pt(n)->position(t, x);
+			// 		get_exact_u(time, x, u);
+			// 		bulk_mesh_pt->node_pt(n)->set_value(t, 0, u[1]);
+			// 	}
+
+			// 	printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
+			// 	doc_step(step, t);
+			// 	step++;
+			// }
+
+			printf("Rechecking time\n");
+			for (unsigned int t = 0; t < tsteps; t++) {
+				printf("[%2u] h=%8.6f\n", t, geometry->get_interface(t));
+			}
+
+			// time_pt()->time() = t_shift;
 			ic_set = true;
 		}
 
@@ -574,11 +646,13 @@ int main(int argc, char **argv) {
 
 	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;
 
-	for (uint t = 0; t < t_steps; t++) {
+	// keeps 
+	for (uint t = 1; t < t_steps+1; t++) {
 		problem.unsteady_newton_solve(dt);
 
-		if (t % write_freq == 0 || t == t_steps - 1)
-			problem.doc_step(t+prev_steps);
+		// if (t % write_freq == 0 || t == t_steps - 1)
+		if (t % write_freq == 0)
+			problem.doc_step(t+prev_steps-1);
 
 		double x_int = geometry->get_interface();
 
