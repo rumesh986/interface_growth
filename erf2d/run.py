@@ -276,8 +276,8 @@ class Run:
 				max_dt = max(self.dts)
 				if tshift is None:
 					tshift = (max(self.ts) + 1) * max_dt
-				else:
-					tshift += (max(self.ts) + 1) * max_dt
+				# else:
+				# 	tshift += (max(self.ts) + 1) * max_dt
 				for x in self.xs:
 					for t in self.ts:
 						for nx in self.nxs:
