@@ -84,7 +84,7 @@
 The following commands were used when creating figures from the report
 | figure | command |
 | ------ | ------- |
-| 3, 4	 | `./run erf2d8 --nx 100 --dt 0.0001 --tshift 0.001 --x 2 --t 2 --style report.mplstyle` |
+| 3, 4	 | `./run erf2d8 --nx 100 --dt 0.0001 --tshift 0.001 --x 2 --t 2 --tsteps 2000 --style report.mplstyle` |
 | 5		 | `./run erf2d8 --nx 10  --dt 0.0001 --tshift 0.001 --x 2 --t 2 --style report.mplstyle` |
 | 6a	 | `./run erf2d8 --nx 3 4 5 10 20 30 40 50 100 200 400 --dt 0.0001 --xs 2 3 4 --ts 2 --tshift 0.001 --type x --style report.mplstyle` |
 | 6b	 | `./run erf2d8 --nx 100 --dt 0.1 0.01 0.05 0.08 0.003 0.002 0.001 0.0002 0.0005 0.0008 0.0001 --xs 2 --ts 1 2 4 --type t --style report.mplstyle` |
