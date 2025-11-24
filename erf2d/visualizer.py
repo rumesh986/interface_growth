@@ -874,9 +874,12 @@ class Visualizer:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
 			if 'i' in self.dxdt:
-				ref_power = 1.2
+				ref_power = x - 0.8
 			else:
 				ref_power = x
+
+			if 't' in self.dxdt:
+				ref_power = 1.2
 
 			# max_point = df.loc[df[ylabel] == df[ylabel].min()]
 			max_point = df.iloc[(df[xlabel] - 0.02).abs().argsort()[:1]]
