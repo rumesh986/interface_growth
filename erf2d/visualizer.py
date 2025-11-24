@@ -170,7 +170,7 @@ class _RunData:
 	# normalized error for whole run
 	@property
 	def total_error_norm(self):
-		return np.linalg.norm(self.results['error'])/len(self.results['error'])
+		return np.linalg.norm(self.results['error'][self.config.t_order+1:])/len(self.results['error'][self.config.t_order+1:])
 
 	@property
 	def interface_error_norm(self):
@@ -549,8 +549,8 @@ class Visualizer:
 		mesh_pos = np.zeros((run.config.nx+1, 4))
 
 		for i, ax in enumerate(axs.flatten()):
-			data = run.exact_solns[i]
-			# data = run.exact_solns[i*num_frames]
+			# data = run.exact_solns[i]
+			data = run.exact_solns[i*num_frames]
 			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
 			print(f'time in col {i}={run.times[i]}')
 
@@ -698,6 +698,14 @@ class Visualizer:
 			
 			if not self.report:
 				line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+
+				# if run.config.params['nx1'] < 20:
+				nx1 = int(run.config.params['nx1'])
+				if nx1 < 15:
+					nx1 = 15
+				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
 
 			if run.interface is not None:
 				line_interface.set_xdata([run.interface[n]])
@@ -708,9 +716,6 @@ class Visualizer:
 				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
 				if not self.report:
 					diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
-
-			if not self.report:
-				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
 		
 		plt.cla()
 		
@@ -735,6 +740,13 @@ class Visualizer:
 
 		if not self.report:
 			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+			nx1 = int(run.config.params['nx1'])
+			if nx1 < 15:
+				nx1 = 15
+			# if run.config.params['nx1'] < 21:
+			nodes_prof = prof_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff = diff_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
 
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
