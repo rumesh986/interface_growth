@@ -28,6 +28,7 @@ double _D[3] = {0.0, 0.0, 0.0};
 
 // dimensionless parameters
 double D = _D[1] / _D[0];
+double D2 = 0.0;
 double k = _k[1] / _k[0];
 double St = 0.0;
 
@@ -39,7 +40,7 @@ static const double T_m = 0.0; // melting point x=h(t)
 static const double T_l = 1.0; // temp far away in liquid x->\infty
 
 // simulation domain
-double xs[3] = {0.0, 0.025, 1.0};
+double xs[3] = {0.0, 0.025, 5.0};
 static const double ys[2] = {0.0, 0.0001};
 
 FreeBoundaryElement *geometry;
@@ -81,20 +82,20 @@ void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
 
 Vector<unsigned int> analytical_boundaries = {
 	1, // right
-	3, // left
+	// 3, // left
 	// 4 //interface
 };
 
 Vector<unsigned int> pinned_boundaries = {
-	// 3, // left
+	3, // left
 	4 // interface
 };
 
 map<unsigned int, FluxFctPt> flux_boundaries = {
 	// {0, no_flux_fct},
 	// {2, no_flux_fct},
+	// {1, no_flux_fct},
 };
-
 
 template<class EL>
 class Erf2DProblem : public Problem {
@@ -155,10 +156,23 @@ class Erf2DProblem : public Problem {
 				create_flux_elements(iter.first, iter.second);
 			}
 
+			D2 = 0.5 * (1.0 - D);
 			for (unsigned int yi = 0; yi < ny; yi++) {
 				unsigned int base = yi * nx;
+				
+				// dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + nx1-1))->beta_pt() = &D2;
+				// dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + nx1))->beta_pt() = &D2;
+
+				// for (unsigned int e = nx1+1; e < nx; e++)
 				for (unsigned int e = nx1; e < nx; e++)
 					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D;
+			}
+
+			for (unsigned int e = 0; e < mesh_pt()->nelement(); e++) {
+				EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+				if (elem == NULL) continue;
+				// printf("e=%u ale=%s\n", e, elem->ALE_is_disabled ? "True" : "False");
+				elem->enable_ALE();
 			}
 
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
@@ -189,7 +203,13 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
-		void actions_before_newton_solve() {};
+		void actions_before_newton_solve() {
+			// try this properly!!!
+			// double trial_h = geometry->get_interface() + 0.1 * sqrt(0.5*D*(time_pt()->time()+dt));
+			// double trial_h = geometry->get_interface() * (1.0 + 1e-9);
+			double trial_h = geometry->get_interface() + 1e-8;
+			geometry->set_interface(trial_h);
+		};
 		void actions_after_newton_solve() {};
 
 		void actions_before_implicit_timestep() {
@@ -263,8 +283,8 @@ class Erf2DProblem : public Problem {
 			unsigned int step = 0;
 			// time_pt()->time() = t_shift - tsteps * dt;
 			
-			for (unsigned long int n = 0; n < nnode; n++)
-			time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
+			// for (unsigned long int n = 0; n < nnode; n++)
+			// 	time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
 			
 			double time = t_shift - tsteps*dt;
 			time_pt()->time() = time;
@@ -525,6 +545,7 @@ int main(int argc, char **argv) {
 	std::string dname;
 
 	CommandLineArgs::specify_command_line_flag("--nx", &Nx1);
+	CommandLineArgs::specify_command_line_flag("--nx2", &Nx2);
 	CommandLineArgs::specify_command_line_flag("--ny", &Ny);
 	CommandLineArgs::specify_command_line_flag("--tsteps", &t_steps);
 	CommandLineArgs::specify_command_line_flag("--dt", &dt);
@@ -614,7 +635,7 @@ int main(int argc, char **argv) {
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", xs[0], xs[1], xs[2]);
 	printf("\tL=%8.6f D=%8.6f k=%8.6f St=%8.6f\n", L, D, k, St);
 
-	Nx2 = Nx1;
+	// Nx2 = Nx1;
 	auto problem = Erf2DProblem<QUnsteadyHeatElement<2,X_ORDER>>(Nx1, Nx2, Ny, t_steps, dt, t_shift, info);
 
 	problem.initialise_dt(dt);

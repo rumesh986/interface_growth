@@ -153,7 +153,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0, 0);
+			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
 
 			if (compute_jacobian)
 				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor * interface_ts_pt->weight(1, 0);
