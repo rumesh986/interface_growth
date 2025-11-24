@@ -170,7 +170,7 @@ class _RunData:
 	# normalized error for whole run
 	@property
 	def total_error_norm(self):
-		return np.linalg.norm(self.results['error'])/len(self.results['error'])
+		return np.linalg.norm(self.results['error'][self.config.t_order+1:])/len(self.results['error'][self.config.t_order+1:])
 
 	@property
 	def interface_error_norm(self):
@@ -293,8 +293,9 @@ class Visualizer:
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
-			# self.subplot_surf_prof(run)
-			if run.config.nx == 10:
+			if self.report:
+				self.subplot_surf_prof(run)
+			if run.config.nx == 20:
 				self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
@@ -377,8 +378,11 @@ class Visualizer:
 
 		plt.cla()
 
-		fig, (iface_ax, err_ax) = plt.subplots(2, figsize=(7,10))
-		err_ax2 = err_ax.twinx()
+		if self.report:
+			fig, iface_ax = plt.subplots(1)
+		else:
+			fig, (iface_ax, err_ax) = plt.subplots(2, figsize=(7,10))
+			err_ax2 = err_ax.twinx()
 		
 		iface_ax.plot(run.times, run.interface, label='Interface position')
 
@@ -389,31 +393,35 @@ class Visualizer:
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			print(f'{run.title} D_eff = {optimal[0]}')
-			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.6e} * t}} + {optimal[1]:.2f}$')
+			# iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.6e} * t}} + {optimal[1]:.2f}$')
+			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'Fit $D_e={{{optimal[0]:.4e}}}$')
 		except:
 			print("Failed to fit h-curve")
 
 		if 'expected_interface' in run.results.columns:
 			if 'De' in run.config.params.keys():
-				label = fr'analytical $y=\sqrt{{{run.config.params["De"]:.6e} t}}$'
+				# label = fr'Analytical $y=\sqrt{{{run.config.params["De"]:.6e} t}}$'
+				label = fr'Analytical $D_e={{{run.config.params["De"]:.4e}}}$'
 			else:
 				label = 'analytical'
 			iface_ax.plot(run.results['time'], run.results['expected_interface'], label=label, ls=':')
-			abs_plot, = err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
-			rel_plot, = err_ax2.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error', c='C1')
-			
-			err_ax.legend(handles=[abs_plot, rel_plot])
+
+			if not self.report:
+				abs_plot, = err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
+				rel_plot, = err_ax2.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error', c='C1')
+				
+				err_ax.legend(handles=[abs_plot, rel_plot])
 			
 		iface_ax.legend()
 		iface_ax.set_xlabel('time')
-		iface_ax.set_ylabel('interface posiion h(t)')
+		iface_ax.set_ylabel(r'interface posiion $h(t)$')
 		
 		# err_ax.set_yscale('log')
-		err_ax.set_xlabel('Time')
-		err_ax.set_ylabel('Absolute Error')
-		err_ax2.set_ylabel('Relative error')
-
 		if not self.report:
+			err_ax.set_xlabel('Time')
+			err_ax.set_ylabel('Absolute Error')
+			err_ax2.set_ylabel('Relative error')
+
 			iface_ax.set_title('Interface position with time')
 			err_ax.set_title('Error in interface position')
 
@@ -476,8 +484,8 @@ class Visualizer:
 		optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
 		
 		De = np.square(run.interface) / run.times
-		print(De)
-		print(run.config.params['De'])
+		# print(De)
+		# print(run.config.params['De'])
 
 		plt.plot(De[4:], label='Instantaneous De')
 		plt.axhline(run.config.params['De'], c='C1', linestyle='--', label='Analytical')
@@ -514,10 +522,10 @@ class Visualizer:
 			ax.scatter(exact_data['x'][::10], exact_data['u'][::10], marker='X', c='C1', zorder=2)
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
 
-			ax.set_title(f't={run.times[i*num_frames]}')
+			ax.set_title(f't={run.times[i*num_frames]:5f}')
 
 			if i == 0:
-				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='upper left')
+				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
@@ -687,26 +695,39 @@ class Visualizer:
 
 			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
 			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
-			line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+			
+			if not self.report:
+				line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+
+				# if run.config.params['nx1'] < 20:
+				nx1 = int(run.config.params['nx1'])
+				if nx1 < 15:
+					nx1 = 15
+				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
 
 			if run.interface is not None:
 				line_interface.set_xdata([run.interface[n]])
-				diff_interface.set_xdata([run.interface[n]])
+				if not self.report:
+					diff_interface.set_xdata([run.interface[n]])
 			
 			if 'expected_interface' in run.results.columns:
 				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
-				diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
-
-			diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+				if not self.report:
+					diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
 		
 		plt.cla()
 		
-		fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		if self.report:
+			fig, prof_ax = plt.subplots(1, figsize=(10,5))
+		else:
+			fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
 		# fig, prof_ax= plt.subplots(1, figsize=(10,5))
 
 		time_text = prof_ax.annotate(
 			f't={run.times[0]}',
-			xy=(0.8,0.9),
+			xy=(0.6,0.9),
 			xycoords='axes fraction'
 		)
 
@@ -716,15 +737,26 @@ class Visualizer:
 
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
 		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
-		line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+		if not self.report:
+			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+			nx1 = int(run.config.params['nx1'])
+			if nx1 < 15:
+				nx1 = 15
+			# if run.config.params['nx1'] < 21:
+			nodes_prof = prof_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff = diff_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
 
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
-			diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			if not self.report:
+				diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
 		
 		if 'expected_interface' in run.results.columns:
 			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
-			diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+			if not self.report:
+				diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
 		
 		for pos in run.config.fixed_pos:
 			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
@@ -733,7 +765,7 @@ class Visualizer:
 
 		prof_ax.set_ylim([-1.5, 1.5])
 		prof_ax.set_xlim([data['x'].min()-0.1, data['x'].max()])
-		prof_ax.set_ylabel('Temperature-ish')
+		prof_ax.set_ylabel('Temperature')
 
 		if self.report:
 			box = prof_ax.get_position()
@@ -743,10 +775,11 @@ class Visualizer:
 			prof_ax.legend(loc='upper left')
 			prof_ax.set_title('Temperature profile')
 
-		diff_ax.set_xlabel('x')
-		diff_ax.set_ylabel('Error')
-		diff_ax.set_title('Error in profile')
-		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+		if not self.report:
+			diff_ax.set_xlabel('x')
+			diff_ax.set_ylabel('Error')
+			diff_ax.set_title('Error in profile')
+			diff_ax.yaxis.set_major_formatter('{x:3.1e}')
 
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
@@ -848,7 +881,7 @@ class Visualizer:
 		t_orders = self._pd['t_order'].unique()
 		t_orders.sort()
 
-		fig, ax = plt.subplots(1, subplot_kw={
+		fig, ax = plt.subplots(1, figsize=(8,5), subplot_kw={
 			'xlabel': xlabel,
 			'ylabel': 'Normalized Error',
 			'xscale': 'log',
@@ -882,7 +915,9 @@ class Visualizer:
 				ref_power = 1.2
 
 			# max_point = df.loc[df[ylabel] == df[ylabel].min()]
-			max_point = df.iloc[(df[xlabel] - 0.02).abs().argsort()[:1]]
+			max_point = df.loc[df[ylabel] == df[ylabel].max()]
+			# max_point = df.loc[df[xlabel] == 0.1]
+			# max_point = df.iloc[(df[xlabel] - 0.04).abs().argsort()[:1]]
 			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** ref_power * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{{{ref_power:.2f}}})$', linestyle='--', marker='', alpha=0.8)
 
 		if not self.report:

@@ -71,6 +71,8 @@ class Run:
 			kwargs['cp2'] = 4220.0
 			kwargs['L'] = 334000.0
 
+		kwargs.pop('water')
+
 		print(f'Run.__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 
 		stylef = kwargs.pop('stylef', None)
