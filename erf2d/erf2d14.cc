@@ -207,8 +207,19 @@ class Erf2DProblem : public Problem {
 			// try this properly!!!
 			// double trial_h = geometry->get_interface() + 0.1 * sqrt(0.5*D*(time_pt()->time()+dt));
 			// double trial_h = geometry->get_interface() * (1.0 + 1e-9);
-			double trial_h = geometry->get_interface() + 1e-8;
+			// double trial_h = geometry->get_interface() + 1e-8;
+			// geometry->set_interface(trial_h);
+			double De_sqrt_estimate = geometry->get_interface() / sqrt(time_pt()->time()-dt);
+			double trial_h = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
+			printf("setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f)\n", trial_h, time_pt()->time(), sqrt(_D[2]*time_pt()->time()));
 			geometry->set_interface(trial_h);
+
+
+			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
+			}
+
+			bulk_mesh_pt->node_update();
 		};
 		void actions_after_newton_solve() {};
 
@@ -569,6 +580,11 @@ int main(int argc, char **argv) {
 	if (Nx1 == 0) {
 		cout << "Error: Nx not specified" << endl;
 		exit(1);
+	}
+
+	if (Nx2 == 0) {
+		printf("nx2 not defined, assuming nx2 = nx1\n");
+		Nx2 = Nx1;
 	}
 
 	if (dt == 0.0 && !var_dt) {
