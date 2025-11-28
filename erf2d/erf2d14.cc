@@ -168,12 +168,12 @@ class Erf2DProblem : public Problem {
 					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D;
 			}
 
-			for (unsigned int e = 0; e < mesh_pt()->nelement(); e++) {
-				EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-				if (elem == NULL) continue;
-				// printf("e=%u ale=%s\n", e, elem->ALE_is_disabled ? "True" : "False");
-				elem->enable_ALE();
-			}
+			// for (unsigned int e = 0; e < mesh_pt()->nelement(); e++) {
+			// 	EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
+			// 	if (elem == NULL) continue;
+			// 	// printf("e=%u ale=%s\n", e, elem->ALE_is_disabled ? "True" : "False");
+			// 	elem->enable_ALE();
+			// }
 
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
 			printf("NDOF: %lu\n", ndof());
@@ -265,7 +265,7 @@ class Erf2DProblem : public Problem {
 
 		// calculate flux before each newton step
 		void actions_before_newton_step() {
-			Vector<double> flux(2), flux_fd(2);
+			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
 			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
