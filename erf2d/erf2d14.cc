@@ -120,7 +120,7 @@ class Erf2DProblem : public Problem {
 			DocInfo info_
 		) : nx1(nx1_), nx2(nx2_), nx(nx1_+nx2_), ny(ny_), t_steps(tsteps), dt(dt_), t_shift(tshift), info(info_) {
 
-			add_time_stepper_pt(new BDF<T_ORDER>);
+			add_time_stepper_pt(new BDF<T_ORDER>(true));
 
 			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], St, time_stepper_pt());
 
@@ -210,9 +210,33 @@ class Erf2DProblem : public Problem {
 			// double trial_h = geometry->get_interface() + 1e-8;
 			// geometry->set_interface(trial_h);
 			double De_sqrt_estimate = geometry->get_interface() / sqrt(time_pt()->time()-dt);
-			double trial_h = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
-			printf("setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f)\n", trial_h, time_pt()->time(), sqrt(_D[2]*time_pt()->time()));
-			geometry->set_interface(trial_h);
+			time_stepper_pt()->set_predictor_weights();
+			time_stepper_pt()->calculate_predicted_values(geometry->geom_data_pt(0));
+			
+			double h_est = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
+			double h_pred = geometry->x1(time_stepper_pt()->predictor_storage_index());
+			double h_ana = sqrt(_D[2] * time_pt()->time());
+			
+
+			printf("setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
+			printf("\terror in estimate: %e\n\terror in prediction: %e\n", fabs(h_ana - h_est), fabs(h_ana - h_pred));
+
+			geometry->set_interface(h_pred);
+
+
+			// printf("time stepper check: %s location: %u\n", time_stepper_pt()->adaptive_flag() ? "true" : "false", time_stepper_pt()->predictor_storage_index());
+			// printf("nvalue in geom data: %u\n", geometry->geom_data_pt(0)->nvalue());
+			// for (unsigned int j = 0; j < geometry->geom_data_pt(0)->nvalue(); j++) {
+			// 	printf("\tdata value %u: copy: %s\n", j, geometry->geom_data_pt(0)->is_a_copy(j) ? "true" : "false");
+			// }
+
+			// printf("Checking all history values:\n");
+			// for (unsigned int t = 0; t < time_stepper_pt()->ntstorage(); t++) {
+			// 	printf("\tt=%u h=%16.14f\n", t, geometry->x1(t));
+			// }
+			// printf("\tpredicted (%u): %16.14f\n", time_stepper_pt()->predictor_storage_index(), geometry->x1(time_stepper_pt()->predictor_storage_index()));
+
+			// printf("nprev_value: %u ntstoreage: %u geom->nvalue: %u\n", time_stepper_pt()->nprev_values(), time_stepper_pt()->ntstorage(), geometry->geom_data_pt(0)->nvalue());
 
 
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
@@ -420,7 +444,7 @@ class Erf2DProblem : public Problem {
 
 			printf("Rechecking time\n");
 			for (unsigned int t = 0; t < tsteps; t++) {
-				printf("[%2u] h=%8.6f\n", t, geometry->get_interface(t));
+				printf("[%2u] h=%16.14f\n", t, geometry->get_interface(t));
 			}
 
 			// time_pt()->time() = t_shift;
@@ -468,7 +492,7 @@ class Erf2DProblem : public Problem {
 			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(_D[2]*time), max_elem_size/ys[1]);
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%8.6f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
+			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
 			info.number()++;
 		}
 
