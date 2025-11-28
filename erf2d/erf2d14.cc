@@ -245,7 +245,36 @@ class Erf2DProblem : public Problem {
 
 			bulk_mesh_pt->node_update();
 		};
-		void actions_after_newton_solve() {};
+		void actions_after_newton_solve() {
+			Vector<double> flux(2);
+
+			double tot_flux = 0.0;
+			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
+
+			Vector<double> s(2);
+			s[1] = 0.0;
+			
+			for (unsigned long int e = 0; e < nelems; e++) {
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				
+				double factor = 0.0;
+				if (face_index == 1) {
+					s[0] = 1.0;
+					factor = 1.0;
+				} else if (face_index == -1) {
+					s[0] = -1.0;
+					factor = -k;
+				}
+
+				elem->get_flux(s, flux);
+				tot_flux += factor * flux[0];
+
+				printf("flux from %s: %16.14f\n", (face_index == 1) ? "solid" : "liquid", factor * flux[0]);
+			}
+			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			printf("total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+		};
 
 		void actions_before_implicit_timestep() {
 			Vector<double> x(2), u(2);
