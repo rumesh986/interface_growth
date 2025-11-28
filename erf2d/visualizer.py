@@ -907,17 +907,18 @@ class Visualizer:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
 			if 'i' in self.dxdt:
-				ref_power = x - 0.8
+				if 't' in self.dxdt:
+					# ref_power = df['x_order'].iloc[0] - 0.8
+					ref_power = 1.0
+				else:
+					ref_power = x - 0.8
 			else:
 				ref_power = x
 
-			if 't' in self.dxdt:
-				ref_power = 1.2
-
 			# max_point = df.loc[df[ylabel] == df[ylabel].min()]
-			max_point = df.loc[df[ylabel] == df[ylabel].max()]
+			# max_point = df.loc[df[ylabel] == df[ylabel].max()]
 			# max_point = df.loc[df[xlabel] == 0.1]
-			# max_point = df.iloc[(df[xlabel] - 0.04).abs().argsort()[:1]]
+			max_point = df.iloc[(df[xlabel] - 0.09).abs().argsort()[:1]]
 			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** ref_power * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{{{ref_power:.2f}}})$', linestyle='--', marker='', alpha=0.8)
 
 		if not self.report:
