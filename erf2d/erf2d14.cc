@@ -180,9 +180,11 @@ class Erf2DProblem : public Problem {
 
 			linear_solver_pt()->disable_doc_time();
 			disable_info_in_newton_solve();
-			// newton_solver_tolerance() = 1e-9;
-			max_newton_iterations() = 1e2;
+			newton_solver_tolerance() = 1e-9 * dt;
+			max_newton_iterations() = 1e5;
 			max_residuals() = 1e3;
+
+			printf("tolerance for newton: %e\n", newton_solver_tolerance());
 		}
 
 		~Erf2DProblem() {
@@ -273,7 +275,7 @@ class Erf2DProblem : public Problem {
 				printf("flux from %s: %16.14f\n", (face_index == 1) ? "solid" : "liquid", factor * flux[0]);
 			}
 			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+			printf("[OUT] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
 		};
 
 		void actions_before_implicit_timestep() {
@@ -293,7 +295,8 @@ class Erf2DProblem : public Problem {
 		void actions_after_implicit_timestep() {};
 
 		// calculate flux before each newton step
-		void actions_before_newton_step() {
+		// void actions_before_newton_step() {
+		void actions_before_newton_convergence_check() {
 			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
@@ -321,15 +324,21 @@ class Erf2DProblem : public Problem {
 			
 			printf("Setting total flux to %8.6f interface at %16.14f\n", tot_flux / ny, geometry->get_interface());
 			geometry->set_flux(tot_flux / ny);
-		}
 
-		// update node positions after each newton step
-		void actions_after_newton_step() {
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
 
 			bulk_mesh_pt->node_update();
+		}
+
+		// update node positions after each newton step
+		void actions_after_newton_step() {
+			// for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+			// 	bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
+			// }
+
+			// bulk_mesh_pt->node_update();
 		}
 
 		void set_initial_condition() {

@@ -153,10 +153,10 @@ class _RunData:
 	@property
 	def error_max(self):
 		try:
-			node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1 # node at highest error some steps after start of simulation
+			node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 3 # node at highest error some steps after start of simulation
 		except:
 			print("Not enough steps, choosing first available step")
-			node = np.argmax(np.fabs(self.errors[0]['error'][1:])) + 1 # node at highest error at start of simulation
+			node = np.argmax(np.fabs(self.errors[0]['error'][1:])) + 3 # node at highest error at start of simulation
 
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact = np.array([df['u'][node] for df in self.exact_solns])
@@ -257,6 +257,8 @@ class Visualizer:
 				self.sensitivity_analysis()
 			else:
 				self.plot_interfaces()
+				self.plot_analysis()
+				self.dxdt += 'i'
 				self.plot_analysis()
 
 			# for rtype in self.dxdt:
