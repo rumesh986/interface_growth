@@ -220,7 +220,7 @@ class Erf2DProblem : public Problem {
 			double h_ana = sqrt(_D[2] * time_pt()->time());
 			
 
-			printf("setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
+			printf("[BSolve] setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
 			printf("\terror in estimate: %e\n\terror in prediction: %e\n", fabs(h_ana - h_est), fabs(h_ana - h_pred));
 
 			geometry->set_interface(h_pred);
@@ -246,6 +246,8 @@ class Erf2DProblem : public Problem {
 			}
 
 			bulk_mesh_pt->node_update();
+			printf("[BSolve] node update\n");
+
 		};
 		void actions_after_newton_solve() {
 			Vector<double> flux(2);
@@ -272,10 +274,10 @@ class Erf2DProblem : public Problem {
 				elem->get_flux(s, flux);
 				tot_flux += factor * flux[0];
 
-				printf("flux from %s: %16.14f\n", (face_index == 1) ? "solid" : "liquid", factor * flux[0]);
+				// printf("flux from %s: %16.14f\n", (face_index == 1) ? "solid" : "liquid", factor * flux[0]);
 			}
 			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[OUT] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+			printf("[ASolve] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
 		};
 
 		void actions_before_implicit_timestep() {
@@ -295,8 +297,10 @@ class Erf2DProblem : public Problem {
 		void actions_after_implicit_timestep() {};
 
 		// calculate flux before each newton step
-		// void actions_before_newton_step() {
-		void actions_before_newton_convergence_check() {
+		void actions_before_newton_step() {
+			printf("[BStep]\n");
+			return;
+
 			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
@@ -322,29 +326,151 @@ class Erf2DProblem : public Problem {
 				tot_flux += factor * flux[0];
 			}
 			
-			printf("Setting total flux to %8.6f interface at %16.14f\n", tot_flux / ny, geometry->get_interface());
+			printf("[BStep] flux=%16.14f h=%16.14f\n", tot_flux / ny, geometry->get_interface());
 			geometry->set_flux(tot_flux / ny);
+			printf("[BStep] setting flux\n");
+		}
+
+		// void actions_before_newton_step() {
+		void actions_before_newton_convergence_check() {
+			// printf("[BConv]\n");
+			// return;
+
+
+			Vector<double> flux(2);
+
+			double tot_flux = 0.0;
+			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
+
+			Vector<double> s(2);
+			s[1] = 0.0;
+			
+			for (unsigned long int e = 0; e < nelems; e++) {
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				
+				double factor = 0.0;
+				if (face_index == 1) {
+					s[0] = 1.0;
+					factor = 1.0;
+				} else if (face_index == -1) {
+					s[0] = -1.0;
+					factor = -k;
+				}
+
+				elem->get_flux(s, flux);
+				tot_flux += factor * flux[0];
+			}
+			
+			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
+			
+			geometry->set_flux(tot_flux / ny);
+			printf("[BConv ] setting flux\n");
+			
+			
+			return;
+
+
+			
+			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
+			}
+
+			bulk_mesh_pt->node_update();
+			printf("[BConv ] node update\n");
+
+			tot_flux = 0.0;
+			for (unsigned long int e = 0; e < nelems; e++) {
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				
+				double factor = 0.0;
+				if (face_index == 1) {
+					s[0] = 1.0;
+					factor = 1.0;
+				} else if (face_index == -1) {
+					s[0] = -1.0;
+					factor = -k;
+				}
+
+				elem->get_flux(s, flux);
+				tot_flux += factor * flux[0];
+			}
+			
+			latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			printf("[BConv2] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
+
+		}
+
+		// update node positions after each newton step
+		void actions_after_newton_step() {
+			// printf("[AStep]\n");
+			// return;
+
+			Vector<double> flux(2);
+
+			double tot_flux = 0.0;
+			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
+
+			Vector<double> s(2);
+			s[1] = 0.0;
+			
+			for (unsigned long int e = 0; e < nelems; e++) {
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				
+				double factor = 0.0;
+				if (face_index == 1) {
+					s[0] = 1.0;
+					factor = 1.0;
+				} else if (face_index == -1) {
+					s[0] = -1.0;
+					factor = -k;
+				}
+
+				elem->get_flux(s, flux);
+				tot_flux += factor * flux[0];
+			}
+			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			printf("[AStep1] flux=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+
 
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
 
 			bulk_mesh_pt->node_update();
-		}
+			printf("[AStep ] node update\n");
 
-		// update node positions after each newton step
-		void actions_after_newton_step() {
-			// for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
-			// 	bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
-			// }
+			
+			
+			tot_flux = 0.0;
+			for (unsigned long int e = 0; e < nelems; e++) {
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				
+				double factor = 0.0;
+				if (face_index == 1) {
+					s[0] = 1.0;
+					factor = 1.0;
+				} else if (face_index == -1) {
+					s[0] = -1.0;
+					factor = -k;
+				}
 
-			// bulk_mesh_pt->node_update();
+				elem->get_flux(s, flux);
+				tot_flux += factor * flux[0];
+			}
+			latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			printf("[AStep2] flux=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+
 		}
 
 		void set_initial_condition() {
 			
 			Vector<double> x(2);
-			Vector<double> u(1);
+			Vector<double> u(2);
 			Vector<double> s(2);
 			Vector<double> flux(2);
 			Vector<double> r(2);
