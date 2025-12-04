@@ -180,8 +180,9 @@ class Erf2DProblem : public Problem {
 
 			linear_solver_pt()->disable_doc_time();
 			disable_info_in_newton_solve();
-			newton_solver_tolerance() = 1e-9 * dt;
-			max_newton_iterations() = 1e5;
+			// newton_solver_tolerance() = 1e-7 * dt;
+			newton_solver_tolerance() = 5e-10;
+			max_newton_iterations() = 1e6;
 			max_residuals() = 1e3;
 
 			printf("tolerance for newton: %e\n", newton_solver_tolerance());
