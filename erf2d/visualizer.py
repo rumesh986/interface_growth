@@ -703,7 +703,7 @@ class Visualizer:
 				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
 
 				# if run.config.params['nx1'] < 20:
-				nx1 = int(run.config.params['nx1'])
+				nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
 				if nx1 < 15:
 					nx1 = 15
 				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
@@ -743,7 +743,7 @@ class Visualizer:
 		if not self.report:
 			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
 
-			nx1 = int(run.config.params['nx1'])
+			nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
 			if nx1 < 15:
 				nx1 = 15
 			# if run.config.params['nx1'] < 21:

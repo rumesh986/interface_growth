@@ -180,8 +180,9 @@ class Erf2DProblem : public Problem {
 
 			linear_solver_pt()->disable_doc_time();
 			disable_info_in_newton_solve();
-			newton_solver_tolerance() = 1e-9 * dt;
-			max_newton_iterations() = 1e5;
+			// newton_solver_tolerance() = 1e-7 * dt;
+			newton_solver_tolerance() = 5e-10;
+			max_newton_iterations() = 1e6;
 			max_residuals() = 1e3;
 
 			printf("tolerance for newton: %e\n", newton_solver_tolerance());
@@ -278,6 +279,13 @@ class Erf2DProblem : public Problem {
 			}
 			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
 			printf("[ASolve] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+
+			char fname[256];
+			FILE *file;
+			sprintf(fname, "%s/stefan_bc_diffs.dat", info.directory().c_str());
+			file = fopen(fname, "a");
+			fprintf(file, "%16.14f %16.14f\n", time_pt()->time(), fabs(tot_flux - latent_est));
+			fclose(file);
 		};
 
 		void actions_before_implicit_timestep() {
