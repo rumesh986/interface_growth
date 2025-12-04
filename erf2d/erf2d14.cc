@@ -277,6 +277,13 @@ class Erf2DProblem : public Problem {
 			}
 			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
 			printf("[OUT] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
+
+			char fname[256];
+			FILE *file;
+			sprintf(fname, "%s/stefan_bc_diffs.dat", info.directory().c_str());
+			file = fopen(fname, "a");
+			fprintf(file, "%16.14f %16.14f\n", time_pt()->time(), fabs(tot_flux - latent_est));
+			fclose(file);
 		};
 
 		void actions_before_implicit_timestep() {
