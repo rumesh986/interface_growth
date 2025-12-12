@@ -40,7 +40,7 @@ static const double T_m = 0.0; // melting point x=h(t)
 static const double T_l = 1.0; // temp far away in liquid x->\infty
 
 // simulation domain
-double xs[3] = {0.0, 0.025, 5.0};
+double xs[3] = {0.0, 0.025, 2.0};
 static const double ys[2] = {0.0, 0.0001};
 
 FreeBoundaryElement *geometry;
@@ -156,24 +156,12 @@ class Erf2DProblem : public Problem {
 				create_flux_elements(iter.first, iter.second);
 			}
 
-			D2 = 0.5 * (1.0 - D);
 			for (unsigned int yi = 0; yi < ny; yi++) {
 				unsigned int base = yi * nx;
 				
-				// dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + nx1-1))->beta_pt() = &D2;
-				// dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + nx1))->beta_pt() = &D2;
-
-				// for (unsigned int e = nx1+1; e < nx; e++)
 				for (unsigned int e = nx1; e < nx; e++)
 					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D;
 			}
-
-			// for (unsigned int e = 0; e < mesh_pt()->nelement(); e++) {
-			// 	EL *elem = dynamic_cast<EL *>(mesh_pt()->element_pt(e));
-			// 	if (elem == NULL) continue;
-			// 	// printf("e=%u ale=%s\n", e, elem->ALE_is_disabled ? "True" : "False");
-			// 	elem->enable_ALE();
-			// }
 
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
 			printf("NDOF: %lu\n", ndof());
@@ -182,7 +170,7 @@ class Erf2DProblem : public Problem {
 			disable_info_in_newton_solve();
 			// newton_solver_tolerance() = 1e-7 * dt;
 			newton_solver_tolerance() = 5e-10;
-			max_newton_iterations() = 1e6;
+			max_newton_iterations() = 1e7;
 			max_residuals() = 1e3;
 
 			printf("tolerance for newton: %e\n", newton_solver_tolerance());
@@ -207,86 +195,26 @@ class Erf2DProblem : public Problem {
 		}
 
 		void actions_before_newton_solve() {
-			// try this properly!!!
-			// double trial_h = geometry->get_interface() + 0.1 * sqrt(0.5*D*(time_pt()->time()+dt));
-			// double trial_h = geometry->get_interface() * (1.0 + 1e-9);
-			// double trial_h = geometry->get_interface() + 1e-8;
-			// geometry->set_interface(trial_h);
-			double De_sqrt_estimate = geometry->get_interface() / sqrt(time_pt()->time()-dt);
+			// double De_sqrt_estimate = geometry->get_interface() / sqrt(time_pt()->time()-dt);
 			time_stepper_pt()->set_predictor_weights();
 			time_stepper_pt()->calculate_predicted_values(geometry->geom_data_pt(0));
 			
-			double h_est = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
+			// double h_est = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
 			double h_pred = geometry->x1(time_stepper_pt()->predictor_storage_index());
-			double h_ana = sqrt(_D[2] * time_pt()->time());
-			
+			// double h_ana = sqrt(_D[2] * time_pt()->time());
 
-			printf("[BSolve] setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
-			printf("\terror in estimate: %e\n\terror in prediction: %e\n", fabs(h_ana - h_est), fabs(h_ana - h_pred));
+			// printf("[BSolve] setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
+			// printf("\terror in estimate: %e\n\terror in prediction: %e\n", fabs(h_ana - h_est), fabs(h_ana - h_pred));
 
 			geometry->set_interface(h_pred);
-
-
-			// printf("time stepper check: %s location: %u\n", time_stepper_pt()->adaptive_flag() ? "true" : "false", time_stepper_pt()->predictor_storage_index());
-			// printf("nvalue in geom data: %u\n", geometry->geom_data_pt(0)->nvalue());
-			// for (unsigned int j = 0; j < geometry->geom_data_pt(0)->nvalue(); j++) {
-			// 	printf("\tdata value %u: copy: %s\n", j, geometry->geom_data_pt(0)->is_a_copy(j) ? "true" : "false");
-			// }
-
-			// printf("Checking all history values:\n");
-			// for (unsigned int t = 0; t < time_stepper_pt()->ntstorage(); t++) {
-			// 	printf("\tt=%u h=%16.14f\n", t, geometry->x1(t));
-			// }
-			// printf("\tpredicted (%u): %16.14f\n", time_stepper_pt()->predictor_storage_index(), geometry->x1(time_stepper_pt()->predictor_storage_index()));
-
-			// printf("nprev_value: %u ntstoreage: %u geom->nvalue: %u\n", time_stepper_pt()->nprev_values(), time_stepper_pt()->ntstorage(), geometry->geom_data_pt(0)->nvalue());
-
 
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
 
 			bulk_mesh_pt->node_update();
-			printf("[BSolve] node update\n");
-
 		};
-		void actions_after_newton_solve() {
-			Vector<double> flux(2);
-
-			double tot_flux = 0.0;
-			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			Vector<double> s(2);
-			s[1] = 0.0;
-			
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
-
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-
-				// printf("flux from %s: %16.14f\n", (face_index == 1) ? "solid" : "liquid", factor * flux[0]);
-			}
-			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[ASolve] total flux = %16.14f latent est: %16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
-
-			char fname[256];
-			FILE *file;
-			sprintf(fname, "%s/stefan_bc_diffs.dat", info.directory().c_str());
-			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f\n", time_pt()->time(), fabs(tot_flux - latent_est));
-			fclose(file);
-		};
+		void actions_after_newton_solve() {};
 
 		void actions_before_implicit_timestep() {
 			Vector<double> x(2), u(2);
@@ -304,47 +232,10 @@ class Erf2DProblem : public Problem {
 		}
 		void actions_after_implicit_timestep() {};
 
-		// calculate flux before each newton step
-		void actions_before_newton_step() {
-			printf("[BStep]\n");
-			return;
-
-			Vector<double> flux(2);
-
-			double tot_flux = 0.0;
-			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			Vector<double> s(2);
-			s[1] = 0.0;
-			
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
-
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-			}
-			
-			printf("[BStep] flux=%16.14f h=%16.14f\n", tot_flux / ny, geometry->get_interface());
-			geometry->set_flux(tot_flux / ny);
-			printf("[BStep] setting flux\n");
-		}
-
-		// void actions_before_newton_step() {
+		void actions_before_newton_step() {};
+		
+		// calculate flux and store flux
 		void actions_before_newton_convergence_check() {
-			// printf("[BConv]\n");
-			// return;
-
-
 			Vector<double> flux(2);
 
 			double tot_flux = 0.0;
@@ -370,129 +261,29 @@ class Erf2DProblem : public Problem {
 				tot_flux += factor * flux[0];
 			}
 			
-			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
+			// double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			// printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
 			
 			geometry->set_flux(tot_flux / ny);
-			printf("[BConv ] setting flux\n");
-			
-			
-			return;
-
-
-			
-			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
-				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
-			}
-
-			bulk_mesh_pt->node_update();
-			printf("[BConv ] node update\n");
-
-			tot_flux = 0.0;
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
-
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-			}
-			
-			latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[BConv2] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
-
 		}
 
 		// update node positions after each newton step
 		void actions_after_newton_step() {
-			// printf("[AStep]\n");
-			// return;
-
-			Vector<double> flux(2);
-
-			double tot_flux = 0.0;
-			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			Vector<double> s(2);
-			s[1] = 0.0;
-			
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
-
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-			}
-			double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[AStep1] flux=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
-
-
 			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			}
 
 			bulk_mesh_pt->node_update();
-			printf("[AStep ] node update\n");
-
-			
-			
-			tot_flux = 0.0;
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
-
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-			}
-			latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			printf("[AStep2] flux=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux, latent_est, fabs(tot_flux - latent_est));
-
 		}
 
 		void set_initial_condition() {
-			
 			Vector<double> x(2);
 			Vector<double> u(2);
-			Vector<double> s(2);
-			Vector<double> flux(2);
-			Vector<double> r(2);
-
-			// time_pt()->time() = t_shift;
 			
 			unsigned int tsteps = time_stepper_pt()->nprev_values();
 			unsigned long int nnode = bulk_mesh_pt->nnode();
 			unsigned int step = 0;
-			// time_pt()->time() = t_shift - tsteps * dt;
-			
-			// for (unsigned long int n = 0; n < nnode; n++)
-			// 	time_stepper_pt()->assign_initial_positions_impulsive(bulk_mesh_pt->node_pt(n));
-			
+
 			double time = t_shift - tsteps*dt;
 			time_pt()->time() = time;
 			time_pt()->dt() = dt;
@@ -517,7 +308,6 @@ class Erf2DProblem : public Problem {
 				time += dt;
 				time_pt()->time() = time;
 				time_pt()->dt() = dt;
-				// time_pt()->time() = time + dt;
 				h = sqrt(_D[2] * time);
 				
 				geometry->set_interface(h);
@@ -535,91 +325,6 @@ class Erf2DProblem : public Problem {
 			}
 
 			time_pt()->time() = time;
-
-			// for (int t = tsteps; t >= 0; t--) {
-			// 	double time = time_pt()->time((unsigned int) t);
-			// 	double h = sqrt(_D[2] * time);
-
-			// 	geometry->set_interface(t, h);
-			// 	geometry->set_interface(h);
-			// 	bulk_mesh_pt->node_update();
-
-			// 	for (unsigned int n = 0; n < nnode; n++) {
-			// 		bulk_mesh_pt->node_pt(n)->position(t, x);
-			// 		get_exact_u(time, x, u);
-			// 		bulk_mesh_pt->node_pt(n)->set_value(t, 0, u[1]);
-			// 	}
-
-			// 	printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
-			// 	doc_step(step, t);
-			// 	step++;
-			// }
-
-
-			// for (unsigned long int n = 0; n < nnode; n++) {
-			// 	bulk_mesh_pt->node_pt(n)->position(tsteps, x);
-			// 	get_exact_u(time_pt()->time(tsteps), x, u);
-			// 	bulk_mesh_pt->node_pt(n)->set_value(tsteps, 0, u[1]);
-			// }
-
-			// unsigned int step = 0;
-			// doc_step(step, tsteps);
-			// step++;
-
-			// s[0] = 1.0;
-			// s[1] = 0.0;
-			// unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			// for (int t = tsteps -1; t >= 0; t--) {
-			// 	double time = time_pt()->time((unsigned int) t);
-
-			// 	//
-			// 	// update_interface
-			// 	//
-			// 	double new_h = 0.0;
-			// 	if (_D[2] == 0.0) {
-			// 		double tot_flux = 0.0;
-			// 		for (unsigned long int e = 0; e < nelems; e++) {
-			// 			int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-			// 			if (face_index == 1) {
-			// 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-			// 				get_flux_ic(t+1, elem, s, flux);
-			// 				tot_flux += _k[0] * flux[0];
-			// 			} else if (face_index == -1) {
-			// 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-			// 				get_flux_ic(t+1, elem, s, flux);
-			// 				tot_flux -= _k[1] * flux[0];
-			// 			}
-			// 		}
-			// 		double v = tot_flux / (_rho[0] * L * ny);
-			// 		new_h = geometry->get_interface() + v*dt;
-			// 		// printf("IC %u: v=%8.6f x_old=%8.6f x_new=%8.6f\n", t, v, geometry->get_interface(), new_h);
-			// 	} else {
-			// 		new_h = sqrt(_D[2] * time);
-			// 	}
-
-			// 	printf("IC %u: x_old=%8.6f x_new=%8.6f\n", t, geometry->get_interface(), new_h);
-			// 	geometry->set_interface(t, new_h);
-			// 	// geometry->set_interface(new_h); // this might be needed for the proper node update
-			// 	bulk_mesh_pt->node_update();
-
-			// 	for (unsigned long int n = 0; n < nnode; n++) {
-			// 		bulk_mesh_pt->node_pt(n)->position(t, x);
-			// 		get_exact_u(time, x, u);
-			// 		bulk_mesh_pt->node_pt(n)->set_value(t, 0, u[1]);
-			// 	}
-
-			// 	printf("[% 4d] Setting initial condition at t=%8.6f\n", step, time);
-			// 	doc_step(step, t);
-			// 	step++;
-			// }
-
-			printf("Rechecking time\n");
-			for (unsigned int t = 0; t < tsteps; t++) {
-				printf("[%2u] h=%16.14f\n", t, geometry->get_interface(t));
-			}
-
-			// time_pt()->time() = t_shift;
 			ic_set = true;
 		}
 
@@ -644,9 +349,6 @@ class Erf2DProblem : public Problem {
 				double error = numerical_u[0] - exact_u[1];
 				tot_error += error * error;
 
-				// double redim_numerical_u = T_m - (T_m - T_s) * numerical_u[0];
-				// double redim_exact_u = T_m - (T_m - T_s)  * exact_u[1];
-
 				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[1], numerical_u[0], error);
 			}
 			fclose(file);
@@ -656,9 +358,6 @@ class Erf2DProblem : public Problem {
 			double max_elem_size, min_elem_size;
 			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
 
-			// double redim_time = time / _D[0];
-
-			// printf("Max element size: %16.14f min element size: %16.14f\n", max_elem_size, min_elem_size);
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
 			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(_D[2]*time), max_elem_size/ys[1]);
@@ -666,75 +365,6 @@ class Erf2DProblem : public Problem {
 
 			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
 			info.number()++;
-		}
-
-		// modified from UnsteadyHeatEquations::get_flux from unsteady_heat_elements.h
-		void get_flux_ic(const unsigned int &t, EL * elem, const Vector<double> &s, Vector<double> &flux) const {
-			// Find out how many nodes there are in the element
-			unsigned n_node = elem->nnode();
-
-			// Find the index at which the variable is stored
-			unsigned u_nodal_index = elem->u_index_ust_heat();
-
-			// Set up memory for the shape and test functions
-			Shape psi(n_node);
-			DShape dpsidx(n_node, 2);
-
-			// Call the derivatives of the shape and test functions
-			elem->dshape_eulerian(s, psi, dpsidx);
-
-			// Initialise to zero
-			for (unsigned j = 0; j < 2; j++) {
-				flux[j] = 0.0;
-			}
-
-			// Loop over nodes
-			for (unsigned l = 0; l < n_node; l++) {
-				// Loop over derivative directions
-				for (unsigned j = 0; j < 2; j++) {
-					flux[j] += elem->nodal_value(t, l, u_nodal_index) * dpsidx(l, j);
-				}
-			}
-		}
-
-		void get_flux_fd(const unsigned &t, EL *elem, Vector<double> &flux, int direction) {
-			unsigned n_node = elem->nnode_1d();
-			Vector<Vector<double>> pos(n_node);
-			Vector<double> fluxes(n_node);
-			Vector<Node *> nodes(n_node);
-
-			for (unsigned int i = 0; i < n_node; i++) pos[i].reserve(2);
-
-			// n1 is to loop in y-direction
-			// n2 is main loop in x-direciton
-			for (unsigned int n1 = 0; n1 < n_node; n1++) {
-				for (unsigned int n2 = 0; n2 < n_node; n2++) {
-					nodes[n2] = elem->node_pt(n1 * n_node + n2);
-					nodes[n2]->position(t, pos[n2]);
-				}
-
-				double dx = pos[n_node-1][0] - pos[0][0];
-				double dT = 0.0;
-				
-				if (direction > 0) {
-					// solid phase 
-					switch(n_node) {
-						case 2: dT = - nodes[0]->value(0, t) +     nodes[1]->value(0, t);															break;
-						case 3: dT =   nodes[0]->value(0, t) - 4.0*nodes[1]->value(0, t) + 3.0*nodes[2]->value(0, t);								break;
-						case 4: dT = - nodes[0]->value(0, t) + 4.5*nodes[1]->value(0, t) - 9.0*nodes[2]->value(0, t) + 5.5*nodes[3]->value(0, t);	break;
-					}
-				} else {
-					// liquid phase
-					switch (n_node) {
-						case 2: dT =  nodes[1]->value(0, t) -     nodes[0]->value(0, t);															break;
-						case 3: dT = -nodes[2]->value(0, t) + 4.0*nodes[1]->value(0, t) - 3.0*nodes[0]->value(0, t);								break;
-						case 4: dT =  nodes[3]->value(0, t) - 4.5*nodes[2]->value(0, t) + 9.0*nodes[1]->value(0, t) - 5.5*nodes[0]->value(0, t);	break;
-					}
-				}
-				fluxes[n1] = dT / dx;
-			}
-
-			flux[0] = fluxes[0];
 		}
 };
 
@@ -879,7 +509,6 @@ int main(int argc, char **argv) {
 
 	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;
 
-	// keeps 
 	for (uint t = 1; t < t_steps+1; t++) {
 		problem.unsteady_newton_solve(dt);
 
@@ -888,6 +517,7 @@ int main(int argc, char **argv) {
 			problem.doc_step(t+prev_steps-1);
 
 		double x_int = geometry->get_interface();
+		printf("[%u] h = %16.14f\n", t, x_int);
 
 		if (x_int >= xs[2] || isnan(x_int)) {
 			printf("Interface reached right boundary, exiting...\n");

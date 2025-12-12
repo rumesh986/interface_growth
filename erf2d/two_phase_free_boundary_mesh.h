@@ -155,15 +155,6 @@ class FreeBoundaryElement : public GeneralisedElement,
 
 			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
 
-			if (!compute_jacobian) {
-				printf("[RES] stored flux: %16.14f latent est: %16.14f diff: %e residual: %e\n", 
-					external_data_pt(flux_index)->value(0), 
-					factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index), 
-					fabs(factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0)),
-					residuals[free_boundary_local_eqn_number]
-				);
-			}
-
 			if (compute_jacobian)
 				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor * interface_ts_pt->weight(1, 0);
 		}
