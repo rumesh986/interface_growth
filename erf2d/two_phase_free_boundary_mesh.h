@@ -4,7 +4,7 @@
 #include "generic.h"
 #include "meshes/rectangular_quadmesh.h"
 
-using namespace oomph;
+#include "includes.h"
 
 // geometry object for (pseudo 1D) phase change problem
 // Just stores boundary locations, including interface
@@ -79,11 +79,17 @@ class FreeBoundaryGeometry : public GeomObject {
 // allows us to add an equation to the main FEM solver
 class FreeBoundaryElement : public GeneralisedElement, 
 							public FreeBoundaryGeometry {
+
+	friend QUnsteadyHeatElement<2, X_ORDER>;
 	private:
-		double factor;
+		double St, k;
 		unsigned int geometry_index;
 		unsigned int flux_index;
 		Data *flux_data_pt;
+		Vector<QUnsteadyHeatElement<2, X_ORDER> *> phase1Elements = {};
+		Vector<QUnsteadyHeatElement<2, X_ORDER> *> phase2Elements = {};
+		Vector<unsigned int> phase1_indexes;
+		Vector<unsigned int> phase2_indexes;
 
 		TimeStepper *ts_pt;
 
@@ -95,8 +101,9 @@ class FreeBoundaryElement : public GeneralisedElement,
 			const double y0,
 			const double y1,
 			const double factor_, // This is the Stefan number
+			const double k_, // ratio of thermal conductivities
 			TimeStepper *timestepper = new Steady<0>
-		) : FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper), factor(factor_), ts_pt(timestepper) {
+		) : FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper), St(factor_), k(k_), ts_pt(timestepper) {
 
 			geometry_index = add_internal_data(data_pt[0]);
 			unpin_free_boundary();
@@ -127,6 +134,18 @@ class FreeBoundaryElement : public GeneralisedElement,
 			set_flux(0, flux);
 		}
 
+		void add_phase1_element(QUnsteadyHeatElement<2, X_ORDER> *elem) {
+			phase1Elements.push_back(elem);
+			for (unsigned int i = 0; i < elem->nnode(); i++)
+				phase1_indexes.push_back(add_external_data(elem->node_pt(i)));
+		}
+
+		void add_phase2_element(QUnsteadyHeatElement<2, X_ORDER> *elem) {
+			phase2Elements.push_back(elem);
+			for (unsigned int i = 0; i < elem->nnode(); i++)
+				phase2_indexes.push_back(add_external_data(elem->node_pt(i)));
+		}
+
 		void get_residuals(Vector<double>& residuals) {
 			residuals.initialise(0.0);
 			DenseMatrix<double> placeholder(1);
@@ -147,18 +166,110 @@ class FreeBoundaryElement : public GeneralisedElement,
 		void fill_in_generic_residual_contribution(Vector<double>& residuals, DenseMatrix<double>& jacobian, bool compute_jacobian) {
 			unsigned int ndofs = ndof();
 			if (ndofs == 0) return;
-			
-			int free_boundary_local_eqn_number = internal_local_eqn(geometry_index, free_boundary_index);
+
+			// printf("ndofs in FreeBoundaryElement: %u\n", ndofs);			
+			// printf("phase1 indexes: %lu\n\t", phase1_indexes.size());
+			// for (unsigned int i = 0; i < phase1_indexes.size(); i++)
+			// 	printf("%u ", phase1_indexes[i]);
+			// printf("\n");
+			// printf("phase2 indexes: %lu\n\t", phase2_indexes.size());
+			// for (unsigned int i = 0; i < phase2_indexes.size(); i++)
+			// 	printf("%u ", phase2_indexes[i]);
+			// printf("\n");
 
 			Data *interface_data_pt = internal_data_pt(geometry_index);
 			TimeStepper *interface_ts_pt = interface_data_pt->time_stepper_pt();
 
-			residuals[free_boundary_local_eqn_number] = factor * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
+			int free_boundary_local_eqn_number = internal_local_eqn(geometry_index, free_boundary_index);
 
 			if (compute_jacobian)
-				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = factor * interface_ts_pt->weight(1, 0);
+				jacobian(free_boundary_local_eqn_number, free_boundary_local_eqn_number) = St * interface_ts_pt->weight(1, 0);
+
+			double tot_flux = 0.0;
+			Vector<double> s = {1.0, 0.0};
+			for (unsigned int e = 0; e < phase1Elements.size(); e++) {
+				QUnsteadyHeatElement<2, X_ORDER> *elem = phase1Elements[e];
+				unsigned int nnode = elem->nnode();
+				
+				Shape psi(nnode), test(nnode), psi_f(nnode);
+				DShape dpsidx(nnode, 2), dtestdx(nnode, 2), dpsidx_f(nnode, 2);
+
+				elem->dshape_eulerian_at_knot(0, psi, dpsidx);
+				// for (unsigned int n = 0; n < elem->nnode_1d(); n++)
+				// 	test[n] = psi[n];
+
+				elem->dshape_eulerian(s, psi_f, dpsidx_f);
+				double flux = 0.0;
+
+				for (unsigned int n = 0; n < nnode; n++) {
+					flux += elem->nodal_value(n, 0) * dpsidx_f(n, 0);
+
+					if (compute_jacobian) {
+						// int local_unknown = elem->nodal_local_eqn(n, 0);
+						int local_unknown = external_local_eqn(phase1_indexes[n], 0);
+						if (local_unknown >= 0) {
+							// printf("phase1 n=%u dpsidx=%f local_unknown=%d\n", n, dpsidx(n, 0), local_unknown);
+							jacobian(free_boundary_local_eqn_number, local_unknown) = dpsidx_f(n, 0);
+
+							// double fraction = dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
+							// jacobian(local_unknown, free_boundary_local_eqn_number) = -fraction * interface_ts_pt->weight(1, 0) * psi(n) * dpsidx(n, 0);
+							// printf("phase1 jac addition: %16.14f psi=%8.6f dpsidx=%8.6f frac=%5.3f\n", jacobian(local_unknown, free_boundary_local_eqn_number), psi(n), dpsidx(n, 0), fraction);
+						}
+					}
+				}
+
+				tot_flux += flux;
+			}
+
+			s[0] = -1.0;
+			for (unsigned int e = 0; e < phase2Elements.size(); e++) {
+				QUnsteadyHeatElement<2, X_ORDER> *elem = phase2Elements[e];
+				unsigned int nnode = elem->nnode();
+				
+				Shape psi(nnode), test(nnode), psi_f(nnode);
+				DShape dpsidx(nnode, 2), dtestdx(nnode, 2), dpsidx_f(nnode, 2);
+
+				elem->dshape_eulerian_at_knot(0, psi, dpsidx);
+				elem->dshape_eulerian(s, psi_f, dpsidx_f);
+				double flux = 0.0;
+
+				for (unsigned int n = 0; n < nnode; n++) {
+					flux += elem->nodal_value(n, 0) * dpsidx_f(n, 0);
+					if (compute_jacobian) {
+						// int local_unknown = elem->nodal_local_eqn(n, 0);
+						int local_unknown = external_local_eqn(phase2_indexes[n], 0);
+						if (local_unknown >= 0) {
+							// printf("phase2 n=%u dpsidx=%f local_unknown=%d\n", n, dpsidx(n, 0), local_unknown);
+							jacobian(free_boundary_local_eqn_number, local_unknown) = -k * dpsidx_f(n, 0);
+							
+							// double fraction = dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
+							// jacobian(local_unknown, free_boundary_local_eqn_number) = (fraction - 1.0) * interface_ts_pt->weight(1, 0) * psi(n) * dpsidx(n, 0);
+							// printf("phase2 jac addition: %16.14f psi=%8.6f dpsidx=%8.6f frac=%5.3f\n", jacobian(local_unknown, free_boundary_local_eqn_number), psi(n), dpsidx(n, 0), fraction);
+						}
+					}
+				}
+
+				tot_flux -= k * flux;
+			}
+			
+
+			residuals[free_boundary_local_eqn_number] = St * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - tot_flux;
+			
+
+			// printf("residual: tot_flux: %16.14f\n", tot_flux);
+			// residuals[free_boundary_local_eqn_number] = St * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
+
+			// if (compute_jacobian) {
+			// 	printf("FreeBoundaryElement Jacobian\n\t");
+			// 	for (unsigned int i = 0; i < ndof(); i++) {
+			// 		for (unsigned int j = 0; j < ndof(); j++) {
+			// 			printf("%8.6f\t", jacobian(i, j));
+			// 		}
+			// 		printf("\n\t");
+			// 	}
+			// }
 		}
-};
+	};
 
 class FreeBoundaryDomain : public Domain {
 	private:

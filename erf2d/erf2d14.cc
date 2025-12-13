@@ -11,11 +11,6 @@
 #include "includes.h"
 #include "two_phase_free_boundary_mesh.h"
 
-#ifndef RUN_SCRIPT
-#define X_ORDER 2
-#define T_ORDER 1
-#endif
-
 // dimensional parameters
 double _k[2] = {1.0, 0.25}; // thermal conductivity
 double _rho[2] = {1.0, 2.0}; // density
@@ -122,7 +117,7 @@ class Erf2DProblem : public Problem {
 
 			add_time_stepper_pt(new BDF<T_ORDER>(true));
 
-			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], St, time_stepper_pt());
+			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], St, k, time_stepper_pt());
 
 			printf("x0=%8.6f x1=%8.6f x2=%8.6f\n", geometry->x0(), geometry->x1(), geometry->x2());
 
@@ -162,6 +157,9 @@ class Erf2DProblem : public Problem {
 				for (unsigned int e = nx1; e < nx; e++)
 					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D;
 			}
+
+			geometry->add_phase1_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1-1)));
+			geometry->add_phase2_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1)));
 
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
 			printf("NDOF: %lu\n", ndof());
@@ -236,35 +234,35 @@ class Erf2DProblem : public Problem {
 		
 		// calculate flux and store flux
 		void actions_before_newton_convergence_check() {
-			Vector<double> flux(2);
+			// Vector<double> flux(2);
 
-			double tot_flux = 0.0;
-			unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
+			// double tot_flux = 0.0;
+			// unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
 
-			Vector<double> s(2);
-			s[1] = 0.0;
+			// Vector<double> s(2);
+			// s[1] = 0.0;
 			
-			for (unsigned long int e = 0; e < nelems; e++) {
-				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+			// for (unsigned long int e = 0; e < nelems; e++) {
+			// 	int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+			// 	EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
 				
-				double factor = 0.0;
-				if (face_index == 1) {
-					s[0] = 1.0;
-					factor = 1.0;
-				} else if (face_index == -1) {
-					s[0] = -1.0;
-					factor = -k;
-				}
+			// 	double factor = 0.0;
+			// 	if (face_index == 1) {
+			// 		s[0] = 1.0;
+			// 		factor = 1.0;
+			// 	} else if (face_index == -1) {
+			// 		s[0] = -1.0;
+			// 		factor = -k;
+			// 	}
 
-				elem->get_flux(s, flux);
-				tot_flux += factor * flux[0];
-			}
+			// 	elem->get_flux(s, flux);
+			// 	tot_flux += factor * flux[0];
+			// }
 			
-			// double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			// printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
+			// // double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
+			// // printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
 			
-			geometry->set_flux(tot_flux / ny);
+			// geometry->set_flux(tot_flux / ny);
 		}
 
 		// update node positions after each newton step
@@ -517,7 +515,7 @@ int main(int argc, char **argv) {
 			problem.doc_step(t+prev_steps-1);
 
 		double x_int = geometry->get_interface();
-		printf("[%u] h = %16.14f\n", t, x_int);
+		// printf("[%u] h = %16.14f\n", t, x_int);
 
 		if (x_int >= xs[2] || isnan(x_int)) {
 			printf("Interface reached right boundary, exiting...\n");

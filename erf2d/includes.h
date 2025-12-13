@@ -7,6 +7,11 @@
 #include "generic.h"
 #include "unsteady_heat.h"
 
+#ifndef RUN_SCRIPT
+#define X_ORDER 2
+#define T_ORDER 1
+#endif
+
 using namespace std;
 using namespace oomph;
 using namespace MathematicalConstants;
