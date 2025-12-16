@@ -187,14 +187,20 @@ class FreeBoundaryElement : public GeneralisedElement,
 
 			double tot_flux = 0.0;
 			Vector<double> s = {1.0, 0.0};
+			Vector<double> s2(2, 0.0);
 			for (unsigned int e = 0; e < phase1Elements.size(); e++) {
 				QUnsteadyHeatElement<2, X_ORDER> *elem = phase1Elements[e];
 				unsigned int nnode = elem->nnode();
 				
-				Shape psi(nnode), test(nnode), psi_f(nnode);
-				DShape dpsidx(nnode, 2), dtestdx(nnode, 2), dpsidx_f(nnode, 2);
+				// for jacobian stuff
+				Shape psi(nnode), test(nnode);
+				DShape dpsidx(nnode, 2), dtestdx(nnode, 2);
 
-				elem->dshape_eulerian_at_knot(0, psi, dpsidx);
+				// for flux calculations
+				Shape psi_f(nnode);
+				DShape dpsidx_f(nnode, 2);
+
+				// elem->dshape_eulerian_at_knot(0, psi, dpsidx);
 				// for (unsigned int n = 0; n < elem->nnode_1d(); n++)
 				// 	test[n] = psi[n];
 
@@ -211,9 +217,38 @@ class FreeBoundaryElement : public GeneralisedElement,
 							// printf("phase1 n=%u dpsidx=%f local_unknown=%d\n", n, dpsidx(n, 0), local_unknown);
 							jacobian(free_boundary_local_eqn_number, local_unknown) = dpsidx_f(n, 0);
 
-							// double fraction = dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
+							double fraction = dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
 							// jacobian(local_unknown, free_boundary_local_eqn_number) = -fraction * interface_ts_pt->weight(1, 0) * psi(n) * dpsidx(n, 0);
 							// printf("phase1 jac addition: %16.14f psi=%8.6f dpsidx=%8.6f frac=%5.3f\n", jacobian(local_unknown, free_boundary_local_eqn_number), psi(n), dpsidx(n, 0), fraction);
+
+							double jac_contrib = 0.0;
+							unsigned int n_ipt = elem->integral_pt()->nweight();
+							for (unsigned int ipt = 0; ipt < n_ipt; ipt++) {
+								for (unsigned d = 0; d < 2; d++) s2[d] = elem->integral_pt()->knot(ipt, d);
+								double w = elem->integral_pt()->weight(ipt);
+
+								double J = elem->dshape_eulerian_at_knot(ipt, psi, dpsidx);
+								test = psi;
+								dtestdx = dpsidx;
+
+								double W = w * J;
+
+								double mesh_vel_term = 0.0;
+								double dudx_term = 0.0;
+
+								for (unsigned int n2 = 0; n2 < nnode; n2++) {
+									mesh_vel_term += interface_ts_pt->weight(1, 0) * psi(n2);
+									dudx_term += elem->node_pt(n2)->value(0) * dpsidx(n2, 0);
+									// printf("\te=%u n=%u n2=%u psi=%f dpsidx=%f T=%f tau=%f test=%f w=%e\n", e, n, n2, psi(n2), dpsidx(n2, 0), elem->node_pt(n2)->value(0), interface_ts_pt->weight(1, 0), test(n), W);
+								}
+
+								jac_contrib -= fraction * mesh_vel_term * dudx_term * test(n) * W;
+
+							}
+
+							jacobian(local_unknown, free_boundary_local_eqn_number) = jac_contrib;
+
+
 						}
 					}
 				}
@@ -229,7 +264,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 				Shape psi(nnode), test(nnode), psi_f(nnode);
 				DShape dpsidx(nnode, 2), dtestdx(nnode, 2), dpsidx_f(nnode, 2);
 
-				elem->dshape_eulerian_at_knot(0, psi, dpsidx);
+				// elem->dshape_eulerian_at_knot(0, psi, dpsidx);
 				elem->dshape_eulerian(s, psi_f, dpsidx_f);
 				double flux = 0.0;
 
@@ -242,16 +277,44 @@ class FreeBoundaryElement : public GeneralisedElement,
 							// printf("phase2 n=%u dpsidx=%f local_unknown=%d\n", n, dpsidx(n, 0), local_unknown);
 							jacobian(free_boundary_local_eqn_number, local_unknown) = -k * dpsidx_f(n, 0);
 							
-							// double fraction = dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
+							double fraction = 1.0 - dynamic_cast<SpineNode *>(elem->node_pt(n))->fraction();
 							// jacobian(local_unknown, free_boundary_local_eqn_number) = (fraction - 1.0) * interface_ts_pt->weight(1, 0) * psi(n) * dpsidx(n, 0);
 							// printf("phase2 jac addition: %16.14f psi=%8.6f dpsidx=%8.6f frac=%5.3f\n", jacobian(local_unknown, free_boundary_local_eqn_number), psi(n), dpsidx(n, 0), fraction);
+
+							double jac_contrib = 0.0;
+							unsigned int n_ipt = elem->integral_pt()->nweight();
+							for (unsigned int ipt = 0; ipt < n_ipt; ipt++) {
+								for (unsigned d = 0; d < 2; d++) s2[d] = elem->integral_pt()->knot(ipt, d);
+								double w = elem->integral_pt()->weight(ipt);
+
+								double J = elem->dshape_eulerian_at_knot(ipt, psi, dpsidx);
+								test = psi;
+								dtestdx = dpsidx;
+
+								double W = w * J;
+
+								double mesh_vel_term = 0.0;
+								double dudx_term = 0.0;
+
+								for (unsigned int n2 = 0; n2 < nnode; n2++) {
+									mesh_vel_term += interface_ts_pt->weight(1, 0) * psi(n2);
+									dudx_term += elem->node_pt(n2)->value(0) * dpsidx(n2, 0);
+									// printf("\te=%u n=%u n2=%u psi=%f dpsidx=%f T=%f tau=%f test=%f w=%e\n", e, n, n2, psi(n2), dpsidx(n2, 0), elem->node_pt(n2)->value(0), interface_ts_pt->weight(1, 0), test(n), W);
+								}
+
+								jac_contrib -= fraction * mesh_vel_term * dudx_term * test(n) * W;
+
+							}
+
+							jacobian(local_unknown, free_boundary_local_eqn_number) = jac_contrib;
+
+
 						}
 					}
 				}
 
 				tot_flux -= k * flux;
 			}
-			
 
 			residuals[free_boundary_local_eqn_number] = St * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - tot_flux;
 			
@@ -260,12 +323,13 @@ class FreeBoundaryElement : public GeneralisedElement,
 			// residuals[free_boundary_local_eqn_number] = St * interface_ts_pt->time_derivative(1, interface_data_pt, free_boundary_index) - external_data_pt(flux_index)->value(0);
 
 			// if (compute_jacobian) {
-			// 	printf("FreeBoundaryElement Jacobian\n\t");
+			// 	printf("FreeBoundaryElement Jacobian\n");
 			// 	for (unsigned int i = 0; i < ndof(); i++) {
+			// 		printf("\t");
 			// 		for (unsigned int j = 0; j < ndof(); j++) {
 			// 			printf("%8.6f\t", jacobian(i, j));
 			// 		}
-			// 		printf("\n\t");
+			// 		printf("\n");
 			// 	}
 			// }
 		}
