@@ -58,6 +58,8 @@ class FreeBoundaryGeometry : public GeomObject {
 		unsigned int ngeom_data() const {return data_pt.size();}
 
 		Data* geom_data_pt(const unsigned &j) {return data_pt[0];}
+
+		const unsigned int& free_index() {return free_boundary_index;}
 		
 		double get_interface(const unsigned int &t) {return x1(t);}
 		double get_interface() {return get_interface(0);}
@@ -71,6 +73,14 @@ class FreeBoundaryGeometry : public GeomObject {
 
 		void position(const Vector<double> &zeta, Vector<double> &r) const {
 			position(0, zeta, r);
+		}
+
+		void unpin_free_boundary() {
+			data_pt[0]->unpin(free_boundary_index);
+		}
+
+		void pin_free_boundary() {
+			data_pt[0]->pin(free_boundary_index);
 		}
 };
 
@@ -115,14 +125,6 @@ class FreeBoundaryElement : public GeneralisedElement,
 			flux_index = add_external_data(flux_data_pt);
 			
 			destroy_geom_data = false;
-		}
-
-		void pin_free_boundary() {
-			internal_data_pt(geometry_index)->pin(free_boundary_index);
-		}
-
-		void unpin_free_boundary() {
-			internal_data_pt(geometry_index)->unpin(free_boundary_index);
 		}
 
 		void set_flux(const unsigned int &t, const double &flux) {
