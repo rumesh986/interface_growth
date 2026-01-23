@@ -14,7 +14,6 @@ class FreeBoundaryGeometry : public GeomObject {
 		const unsigned int free_boundary_index = 1;
 
 		bool destroy_geom_data = false;
-		TimeStepper *ts_pt;
 	public:
 		FreeBoundaryGeometry(
 			const double x0,
@@ -23,13 +22,13 @@ class FreeBoundaryGeometry : public GeomObject {
 			const double y0,
 			const double y1,
 			TimeStepper *timestepper = new Steady<0>
-		) : GeomObject(2,2), ts_pt(timestepper) {
+		) : GeomObject(2,2, timestepper) {
 			
 			data_pt.resize(1);
-			data_pt[0] = new Data(ts_pt, 5);
+			data_pt[0] = new Data(time_stepper_pt(), 5);
 
 			// assume impulsive conditions
-			for (unsigned int t = 0; t < ts_pt->nprev_values(); t++) {
+			for (unsigned int t = 0; t < time_stepper_pt()->nprev_values(); t++) {
 				data_pt[0]->set_value(t, 0, x0);
 				data_pt[0]->set_value(t, free_boundary_index, x1);
 				data_pt[0]->set_value(t, 2, x2);
