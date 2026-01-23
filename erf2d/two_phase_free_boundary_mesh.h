@@ -770,4 +770,65 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 			}
 		}
 };
+
+template<class EL>
+class TwoPhaseElasticMesh : public ElasticRectangularQuadMesh<EL> {
+	private:
+		unsigned int nx1, nx2, nx, ny;
+		double x0, x1, x2, y0, y1;
+		TimeStepper *ts_pt;
+	
+	public:
+		TwoPhaseElasticMesh(
+			const unsigned int &nx1,
+			const unsigned int &nx2,
+			const unsigned int &ny,
+			const double &x0,
+			const double &x1,
+			const double &x2,
+			const double &y0,
+			const double &y1,
+			TimeStepper *timestepper = &Mesh::Default_TimeStepper
+		) : RectangularQuadMesh<EL>(nx1+nx2, ny, x0, x2, y0, y1, timestepper),
+			ElasticRectangularQuadMesh<EL>(nx1+nx2, ny, x2, y1, timestepper),
+			nx1(nx1), nx2(nx2), nx(nx1+nx2), ny(ny),  x0(x0), x1(x1), x2(x2), y0(y0), y1(y1), ts_pt(timestepper) {
+
+			this->set_nboundary(5);
+			for (unsigned int e = 0; e < ny; e++) {
+				EL *elem = dynamic_cast<EL *>(this->element_pt(nx1 + nx*e));
+				unsigned int nnode = elem->nnode_1d();
+
+				for (unsigned int n = 0; n < nnode; n++) {
+					Node *node = elem->node_pt(nnode * n);
+
+					this->convert_to_boundary_node(node);
+					this->add_boundary_node(4, node);
+				}
+			}
+
+			this->setup_boundary_element_info();
+		}
+};
+
+// doesn't work, don't bother
+// compiler doesn't know if it should use SolidNode::node_pt(...) or SpineNode::node_pt(...)
+// for element->node_pt(...)
+template<class EL>
+class TwoPhaseElasticSpineMesh : public TwoPhaseFreeBoundarySpineMesh<EL>,
+								 public TwoPhaseElasticMesh<EL> {
+	public:
+		TwoPhaseElasticSpineMesh(
+			const unsigned int &nx1,
+			const unsigned int &nx2,
+			const unsigned int &ny,
+			FreeBoundaryGeometry *geometry,
+			TimeStepper *timestepper = &Mesh::Default_TimeStepper
+		) : RectangularQuadMesh<EL>(nx1+nx2, ny, geometry->x0(), geometry->x2(), geometry->y0(), geometry->y1(), timestepper),
+			TwoPhaseFreeBoundarySpineMesh<EL>(nx1, nx2, ny, geometry, timestepper),
+			TwoPhaseElasticMesh<EL>(nx1, nx2, ny, geometry->x0(), geometry->x1(), geometry->x2(), geometry->y0(), geometry->y1(), timestepper) {
+
+			printf("IT compiles I guess");
+		}
+};
+
 #endif
