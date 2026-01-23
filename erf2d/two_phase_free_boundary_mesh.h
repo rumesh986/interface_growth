@@ -658,4 +658,116 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 		}
 };
 
+template<class EL>
+class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
+	private:
+		double St;
+		// FreeBoundaryGeometry *geom;
+
+		// Vector<unsigned int> data_indexes;
+		// unsigned int data_index;
+		EL *solid_elem, *liquid_elem;
+
+		Data *position;
+	
+	public:
+		FreeBoundaryFluxElement(
+			EL *_solid_elem,
+			EL *_liquid_elem, 
+			unsigned int face_index,
+			double _St,
+			// FreeBoundaryGeometry *_geom,
+			TimeStepper *_ts_pt
+		) : UnsteadyHeatFluxElement<EL>(_solid_elem, face_index), St(_St), solid_elem(_solid_elem), liquid_elem(_liquid_elem) {//, geom(_geom) {
+			this->time_stepper_pt() = _ts_pt;
+			printf("in constructor\n");
+			printf("time stepper pt: %p\n", this->time_stepper_pt());
+			// data_index = this->add_external_data(geom->geom_data_pt(0));
+
+			position = new Data(this->time_stepper_pt(), 1, true);
+		}
+
+		void trial() {
+
+			printf("Flux elem positions\n");
+			for (unsigned int n = 0; n < this->nnode(); n++) {
+				Vector<double> x(2);
+				this->node_pt(n)->position(x);
+				printf("\tNode %u x0=%f x1=%f\n", n, x[0], x[1]);
+			}
+			// printf("In FreeBoundaryFluxElement trial function\n");
+
+			// printf("ndofs: %u\n", this->ndof());
+
+			// int local_eqn = this->external_local_eqn(data_index, geom->free_index());
+			// printf("Got local equation %d\n", local_eqn);
+			// int global_eqn = this->eqn_number(local_eqn);
+
+
+			// printf("Flux element global eqn number: %d\n", global_eqn);
+		}
+
+		 /// Compute the element residual vector
+		inline void fill_in_contribution_to_residuals(Vector<double>& residuals) {
+			// Call the generic residuals function with flag set to 0
+			// using a dummy matrix argument
+			fill_in_generic_residual_contribution_ust_heat_flux(residuals, GeneralisedElement::Dummy_matrix, 0);
+		}
+
+
+		/// Compute the element's residual vector and its Jacobian matrix
+		inline void fill_in_contribution_to_jacobian(Vector<double>& residuals, DenseMatrix<double>& jacobian) {
+			// Call the generic routine with the flag set to 1
+			fill_in_generic_residual_contribution_ust_heat_flux(residuals, jacobian, 1);
+		}
+
+		void fill_in_generic_residual_contribution_ust_heat_flux(Vector<double>& residuals, DenseMatrix<double>& jacobian, unsigned int compute_jacobian) {
+			unsigned int ndofs = this->ndof();
+			if (ndofs == 0) return;
+
+			unsigned int n_node = this->nnode();
+			unsigned int n_ipt = this->integral_pt()->nweight();
+			unsigned int n_dim = this->node_pt(0)->ndim();
+
+			Vector<double> s(n_dim-1);
+			Shape shape(n_node), test(n_node);
+
+			const unsigned int T_idx = solid_elem->u_index_ust_heat();
+
+			for (unsigned int ipt = 0; ipt < n_ipt; ipt++) {
+				for (unsigned int i = 0; i < n_dim-1; i++) 
+					s[i] = this->integral_pt()->knot(ipt, i);
+
+				double J = this->shape_and_test(s, shape, test);
+				double W = J * this->integral_pt()->weight(ipt);
+
+				Vector<double> x_int(n_dim, 0.0);
+
+				for (unsigned int n = 0; n < n_node; n++) {
+					for (unsigned int i = 0; i < n_dim; i++)
+						x_int[i] += this->nodal_position(n, i) * shape[n];
+				}
+
+				Vector<double> flux(2);
+				solid_elem->get_flux(x_int, flux);
+
+				for (unsigned int n1 = 0; n1 < n_node; n1++) {
+					int local_eqn = this->nodal_local_eqn(n1, T_idx);
+					if (local_eqn < 0) continue;
+
+					residuals[local_eqn] -= solid_elem->beta() * test(n1) * flux[0] * W;
+					
+					if (compute_jacobian) {
+						for (unsigned int n2 = 0; n2 < n_node; n2++) {
+							int local_unknown = this->nodal_local_eqn(n2, T_idx);
+							if (local_unknown < 0) continue;
+							
+							jacobian(local_eqn, local_unknown) -= solid_elem->beta() * test(n1) * W; // needs dshape(n2)
+							// printf("n1=%u n2=%u res=%f jac=%f beta=%f\n", n1, n2, residuals[local_eqn], jacobian(local_eqn, local_unknown), solid_elem->beta());
+						}
+					}
+				}
+			}
+		}
+};
 #endif
