@@ -336,6 +336,75 @@ class FreeBoundaryElement : public GeneralisedElement,
 		}
 	};
 
+class FreeBoundaryElementUnpinned : public GeneralisedElement,
+									public FreeBoundaryGeometry {
+	private:
+		unsigned int boundary_index;
+		unsigned int geometry_index;
+		Vector<unsigned int> node_indices;
+
+	public:
+		FreeBoundaryElementUnpinned(
+			const double x0,
+			const double x1,
+			const double x2,
+			const double y0,
+			const double y1,
+			TimeStepper *timestepper = new Steady<0>
+		) : FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper) {
+
+			boundary_index = 4;
+			geometry_index = add_internal_data(data_pt[0]);
+			unpin_free_boundary();
+			destroy_geom_data = false;
+		}
+
+		unsigned int & boundary() {
+			return boundary_index;
+		}
+
+		void add_node(Node *node_pt) {
+			node_indices.push_back(add_external_data(node_pt));
+		}
+
+		inline void get_residuals(Vector<double>& residuals) {
+			residuals.initialise(0.0);
+			DenseMatrix<double> placeholder(1);
+
+			fill_in_generic_residual_contribution(residuals, placeholder, false);
+		}
+
+		inline void get_jacobian(Vector<double>& residuals, DenseMatrix<double>& jacobian) {
+			residuals.initialise(0.0);
+			jacobian.initialise(0.0);
+
+			fill_in_generic_residual_contribution(residuals, jacobian, true);
+		}
+
+	protected:
+		void fill_in_generic_residual_contribution(Vector<double>& residuals, DenseMatrix<double>& jacobian, bool compute_jacobian) {
+			unsigned int ndofs = ndof();
+			if (ndofs == 0) return;
+
+			int local_eqn = internal_local_eqn(geometry_index, free_boundary_index);
+			for (unsigned int i = 0; i < node_indices.size(); i++) {
+				Node *node_pt = dynamic_cast<Node *>(external_data_pt(node_indices[i]));
+
+				if (node_pt == NULL) continue;
+				if (!node_pt->is_on_boundary(boundary_index)) continue;
+
+				residuals[local_eqn] += node_pt->value(0);
+
+				if (compute_jacobian) {
+					int local_unknown = external_local_eqn(node_indices[i], 0);
+					if (local_unknown < 0) continue;
+
+					jacobian(local_eqn, local_unknown) += 1.0;
+				}
+			}
+		}
+};
+
 class FreeBoundaryDomain : public Domain {
 	private:
 		FreeBoundaryElement * geometry;
@@ -662,49 +731,19 @@ template<class EL>
 class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 	private:
 		double St;
-		// FreeBoundaryGeometry *geom;
-
-		// Vector<unsigned int> data_indexes;
-		// unsigned int data_index;
-		EL *solid_elem, *liquid_elem;
-
-		Data *position;
+		int geometry_index;
+		int free_boundary_index;
 	
 	public:
 		FreeBoundaryFluxElement(
-			EL *_solid_elem,
-			EL *_liquid_elem, 
+			EL *bulk_elem,
 			unsigned int face_index,
 			double _St,
-			// FreeBoundaryGeometry *_geom,
-			TimeStepper *_ts_pt
-		) : UnsteadyHeatFluxElement<EL>(_solid_elem, face_index), St(_St), solid_elem(_solid_elem), liquid_elem(_liquid_elem) {//, geom(_geom) {
-			this->time_stepper_pt() = _ts_pt;
-			printf("in constructor\n");
-			printf("time stepper pt: %p\n", this->time_stepper_pt());
-			// data_index = this->add_external_data(geom->geom_data_pt(0));
+			FreeBoundaryElementUnpinned *geom
+		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St) {
 
-			position = new Data(this->time_stepper_pt(), 1, true);
-		}
-
-		void trial() {
-
-			printf("Flux elem positions\n");
-			for (unsigned int n = 0; n < this->nnode(); n++) {
-				Vector<double> x(2);
-				this->node_pt(n)->position(x);
-				printf("\tNode %u x0=%f x1=%f\n", n, x[0], x[1]);
-			}
-			// printf("In FreeBoundaryFluxElement trial function\n");
-
-			// printf("ndofs: %u\n", this->ndof());
-
-			// int local_eqn = this->external_local_eqn(data_index, geom->free_index());
-			// printf("Got local equation %d\n", local_eqn);
-			// int global_eqn = this->eqn_number(local_eqn);
-
-
-			// printf("Flux element global eqn number: %d\n", global_eqn);
+			geometry_index = this->add_external_data(geom->geom_data_pt(0));
+			free_boundary_index = geom->free_index();
 		}
 
 		 /// Compute the element residual vector
@@ -729,42 +768,29 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 			unsigned int n_ipt = this->integral_pt()->nweight();
 			unsigned int n_dim = this->node_pt(0)->ndim();
 
-			Vector<double> s(n_dim-1);
-			Shape shape(n_node), test(n_node);
+			Vector<double> s(n_dim-1, 0.0);
+			Shape psi(n_node), phi(n_node);
 
-			const unsigned int T_idx = solid_elem->u_index_ust_heat();
+			Data *geom_data = this->external_data_pt(geometry_index);
 
 			for (unsigned int ipt = 0; ipt < n_ipt; ipt++) {
-				for (unsigned int i = 0; i < n_dim-1; i++) 
-					s[i] = this->integral_pt()->knot(ipt, i);
+				for (unsigned int i = 0; i < n_dim-1; i++) s[i] = this->integral_pt()->knot(ipt, i);
 
-				double J = this->shape_and_test(s, shape, test);
-				double W = J * this->integral_pt()->weight(ipt);
+				double J = this->shape_and_test(s, phi, psi);
+				double W = this->integral_pt()->weight(ipt) * J;
 
-				Vector<double> x_int(n_dim, 0.0);
-
-				for (unsigned int n = 0; n < n_node; n++) {
-					for (unsigned int i = 0; i < n_dim; i++)
-						x_int[i] += this->nodal_position(n, i) * shape[n];
-				}
-
-				Vector<double> flux(2);
-				solid_elem->get_flux(x_int, flux);
+				double dhdt = St * geom_data->time_stepper_pt()->time_derivative(1, geom_data, free_boundary_index);
 
 				for (unsigned int n1 = 0; n1 < n_node; n1++) {
-					int local_eqn = this->nodal_local_eqn(n1, T_idx);
+					int local_eqn = this->nodal_local_eqn(n1, 0);
 					if (local_eqn < 0) continue;
-
-					residuals[local_eqn] -= solid_elem->beta() * test(n1) * flux[0] * W;
 					
+					residuals[local_eqn] -= phi(n1) * dhdt * W;
+
 					if (compute_jacobian) {
-						for (unsigned int n2 = 0; n2 < n_node; n2++) {
-							int local_unknown = this->nodal_local_eqn(n2, T_idx);
-							if (local_unknown < 0) continue;
-							
-							jacobian(local_eqn, local_unknown) -= solid_elem->beta() * test(n1) * W; // needs dshape(n2)
-							// printf("n1=%u n2=%u res=%f jac=%f beta=%f\n", n1, n2, residuals[local_eqn], jacobian(local_eqn, local_unknown), solid_elem->beta());
-						}
+						int iface_unknown = this->external_local_eqn(geometry_index, free_boundary_index);
+						if (iface_unknown < 0) continue;
+						jacobian(local_eqn, iface_unknown) -= phi(n1) * St * geom_data->time_stepper_pt()->weight(1, 0) * W;
 					}
 				}
 			}
