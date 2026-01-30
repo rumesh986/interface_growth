@@ -302,6 +302,7 @@ class Visualizer:
 			if (run.interface is not None):
 				self.plot_interface(run)
 				self.plot_de(run)
+				self.plot_interface_temp(run)
 			
 			self.make_surf_profile_anim(run)
 
@@ -497,6 +498,29 @@ class Visualizer:
 		plt.ylabel('$D_e$')
 		plt.legend()
 		plt.savefig(f'{run.out_folder}/{self.prefix}-de_conv.png')
+	
+	def plot_interface_temp(self, run):
+		plt.cla()
+
+		fig, ax = plt.subplots(1,1)
+		x = np.zeros(run.times.shape[0])
+		# x = run.times
+		y = np.zeros_like(x)
+		for i, t in enumerate(run.times):
+			x[i] = t
+			df = run.solns[i]
+			y[i] = df[np.isclose(df['x'], run.interface[i])]['u'].iloc[0]
+
+		print(y)
+		
+		if not np.allclose(y, np.zeros_like(y)):
+			print("WARNING: temp not held to zero!!!!")
+		ax.plot(x, y)
+		ax.set_xlabel('Time')
+		ax.set_ylabel('Temperature at interface')
+		ax.set_title('Interface temperatures')
+
+		fig.savefig(f'{run.out_folder}/{self.prefix}-interface_temps.png')
 
 	# plot temperature profile at different steps in one figure (for report)
 	@mpl.rc_context({'font.size': 20})

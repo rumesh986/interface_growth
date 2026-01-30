@@ -361,7 +361,7 @@ class Erf2DProblem : public Problem {
 			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(_D[2]*time), max_elem_size/ys[1]);
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error=%e iface_err=%e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
+			printf("[%4u] time=%8.6f error=%10.8e iface_err=%10.8e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
 			info.number()++;
 		}
 };
