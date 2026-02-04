@@ -24,10 +24,6 @@ double _L = 1.0; // latent heat of fusion
 double _D[3] = {0.0, 0.0, 0.0};
 
 // dimensionless parameters
-// double D = _D[1] / _D[0];
-// double D2 = 0.0;
-// double k = _k[1] / _k[0];
-// double St = 0.0;
 double D, Beta, Alpha, St;
 
 // boundary temperature values (dimensional)
@@ -245,31 +241,9 @@ class Erf2DProblem : public Problem {
 
 		void actions_before_newton_step() {};
 		void actions_before_newton_convergence_check() {}
-		void actions_after_newton_step() {
-			// double tot_temp = 0.0;
-			// printf("temp at interface: ");
-			// for (unsigned int n = 0; n < bulk_mesh_pt->nboundary_node(4); n++) {
-			// 	printf("%e ", bulk_mesh_pt->boundary_node_pt(4, n)->value(0));
-			// 	tot_temp += bulk_mesh_pt->boundary_node_pt(4, n)->value(0);
-			// }
-			// printf(" overall temp=%e\n", tot_temp);
-		}
+		void actions_after_newton_step() {};
 		void actions_after_newton_solve() {};
-		void actions_after_implicit_timestep() {
-			// unsigned int nnode = bulk_mesh_pt->nnode();
-			// Vector<double> x(2), u(2);
-			// double time = time_pt()->time();
-			// double h = sqrt(_D[2] * time) * 1.005;
-
-			// geometry->set_interface(h);
-			// bulk_mesh_pt->node_update();
-
-			// for (unsigned int n = 0; n < nnode; n++) {
-			// 	bulk_mesh_pt->node_pt(n)->position(x);
-			// 	get_exact_u(time, x, u);
-			// 	bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
-			// }
-		};
+		void actions_after_implicit_timestep() {};
 		
 		void set_initial_condition() {
 			Vector<double> x(2);
