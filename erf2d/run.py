@@ -161,7 +161,7 @@ class Run:
 					Tp = (Tl - Tm)/(Tl - Ts)
 					er = np.emath.sqrt((k2*rho2*cp2)/(k1*rho1*cp1))
 					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
-				case 'erf2d14' | 'erf2d16' | 'erf2d17':
+				case 'erf2d14' | 'erf2d16' | 'erf2d17' | 'erf2d18':
 					St = L / (cp1 * (Tm - Ts))
 					T_l = (Tl - Tm) / (Tm - Ts)
 					D = D2 / D1
