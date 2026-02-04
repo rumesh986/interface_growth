@@ -119,7 +119,7 @@ class Erf2DProblem : public Problem {
 
 			add_time_stepper_pt(new BDF<T_ORDER>(true));
 
-			geometry = new FreeBoundaryElementUnpinned(xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
+			geometry = new FreeBoundaryElementUnpinned(xs[0], xs[1], xs[2], ys[0], ys[1], X_ORDER, time_stepper_pt());
 
 			printf("x0=%8.6f x1=%8.6f x2=%8.6f\n", geometry->x0(), geometry->x1(), geometry->x2());
 
@@ -243,9 +243,7 @@ class Erf2DProblem : public Problem {
 
 		void actions_before_newton_step() {};
 		void actions_before_newton_convergence_check() {}
-		void actions_after_newton_step() {
-			printf("temp at interface: %e\n", bulk_mesh_pt->boundary_node_pt(4, 0)->value(0));
-		}
+		void actions_after_newton_step() {};
 		void actions_after_newton_solve() {};
 		void actions_after_implicit_timestep() {};
 		
@@ -271,7 +269,7 @@ class Erf2DProblem : public Problem {
 				bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
 			}
 
-			printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
+			printf("[%2u] Setting initial condition at t=%8.6f\n", step, time);
 
 			doc_step(step);
 			step++;
@@ -292,7 +290,7 @@ class Erf2DProblem : public Problem {
 					bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
 				}
 
-				printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
+				printf("[%2u] Setting initial condition at t=%8.6f\n", step, time);
 				doc_step(step);
 				step++;
 			}
@@ -346,7 +344,7 @@ int main(int argc, char **argv) {
 
 	uint Nx1 = 0;
 	uint Nx2 = 0;
-	uint Ny = 10;
+	uint Ny = 1;
 	uint t_steps = 100;
 	double dt = 0.0;
 	double t_shift = 0.0;
