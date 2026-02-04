@@ -336,8 +336,96 @@ class FreeBoundaryElement : public GeneralisedElement,
 		}
 	};
 
+class FreeBoundaryGeometryMulti : public FreeBoundaryGeometry {
+	protected:
+		Vector<Data *> data_pt;
+		const unsigned int free_boundary_index = 0;
+
+		bool destroy_geom_data = false;
+	public:
+		FreeBoundaryGeometryMulti(
+			const double x0,
+			const double x1,
+			const double x2,
+			const double y0,
+			const double y1,
+			const unsigned int nspine,
+			TimeStepper *timestepper = new Steady<0>
+		) : 
+		// GeomObject(2,2, timestepper),
+			FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper) {
+
+			data_pt.clear();
+
+			printf("Making new geom etry data with %u free values\n", nspine);
+			
+			data_pt.resize(2);
+			data_pt[0] = new Data(time_stepper_pt(), nspine);
+			data_pt[1] = new Data(time_stepper_pt(), 4);
+
+			// assume impulsive conditions
+			for (unsigned int t = 0; t < time_stepper_pt()->nprev_values(); t++) {
+				for (unsigned int i = 0; i < nspine; i++)
+					data_pt[0]->set_value(t, i, x1);
+
+				data_pt[1]->set_value(t, 0, x0);
+				data_pt[1]->set_value(t, 1, x2);
+				data_pt[1]->set_value(t, 2, y0);
+				data_pt[1]->set_value(t, 3, y1);
+			}
+
+			data_pt[0]->pin_all();
+			data_pt[1]->pin_all();
+
+			destroy_geom_data = true;
+		}
+
+		~FreeBoundaryGeometryMulti() {
+			if (destroy_geom_data) {
+				for (unsigned int i = 0; i < data_pt.size(); i++) {
+					delete data_pt[i];
+				}
+			}
+		}
+
+		double& x0(const unsigned int &t = 0) const {return *data_pt[1]->value_pt(t, 0);}
+		double& x2(const unsigned int &t = 0) const {return *data_pt[1]->value_pt(t, 1);}
+		double& y0(const unsigned int &t = 0) const {return *data_pt[1]->value_pt(t, 2);}
+		double& y1(const unsigned int &t = 0) const {return *data_pt[1]->value_pt(t, 3);}
+		
+		double& x1(const unsigned int &t = 0) const {return *data_pt[0]->value_pt(t, free_boundary_index);}
+
+		unsigned int ngeom_data() const {return data_pt.size();}
+
+		Data* geom_data_pt(const unsigned &j) {return data_pt[j];}
+
+		const unsigned int& free_index() {return free_boundary_index;}
+		
+		double get_interface(const unsigned int &t) {return x1(t);}
+		double get_interface() {return get_interface(0);}
+
+		void set_interface(const unsigned int &t, double &x) {x1(t) = x;}
+		void set_interface(double &x) {set_interface(0, x);}
+
+		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
+			r[0] = x1(t);
+		}
+
+		void position(const Vector<double> &zeta, Vector<double> &r) const {
+			position(0, zeta, r);
+		}
+
+		void unpin_free_boundary() {
+			data_pt[0]->unpin_all(); // unpin(free_boundary_index);
+		}
+
+		void pin_free_boundary() {
+			data_pt[0]->pin_all(); //pin(free_boundary_index);
+		}
+};
+
 class FreeBoundaryElementUnpinned : public GeneralisedElement,
-									public FreeBoundaryGeometry {
+									public FreeBoundaryGeometryMulti {
 	private:
 		unsigned int boundary_index;
 		unsigned int geometry_index;
@@ -350,8 +438,9 @@ class FreeBoundaryElementUnpinned : public GeneralisedElement,
 			const double x2,
 			const double y0,
 			const double y1,
+			const unsigned int nspine,
 			TimeStepper *timestepper = new Steady<0>
-		) : FreeBoundaryGeometry(x0, x1, x2, y0, y1, timestepper) {
+		) : FreeBoundaryGeometryMulti(x0, x1, x2, y0, y1, nspine, timestepper) {
 
 			boundary_index = 4;
 			geometry_index = add_internal_data(data_pt[0]);
@@ -386,20 +475,28 @@ class FreeBoundaryElementUnpinned : public GeneralisedElement,
 			unsigned int ndofs = ndof();
 			if (ndofs == 0) return;
 
-			int local_eqn = internal_local_eqn(geometry_index, free_boundary_index);
-			for (unsigned int i = 0; i < node_indices.size(); i++) {
+			Data *geom_data = internal_data_pt(geometry_index);
+
+			if (geom_data->nvalue() != node_indices.size()) {
+				printf("Potential problem!!!\n");
+				printf("Number of nodes does not match number of dofs!\n");
+				return;
+			}
+
+			for (unsigned int i = 0; i < geom_data->nvalue(); i++) {
+				int local_eqn = internal_local_eqn(geometry_index, i);
+				if (local_eqn < 0) continue;
+
 				Node *node_pt = dynamic_cast<Node *>(external_data_pt(node_indices[i]));
+				if (node_pt == NULL || !node_pt->is_on_boundary(boundary_index)) continue;
 
-				if (node_pt == NULL) continue;
-				if (!node_pt->is_on_boundary(boundary_index)) continue;
-
-				residuals[local_eqn] += node_pt->value(0);
+				residuals[local_eqn] = node_pt->value(0);
 
 				if (compute_jacobian) {
 					int local_unknown = external_local_eqn(node_indices[i], 0);
 					if (local_unknown < 0) continue;
 
-					jacobian(local_eqn, local_unknown) += 1.0;
+					jacobian(local_eqn, local_unknown) = 1.0;
 				}
 			}
 		}
@@ -774,21 +871,20 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 			Data *geom_data = this->external_data_pt(geometry_index);
 
 			for (unsigned int ipt = 0; ipt < n_ipt; ipt++) {
-				for (unsigned int i = 0; i < n_dim-1; i++) s[i] = this->integral_pt()->knot(ipt, i);
+				for (unsigned int i = 0; i < n_dim; i++) s[i] = this->integral_pt()->knot(ipt, i);
 
 				double J = this->shape_and_test(s, phi, psi);
 				double W = this->integral_pt()->weight(ipt) * J;
-
-				double dhdt = St * geom_data->time_stepper_pt()->time_derivative(1, geom_data, free_boundary_index);
 
 				for (unsigned int n1 = 0; n1 < n_node; n1++) {
 					int local_eqn = this->nodal_local_eqn(n1, 0);
 					if (local_eqn < 0) continue;
 					
-					residuals[local_eqn] -= phi(n1) * dhdt * W;
+					double dhdt = geom_data->time_stepper_pt()->time_derivative(1, geom_data, n1);
+					residuals[local_eqn] -= phi(n1) * St * dhdt * W;
 
 					if (compute_jacobian) {
-						int iface_unknown = this->external_local_eqn(geometry_index, free_boundary_index);
+						int iface_unknown = this->external_local_eqn(geometry_index, n1);
 						if (iface_unknown < 0) continue;
 						jacobian(local_eqn, iface_unknown) -= phi(n1) * St * geom_data->time_stepper_pt()->weight(1, 0) * W;
 					}
