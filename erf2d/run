@@ -45,6 +45,13 @@ if __name__ == '__main__':
 		help='Number of elements to simulate with, accepts multiple in list'
 	)
 
+	parser.add_argument('--nx2',
+		type=int,
+		dest='nx2',
+		# default=100,
+		help='Number of elements to simulate with in liquid phase (be careful, not meant for general use)'
+	)
+
 	parser.add_argument('--ny',
 		type=int,
 		default=1,

@@ -1,12 +1,16 @@
-
 // moving interface
-// calculate as part of solution in newton iterations (hopefully)
+// calculate as part of solution in newton iterations
+// contributions added at interface using faceelements
 // move with spine meshes
-// using proper non-dimensionalized form with non-dimensionalized constants
+// using newer non-dimensionalized form with non-dimensionalized constants 
+//		and seperate alpha, beta scales instead of D and k
 // and corrected temperature scaling
 // still accepts dimensional inputs and outputs non-dimensional
 
 #include <filesystem>
+
+#include "solid/solid_elements.h"
+#include "constitutive.h"
 
 #include "includes.h"
 #include "two_phase_free_boundary_mesh.h"
@@ -14,31 +18,28 @@
 // dimensional parameters
 double _k[2] = {1.0, 0.25}; // thermal conductivity
 double _rho[2] = {1.0, 2.0}; // density
-double _Cp[2] = {1.0, 0.25}; // specific heat
-double L = 1.0; // latent heat of fusion
+double _Cp[2] = {1.0, 0.25}; // specific heats
+double _L = 1.0; // latent heat of fusion
 
-// the above parameters are used to determine the thermal diffusivity below
-// the third value here is the analyical value of the effective diffusivity
-double _D[3] = {0.0, 0.0, 0.0};
+double _D[3] = {0.0, 0.0, 0.0}; // thermal diffusivity (calculated from above quantities)
 
-// dimensionless parameters
-double D = _D[1] / _D[0];
-double D2 = 0.0;
-double k = _k[1] / _k[0];
-double St = 0.0;
+// dimensionless parameters, calculated from above dimensional quantities
+// double D, k, St;
+double D, Beta, Alpha, St;
 
-bool ic_set = false;
+// dimensional temperature values at boundaries
+static const double T_s = -1.0; // x = 0
+static const double T_l =  1.0; // x -> infinity
+static const double T_m =  0.0; // x = h
 
-// boundary temperature values (dimensional)
-static const double T_s = -1.0; // temp at x=0 (solid)
-static const double T_m = 0.0; // melting point x=h(t)
-static const double T_l = 1.0; // temp far away in liquid x->\infty
+static const double Tl = (T_l - T_m) / (T_m - T_s); // dimensionless T_l
 
-// simulation domain
-double xs[3] = {0.0, 0.025, 2.0};
+double xs[3] = {0.0, 0.0, 1.0};
 static const double ys[2] = {0.0, 0.0001};
 
-FreeBoundaryElement *geometry;
+double nu = 0.1;
+
+FreeBoundaryGeometry *geometry;
 
 void no_flux_fct(const double &t, const Vector<double> &x, double &flux) {
 	flux = 0.0;
@@ -48,48 +49,32 @@ void get_source(const double &t, const Vector<double> &x, double &source) {
 	source = 0.0;
 }
 
-// analytical solution
-// u[0] -> solution with interface in current position (from numerical solution)
-// u[1] -> solution with interface position from analytical solution
-void get_exact_u(const double &t, const Vector<double> &x, Vector<double> &u) {
-	double h = geometry->get_interface();
-	double h_ana = sqrt(_D[2] * t);
+void get_exact_u(const double &time, const Vector<double> &x, double &u, bool ana = false) {
+	double h = (ana) ? sqrt(_D[2] * time) : geometry->get_interface();
 
-	// dimensionless temperature far from interface
-	double trans_Tl = (T_l - T_m) / (T_m - T_s);
+	// print();
 
 	if (x[0] < h) {
-		double denom = 0.5 / sqrt(t);
-		u[0] = (erf(x[0] * denom) / erf(h * denom)) - 1.0;
+		// solid phase
+		double denom = 0.5 / sqrt(time);
+		u = (erf(x[0] * denom) / erf(h * denom)) - 1.0;
 	} else {
-		double denom = 0.5 / sqrt(D * t);
-		u[0] = trans_Tl * (erf(x[0] * denom) - erf(h * denom)) / (1.0 - erf(h * denom));
-	}
-
-	if (x[0] < h_ana) {
-		double denom = 0.5 / sqrt(t);
-		u[1] = (erf(x[0] * denom) / erf(h_ana * denom)) - 1.0;
-	} else {
-		double denom = 0.5 / sqrt(D * t);
-		u[1] = trans_Tl * (erf(x[0] * denom) - erf(h_ana * denom)) / (1.0 - erf(h_ana * denom));
+		// liquid phase
+		double denom = 0.5 / sqrt(D * time);
+		u = Tl * (erf(x[0] * denom) - erf(h * denom)) / (1.0 - erf(h * denom));
 	}
 }
 
 Vector<unsigned int> analytical_boundaries = {
-	1, // right
-	// 3, // left
-	// 4 //interface
+
 };
 
 Vector<unsigned int> pinned_boundaries = {
-	3, // left
-	4 // interface
+
 };
 
-map<unsigned int, FluxFctPt> flux_boundaries = {
-	// {0, no_flux_fct},
-	// {2, no_flux_fct},
-	// {1, no_flux_fct},
+std::map<unsigned int, FluxFctPt> flux_boundaries = {
+	
 };
 
 template<class EL>
@@ -100,40 +85,61 @@ class Erf2DProblem : public Problem {
 		double dt, t_shift;
 
 		DocInfo info;
-	
-		TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>> *bulk_mesh_pt;
-		Mesh *geometry_mesh_pt;
 
-		public:
+		TwoPhaseElasticMesh<EL> *bulk_mesh_pt;
+		Mesh *surf_mesh_pt;
+		ConstitutiveLaw *constitutive;
+		// Mesh *geom_mesh_pt;
+	
+	public:
 		Erf2DProblem(
-			unsigned int nx1_,
-			unsigned int nx2_,
-			unsigned int ny_,
-			unsigned int tsteps,
-			double dt_,
-			double tshift,
-			DocInfo info_
-		) : nx1(nx1_), nx2(nx2_), nx(nx1_+nx2_), ny(ny_), t_steps(tsteps), dt(dt_), t_shift(tshift), info(info_) {
+			unsigned int _nx1,
+			unsigned int _nx2,
+			unsigned int _ny,
+			unsigned int _t_steps,
+			double _dt,
+			double _t_shift,
+			DocInfo _info
+		) : nx1(_nx1), nx2(_nx2), nx(_nx1+_nx2), ny(_ny), t_steps(_t_steps), dt(_dt), t_shift(_t_shift), info(_info) {
 
 			add_time_stepper_pt(new BDF<T_ORDER>(true));
-
-			geometry = new FreeBoundaryElement(xs[0], xs[1], xs[2], ys[0], ys[1], St, k, time_stepper_pt());
+			geometry = new FreeBoundaryGeometry(xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
+			geometry->unpin_free_boundary();
 
 			printf("x0=%8.6f x1=%8.6f x2=%8.6f\n", geometry->x0(), geometry->x1(), geometry->x2());
 
-			bulk_mesh_pt = new TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>>(nx1, nx2, ny, geometry, time_stepper_pt());
+			// bulk_mesh_pt = new TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>>(nx1, nx2, ny, geometry, time_stepper_pt());
+			bulk_mesh_pt = new TwoPhaseElasticMesh<EL>(nx1, nx2, ny, xs[0], xs[1], xs[2], ys[0], ys[1], time_stepper_pt());
 			bulk_mesh_pt->setup_boundary_element_info();
 			add_sub_mesh(bulk_mesh_pt);
 
-			geometry_mesh_pt = new Mesh;
-			geometry_mesh_pt->add_element_pt(geometry);
-			add_sub_mesh(geometry_mesh_pt);
+			surf_mesh_pt = new Mesh;
+			unsigned int nbound4 = bulk_mesh_pt->nboundary_element(4);
+			for (unsigned int e = 0; e < nbound4; e++) {
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
+				int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
+				if (face_index == 1) {
+					EL *elem2 = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e+1));
+					auto flux_elem = new FreeBoundaryFluxElement<EL>(elem, elem2, face_index, St, time_stepper_pt());
+					surf_mesh_pt->add_element_pt(flux_elem);
+				}
+			}
+			add_sub_mesh(surf_mesh_pt);
+
+			constitutive = new GeneralisedHookean(&nu);
+
+			// geom_mesh_pt = new Mesh;
+			// geom_mesh_pt->add_element_pt(geometry);
+			// add_sub_mesh(geom_mesh_pt);
 
 			build_global_mesh();
 
-			for (unsigned int e = 0; e < bulk_mesh_pt->nelement(); e++)
-				dynamic_cast<EL *>(bulk_mesh_pt->element_pt(e))->source_fct_pt() = get_source;
-			
+			for (unsigned int e = 0; e < bulk_mesh_pt->nelement(); e++) {
+				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->element_pt(e));
+				elem->source_fct_pt() = get_source;
+				elem->constitutive_law_pt() = constitutive;
+			}
+
 			// set boundary conditions
 			for (unsigned int b : pinned_boundaries) {
 				unsigned long int nnode = bulk_mesh_pt->nboundary_node(b);
@@ -154,12 +160,14 @@ class Erf2DProblem : public Problem {
 			for (unsigned int yi = 0; yi < ny; yi++) {
 				unsigned int base = yi * nx;
 				
-				for (unsigned int e = nx1; e < nx; e++)
-					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &D;
+				for (unsigned int e = nx1; e < nx; e++) {
+					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->alpha_pt() = &Alpha;
+					dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e))->beta_pt() = &Beta;
+				}
 			}
 
-			geometry->add_phase1_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1-1)));
-			geometry->add_phase2_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1)));
+			// geometry->add_phase1_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1-1)));
+			// geometry->add_phase2_element(dynamic_cast<EL *>(bulk_mesh_pt->element_pt(nx1)));
 
 			printf("Total number of equations: %lu\n", assign_eqn_numbers());
 			printf("NDOF: %lu\n", ndof());
@@ -168,7 +176,8 @@ class Erf2DProblem : public Problem {
 			disable_info_in_newton_solve();
 			// newton_solver_tolerance() = 1e-7 * dt;
 			newton_solver_tolerance() = 5e-10;
-			max_newton_iterations() = 1e7;
+			// max_newton_iterations() = 1e7;
+			max_newton_iterations() = 1e4;
 			max_residuals() = 1e3;
 
 			printf("tolerance for newton: %e\n", newton_solver_tolerance());
@@ -176,7 +185,8 @@ class Erf2DProblem : public Problem {
 
 		~Erf2DProblem() {
 			delete bulk_mesh_pt;
-			delete geometry_mesh_pt;
+			delete surf_mesh_pt;
+			// delete geom_mesh_pt;
 		}
 
 		// Neumann boundaries need special flux elements associated at the boundaries
@@ -192,30 +202,9 @@ class Erf2DProblem : public Problem {
 			}
 		}
 
-		void actions_before_newton_solve() {
-			// double De_sqrt_estimate = geometry->get_interface() / sqrt(time_pt()->time()-dt);
-			time_stepper_pt()->set_predictor_weights();
-			time_stepper_pt()->calculate_predicted_values(geometry->geom_data_pt(0));
-			
-			// double h_est = De_sqrt_estimate * sqrt(time_pt()->time() - 0.5*dt);
-			double h_pred = geometry->x1(time_stepper_pt()->predictor_storage_index());
-			// double h_ana = sqrt(_D[2] * time_pt()->time());
-
-			// printf("[BSolve] setting interface estimate to %16.14f at time=%8.6f (analytical: %16.14f, predicted: %16.14f)\n", h_est, time_pt()->time(), h_ana, h_pred);
-			// printf("\terror in estimate: %e\n\terror in prediction: %e\n", fabs(h_ana - h_est), fabs(h_ana - h_pred));
-
-			geometry->set_interface(h_pred);
-
-			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
-				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
-			}
-
-			bulk_mesh_pt->node_update();
-		};
-		void actions_after_newton_solve() {};
-
 		void actions_before_implicit_timestep() {
-			Vector<double> x(2), u(2);
+			Vector<double> x(2);
+			double u;
 
 			double time = time_pt()->time();
 
@@ -223,60 +212,46 @@ class Erf2DProblem : public Problem {
 				unsigned long int nnode = bulk_mesh_pt->nboundary_node(b);
 				for (unsigned long int n = 0; n < nnode; n++) {
 					bulk_mesh_pt->boundary_node_pt(b, n)->position(x);
-					get_exact_u(time, x, u);
-					bulk_mesh_pt->boundary_node_pt(b,n)->set_value(0, u[1]);
+					get_exact_u(time, x, u, true);
+					bulk_mesh_pt->boundary_node_pt(b,n)->set_value(0, u);
 				}
 			}
 		}
-		void actions_after_implicit_timestep() {};
 
-		void actions_before_newton_step() {};
-		
-		// calculate flux and store flux
-		void actions_before_newton_convergence_check() {
-			// Vector<double> flux(2);
-
-			// double tot_flux = 0.0;
-			// unsigned long int nelems = bulk_mesh_pt->nboundary_element(4);
-
-			// Vector<double> s(2);
-			// s[1] = 0.0;
+		void actions_before_newton_solve() {
+			time_stepper_pt()->set_predictor_weights();
+			time_stepper_pt()->calculate_predicted_values(geometry->geom_data_pt(0));
 			
-			// for (unsigned long int e = 0; e < nelems; e++) {
-			// 	int face_index = bulk_mesh_pt->face_index_at_boundary(4, e);
-			// 	EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(4, e));
-				
-			// 	double factor = 0.0;
-			// 	if (face_index == 1) {
-			// 		s[0] = 1.0;
-			// 		factor = 1.0;
-			// 	} else if (face_index == -1) {
-			// 		s[0] = -1.0;
-			// 		factor = -k;
-			// 	}
+			double h_pred = geometry->x1(time_stepper_pt()->predictor_storage_index());
 
-			// 	elem->get_flux(s, flux);
-			// 	tot_flux += factor * flux[0];
+			geometry->set_interface(h_pred);
+			// for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+			// 	bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
 			// }
-			
-			// // double latent_est = St * time_stepper_pt()->time_derivative(1, geometry->internal_data_pt(0), 1);
-			// // printf("[BConv1] flux=%16.14f h=%16.14f Stdhdt=%16.14f diff=%e\n", tot_flux / ny, geometry->get_interface(), latent_est, fabs(tot_flux - latent_est));
-			
-			// geometry->set_flux(tot_flux / ny);
+
+			// bulk_mesh_pt->node_update();
 		}
 
+		void actions_before_newton_step() {}
+
+		void actions_before_newton_convergence_check() {}
+		
 		// update node positions after each newton step
 		void actions_after_newton_step() {
-			for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
-				bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
-			}
+			// for (unsigned s = 0; s < bulk_mesh_pt->nspine(); s++) {
+			// 	bulk_mesh_pt->spine_pt(s)->height() = geometry->x1();
+			// }
 
-			bulk_mesh_pt->node_update();
+			// bulk_mesh_pt->node_update();
 		}
+
+		void actions_after_newton_solve() {}
+
+		void actions_after_implicit_timestep() {}
 
 		void set_initial_condition() {
 			Vector<double> x(2);
-			Vector<double> u(2);
+			double u;
 			
 			unsigned int tsteps = time_stepper_pt()->nprev_values();
 			unsigned long int nnode = bulk_mesh_pt->nnode();
@@ -292,8 +267,8 @@ class Erf2DProblem : public Problem {
 
 			for (unsigned int n = 0; n < nnode; n++) {
 				bulk_mesh_pt->node_pt(n)->position(x);
-				get_exact_u(time, x, u);
-				bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
+				get_exact_u(time, x, u, true);
+				bulk_mesh_pt->node_pt(n)->set_value(0, u);
 			}
 
 			printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
@@ -308,13 +283,15 @@ class Erf2DProblem : public Problem {
 				time_pt()->dt() = dt;
 				h = sqrt(_D[2] * time);
 				
-				geometry->set_interface(h);
+				// geometry->set_interface(h);
+				printf("[%u] updating nodes at t=%f\n", step, time);
 				bulk_mesh_pt->node_update();
+				printf("[%u] finished updating nodes at t=%f\n", step, time);
 
 				for (unsigned int n = 0; n < nnode; n++) {
 					bulk_mesh_pt->node_pt(n)->position(x);
-					get_exact_u(time, x, u);
-					bulk_mesh_pt->node_pt(n)->set_value(0, u[1]);
+					get_exact_u(time, x, u, true);
+					bulk_mesh_pt->node_pt(n)->set_value(0, u);
 				}
 
 				printf("[%2u] Setting initial confition at t=%8.6f\n", step, time);
@@ -323,7 +300,6 @@ class Erf2DProblem : public Problem {
 			}
 
 			time_pt()->time() = time;
-			ic_set = true;
 		}
 
 		void doc_step(const unsigned int &timestep, const unsigned int &t = 0) {
@@ -331,7 +307,7 @@ class Erf2DProblem : public Problem {
 			unsigned long int nnode = bulk_mesh_pt->nnode();
 
 			Vector<double> x(2);
-			Vector<double> exact_u(2);
+			double exact_u;
 			Vector<double> numerical_u(1);
 
 			double tot_error = 0.0;
@@ -342,12 +318,12 @@ class Erf2DProblem : public Problem {
 			for (unsigned long int n = 0; n < nnode; n++) {
 				bulk_mesh_pt->node_pt(n)->position(t, x);
 				bulk_mesh_pt->node_pt(n)->value(t, numerical_u);
-				get_exact_u(time, x, exact_u);
+				get_exact_u(time, x, exact_u, true);
 
-				double error = numerical_u[0] - exact_u[1];
+				double error = numerical_u[0] - exact_u;
 				tot_error += error * error;
 
-				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u[1], numerical_u[0], error);
+				fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", x[0], x[1], exact_u, numerical_u[0], error);
 			}
 			fclose(file);
 
@@ -356,22 +332,25 @@ class Erf2DProblem : public Problem {
 			double max_elem_size, min_elem_size;
 			bulk_mesh_pt->max_and_min_element_size(max_elem_size, min_elem_size);
 
+			double iface_loc = bulk_mesh_pt->boundary_node_pt(4, 0)->x(0);
+
 			sprintf(fname, "%s/results.dat", info.directory().c_str());
 			file = fopen(fname, "a");
-			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, geometry->get_interface(), sqrt(_D[2]*time), max_elem_size/ys[1]);
+			fprintf(file, "%16.14f %16.14f %16.14f %16.14f %16.14f\n", time, tot_error, iface_loc, sqrt(_D[2]*time), max_elem_size/ys[1]);
 			fclose(file);
 
-			printf("[%4u] time=%8.6f error=%10.8e iface_err=%10.8e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(geometry->get_interface() - sqrt(_D[2] * time)), geometry->get_interface(), sqrt(_D[2]*time));
+			printf("[%4u] time=%8.6f error=%10.8e iface_err=%10.8e interface=%16.14f expected=%8.6f\n", timestep, time, tot_error, fabs(iface_loc - sqrt(_D[2] * time)), iface_loc, sqrt(_D[2]*time));
 			info.number()++;
 		}
 };
+
 
 int main(int argc, char **argv) {
 	CommandLineArgs::setup(argc, argv);
 
 	uint Nx1 = 0;
 	uint Nx2 = 0;
-	uint Ny = 10;
+	uint Ny = 1;
 	uint t_steps = 100;
 	double dt = 0.0;
 	double t_shift = 0.0;
@@ -393,7 +372,7 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--rho2", &_rho[1]);
 	CommandLineArgs::specify_command_line_flag("--cp1", &_Cp[0]);
 	CommandLineArgs::specify_command_line_flag("--cp2", &_Cp[1]);
-	CommandLineArgs::specify_command_line_flag("--L", &L);
+	CommandLineArgs::specify_command_line_flag("--L", &_L);
 	CommandLineArgs::specify_command_line_flag("--De", &_D[2]);
 	CommandLineArgs::specify_command_line_flag("--dname", &dname, "doc");
 
@@ -463,9 +442,11 @@ int main(int argc, char **argv) {
 	
 	for (int i = 0; i < 2; i++) _D[i] = _k[i]/(_Cp[i]*_rho[i]);
 
-	D = _D[1] / _D[0];
-	k = _k[1] / _k[0];
-	St = L / (_Cp[0] * (T_m - T_s));
+	// D = _D[1] / _D[0];
+	Alpha = (_Cp[1]*_rho[1]) / (_Cp[0] * _rho[0]);
+	Beta = _k[1] / _k[0];
+	D = Beta / Alpha;
+	St = _L / (_Cp[0] * (T_m - T_s));
 
 	printf("Problem Def:\n");
 	printf("\tk1=%8.6f k2=%8.6f\n", _k[0], _k[1]);
@@ -473,10 +454,11 @@ int main(int argc, char **argv) {
 	printf("\tCp1=%8.6f Cp2=%8.6f\n", _Cp[0], _Cp[1]);
 	printf("\tD1=%e D2=%e De=%e\n", _D[0], _D[1], _D[2]);
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", xs[0], xs[1], xs[2]);
-	printf("\tL=%8.6f D=%8.6f k=%8.6f St=%8.6f\n", L, D, k, St);
+	printf("\tL=%8.6f alpha=%8.6f beta=%8.6f St=%8.6f\n", _L, Alpha, Beta, St);
 
 	// Nx2 = Nx1;
-	auto problem = Erf2DProblem<QUnsteadyHeatElement<2,X_ORDER>>(Nx1, Nx2, Ny, t_steps, dt, t_shift, info);
+	// auto problem = Erf2DProblem<QUnsteadyHeatElement<2,X_ORDER>>(Nx1, Nx2, Ny, t_steps, dt, t_shift, info);
+	auto problem = Erf2DProblem<PseudoSolidNodeUpdateElement<QUnsteadyHeatElement<2,X_ORDER>, QPVDElement<2, X_ORDER>>>(Nx1, Nx2, Ny, t_steps, dt, t_shift, info);
 
 	problem.initialise_dt(dt);
 	problem.set_initial_condition();
@@ -501,7 +483,7 @@ int main(int argc, char **argv) {
 	fprintf(file, "rho2=%10.8f\n", _rho[1]);
 	fprintf(file, "cp1=%10.8f\n", _Cp[0]);
 	fprintf(file, "cp2=%10.8f\n", _Cp[1]);
-	fprintf(file, "L=%10.8f\n", L);
+	fprintf(file, "L=%10.8f\n", _L);
 	fprintf(file, "De=%e\n", _D[2]);
 	fclose(file);
 
