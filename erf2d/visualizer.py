@@ -304,7 +304,8 @@ class Visualizer:
 				self.plot_de(run)
 				self.plot_interface_temp(run)
 			
-			self.make_surf_profile_anim(run)
+			self.make_surf_profile_anim_zoom(run)
+			# self.make_surf_profile_anim(run)
 
 		except:
 			raise Exception(f"Crashing while processing {run.config}")
@@ -811,6 +812,161 @@ class Visualizer:
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
 		plt.close(fig)
 
+	def make_surf_profile_anim_zoom(self, run):
+		def _extract_data(data):
+			ys = data['y'].unique()
+			ref_y = ys[ys.shape[0] //2]
+
+			mask = np.isclose(data['y'].values, ref_y)
+
+			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
+
+		def _update(n):
+			time_text.set_text(f't={run.times[n]:6.4f}')
+
+			data = _extract_data(run.solns[n])
+			exact_data = _extract_data(run.exact_solns[n])
+			errors = _extract_data(run.errors[n])
+
+			# account for repeated points 
+			# 	avoids a line crossing the plot unnecessarily
+			num_points = len(data['x'])
+			if len(data['x']) != len(data['x'].unique()):
+				num_points //= 2
+
+			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
+			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
+
+			line_soln_zoom.set_data(data['x'][:num_points], data['u'][:num_points])
+			line_exact_zoom.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
+
+			if not self.report:
+				line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+				diff_zoom_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+
+				# if run.config.params['nx1'] < 20:
+				nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+				if nx1 < 15:
+					nx1 = 15
+				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
+
+				line_diff_zoom.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				nodes_prof_zoom.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff_zoom.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
+
+			if run.interface is not None:
+				line_interface.set_xdata([run.interface[n]])
+				line_interface_zoom.set_xdata([run.interface[n]])
+				if not self.report:
+					diff_interface.set_xdata([run.interface[n]])
+					diff_interface_zoom.set_xdata([run.interface[n]])
+			
+			if 'expected_interface' in run.results.columns:
+				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
+				line_interface_exp_zoom.set_xdata([run.results['expected_interface'][n]])
+				if not self.report:
+					diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
+					diff_interface_exp_zoom.set_xdata([run.results['expected_interface'][n]])
+			
+			prof_zoom_ax.set_xlim([run.interface[n]-1e-7, run.interface[n]+1e-7])
+			diff_zoom_ax.set_xlim([run.interface[n]-1e-7, run.interface[n]+1e-7])
+		
+		plt.cla()
+		
+		if self.report:
+			fig, prof_ax = plt.subplots(1, figsize=(10,5))
+		else:
+			mosaic = [
+				['prof', 'prof_zoom'],
+				['diff', 'diff_zoom']
+			]
+
+			fig, axs = plt.subplot_mosaic(mosaic, figsize=(16,10))
+
+			prof_ax = axs['prof']
+			diff_ax = axs['diff']
+
+			prof_zoom_ax = axs['prof_zoom']
+			diff_zoom_ax = axs['diff_zoom']
+
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}',
+			xy=(0.6,0.9),
+			xycoords='axes fraction'
+		)
+
+		data = _extract_data(run.solns[0])
+		exact_data = _extract_data(run.exact_solns[0])
+		errors = _extract_data(run.errors[0])
+
+		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
+
+		line_soln_zoom = prof_zoom_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		line_exact_zoom = prof_zoom_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
+
+		if not self.report:
+			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+			line_diff_zoom = diff_zoom_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+			nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+			if nx1 < 15:
+				nx1 = 15
+			# if run.config.params['nx1'] < 21:
+			nodes_prof = prof_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff = diff_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+
+			nodes_prof_zoom = prof_zoom_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff_zoom = diff_zoom_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+
+		if run.interface is not None:
+			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			line_interface_zoom = prof_zoom_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			if not self.report:
+				diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+				diff_interface_zoom = diff_zoom_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		
+		if 'expected_interface' in run.results.columns:
+			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
+			line_interface_exp_zoom = prof_zoom_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
+			if not self.report:
+				diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+				diff_interface_exp_zoom = diff_zoom_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+		
+		for pos in run.config.fixed_pos:
+			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
+
+		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
+
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_xlim([data['x'].min()-0.1, data['x'].max()])
+		prof_ax.set_ylabel('Temperature')
+
+		prof_zoom_ax.set_ylim([-0.3, 0.3])
+		prof_zoom_ax.set_xlim([run.interface[0]-0.05, run.interface[0]+0.05])
+		diff_zoom_ax.set_xlim([run.interface[0]-0.05, run.interface[0]+0.05])
+		prof_zoom_ax.set_ylabel('Temperature')
+
+		if self.report:
+			box = prof_ax.get_position()
+			prof_ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
+			plt.tight_layout()
+		else:
+			prof_ax.legend(loc='upper left')
+			prof_ax.set_title('Temperature profile')
+
+		if not self.report:
+			diff_ax.set_xlabel('x')
+			diff_ax.set_ylabel('Error')
+			diff_ax.set_title('Error in profile')
+			diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
+		plt.close(fig)
+
 	# plot 1D data (for older erf code that was run with 1D elements)
 	def make_anims(self, run):
 		def _update(n):
@@ -937,7 +1093,7 @@ class Visualizer:
 					# ref_power = df['x_order'].iloc[0] - 0.8
 					ref_power = 1.0
 				else:
-					ref_power = x - 0.8
+					ref_power = x
 			else:
 				ref_power = x
 
