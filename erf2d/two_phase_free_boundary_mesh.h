@@ -409,6 +409,16 @@ class FreeBoundaryGeometryMulti : public FreeBoundaryGeometry {
 
 		void position(const unsigned int &t, const Vector<double> &zeta, Vector<double> &r) const {
 			r[0] = x1(t);
+
+			// unsigned int nnode = data_pt[0]->nvalue();
+			// unsigned int node = (unsigned int) ((((zeta[0] / (y1() - y0())) * 10) / 10) * (nnode-1));
+			// // printf("\tt=%u y0=%8.6f y1=%8.6f y=%8.6f, frac=%8.6f node=%u nnode=%u h=%16.14f\n", t, y0(), y1(), zeta[0], zeta[0] / (y1() - y0()), node, nnode, data_pt[0]->value(node));
+			// r[0] = data_pt[0]->value(node);
+
+
+			// if (zeta[0] < eps) r[0] = data_pt[0]->value(0);
+			// else if ((zeta[0] - a) < eps) r[0] = data_pt[0]->value(1);
+			
 		}
 
 		void position(const Vector<double> &zeta, Vector<double> &r) const {
@@ -807,16 +817,21 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 
 		// assign position for each node based on location of interface
 		void spine_node_update(SpineNode *node_pt) {
-			FreeBoundaryGeometry *geom = dynamic_cast<FreeBoundaryGeometry *>(node_pt->spine_pt()->geom_object_pt(0));
+			GeomObject *geom = node_pt->spine_pt()->geom_object_pt(0);
+			// FreeBoundaryGeometry *geom = dynamic_cast<FreeBoundaryGeometry *>(node_pt->spine_pt()->geom_object_pt(0));
 			double frac = node_pt->fraction();
 			Vector<double> zeta(1), r(1);
-
-			zeta[0] = 0.0;
+			
+			zeta[0] = node_pt->position(1);
 			geom->position(zeta, r);
 
+			double x0 = geom->geom_data_pt(1)->value(0);
+			double x1 = r[0];
+			double x2 = geom->geom_data_pt(1)->value(1);
+
 			switch (node_pt->node_update_fct_id()) {
-				case 0: node_pt->x(0) = (1.0 - frac) * geom->x0() + frac * r[0];	break; // solid phase
-				case 1: node_pt->x(0) = (1.0 - frac) * r[0] + frac * geom->x2();	break; // liquid phase
+				case 0: node_pt->x(0) = x0 + frac * (x1 - x0);	break; // solid phase
+				case 1: node_pt->x(0) = x1 + frac * (x2 - x1);	break; // liquid phase
 				default:
 					printf("Invalid node update function\n");
 					break;
