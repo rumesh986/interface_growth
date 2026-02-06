@@ -55,13 +55,15 @@ class _Config:
 # class to hold results from each run
 class _RunData:
 	_STEP_HEADERS = ['x', 'y', 'exact', 'u', 'error']
-	_OVERALL_HEADERS = ['time', 'error', 'interface']
+	_OVERALL_HEADERS = ['time', 'error', 'interface', 'expected_interface', 'dx']
+	# _OVERALL_HEADERS = ['time', 'error', 'interface']
 
 	def __init__(
 		self,
 		inp_folder,
 		out_folder,
 		load_data=True,
+		reference=None,
 		stepsf='steps/step',
 		configf='config',
 		resultsf='results',
@@ -79,6 +81,7 @@ class _RunData:
 			self.results = pd.read_csv(f'{self.inp_folder}/{self.resultsf}.{self.ext}', sep=' ', names=self._OVERALL_HEADERS)	
 			self.times = self.results['time']
 			self.interface = self.results['interface']
+			self.interface_errors = np.fabs(self.results['interface'] - self.results['expected_interface'])
 		except FileNotFoundError as e:
 			print("Results file not found")
 			raise e
@@ -99,11 +102,43 @@ class _RunData:
 
 				self.data.append(data)
 		else:
-			i = len(self.results['time']) - 1
+			if reference is None:
+				i = len(self.results['time']) - 1
 
-			data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
-			data['time'] = self.results['time'].values[-1]
-			self.solns.append(data[['time', 'x', 'y', 'u']])
+				data = pd.read_csv(f'{inp_folder}/{stepsf}{i}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+				data['time'] = self.results['time'].values[-1]
+				self.solns.append(data[['time', 'x', 'y', 'u']])
+			else:
+				step = reference.config.nx // self.config.nx
+				count = 0
+				print(f"Reference nx = {reference.config.nx} self nx = {self.config.nx} step = {step}")
+				
+				count = 0
+				for t, time in enumerate(reference.times):
+					if time not in self.times.values:
+						continue
+					
+					# print(f'[{self.config.nx}] {t =}')
+					data = pd.read_csv(f'{inp_folder}/{stepsf}{t}.{self.ext}', sep=' ', names=self._STEP_HEADERS)
+					data['time'] = t
+
+					_, _, ref_2d = self._reshape_2D_data(reference.solns[t], 'u')
+					_, _, data_2d = self._reshape_2D_data(data, 'u')
+
+					_, _, ref_2dx = self._reshape_2D_data(reference.solns[t], 'x')
+					_, _, data_2dx = self._reshape_2D_data(data, 'x')
+
+					errors = np.zeros(data_2d.shape)
+					xerrors = np.zeros(data_2d.shape)
+					for i in range(data_2d.shape[1]):
+						errors[:, i] = data_2d[:, i] - ref_2d[:, i*step]
+						xerrors[:, i] = data_2dx[:, i] - ref_2dx[:, i*step]
+
+					print(f'[{self.config.nx}][{t}] errors={np.linalg.norm(errors)} xerrors={np.linalg.norm(xerrors)}')
+					self.results['error'][count] = np.linalg.norm(errors)
+					count += 1
+				
+				print(self.results)
 
 	@property
 	def title(self):
@@ -117,7 +152,12 @@ class _RunData:
 	# node at which errors is max at a certain step is chosen
 	@property
 	def error_max(self):
-		node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 1 # node at highest error some steps after start of simulation
+		try:
+			node = np.argmax(np.fabs(self.errors[10]['error'][1:])) + 3 # node at highest error some steps after start of simulation
+		except:
+			print("Not enough steps, choosing first available step")
+			node = np.argmax(np.fabs(self.errors[0]['error'][1:])) + 3 # node at highest error at start of simulation
+
 		errors = np.array([df['error'][node] for df in self.errors])
 		exact = np.array([df['u'][node] for df in self.exact_solns])
 		mask = exact != 0.0
@@ -130,16 +170,47 @@ class _RunData:
 	# normalized error for whole run
 	@property
 	def total_error_norm(self):
-		return np.linalg.norm(self.results['error'])/len(self.results['error'])
+		return np.linalg.norm(self.results['error'][self.config.t_order+1:])/len(self.results['error'][self.config.t_order+1:])
+
+	@property
+	def interface_error_norm(self):
+		return np.linalg.norm(self.interface_errors) / len(self.interface_errors)
 
 	# create folder to store plots
 	def create_outdir(self):
 		if not os.path.exists(self.out_folder):
 			os.mkdir(self.out_folder)
 
+	# helper method to reshape the data into 2D for easy access
+	# function has been optimised to reduce time with pandas operations
+	def _reshape_2D_data(self, data, key):
+		xs = data['x'].unique()
+		ys = data['y'].unique()
+		u = np.zeros((len(ys), len(xs)))
+		
+		# the loop below has some odd pandas operations, this was done to optimize it
+		# pandas seems to be pretty slow and you can get a significant speedup by changing how you interact with it
+		for j, y in enumerate(ys):
+			# optimized way of filtering dataframe
+			mask1 = data['y'].values == y
+			d2 = pd.DataFrame(data.values[mask1], data.index[mask1], data.columns)
+			for i, x in enumerate(xs):
+				# access by index to avoid creating another dataframe
+				mask2 = np.isclose(d2['x'].values, x)
+				# print(f'{j} {i} {mask2}')
+				try:
+					index = mask2.nonzero()[0][0]
+				except IndexError:
+					print(f"{j=} {i=}")
+					raise Exception("Its failing again")
+
+				u[j,i] = d2[key].iloc[index]
+		
+		return xs, ys, u
+
 # Main class to handle post-processing
 class Visualizer:
-	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False):
+	def __init__(self, prefix, dxdt, resd='RESLT', outd='imgs', stylef='pltstyle.mplstyle', interactive=False, reference=None):
 		self.prefix = prefix
 		self.dxdt = dxdt
 		self.resd = resd
@@ -154,6 +225,13 @@ class Visualizer:
 		# set stylesheet for plots
 		plt.style.use(f'../../{stylef}')
 
+		self.reference = None
+		if reference is not None:
+			for rundir in os.listdir(f'../../{reference}/{self.resd}'):
+				rund = f'../../{reference}/{self.resd}/{rundir}'
+				if os.path.isdir(rund):
+					self.reference = _RunData(rund, f'{self.outd}/reference', True)
+
 		# prepare run data
 		for rundir in os.listdir(self.resd):
 			rund = f'{self.resd}/{rundir}'
@@ -162,7 +240,7 @@ class Visualizer:
 
 			print(f'Processing results in {rund}')
 
-			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', 'a' in self.dxdt))
+			self.runs.append(_RunData(rund, f'{self.outd}/{rundir}', 'a' in self.dxdt, reference=self.reference))
 		
 		# create output directories if needed
 		if 'a' in self.dxdt:
@@ -172,40 +250,62 @@ class Visualizer:
 		# perform all post-processing if run in script mode
 		if not self.interactive:
 			self.prepare_pd()
-			for rtype in self.dxdt:
-				match rtype:
-					case 'a': self.standard()
-					case x if x in 'bxt': self.plot_analysis(x)
-					case 's': self.sensitivity_analysis()
+
+			if 'a' in self.dxdt:
+				self.standard()
+			elif 's' in self.dxdt:
+				self.sensitivity_analysis()
+			else:
+				self.plot_interfaces()
+				self.plot_analysis()
+				self.dxdt += 'i'
+				self.plot_analysis()
+
+			# for rtype in self.dxdt:
+			# 	match rtype:
+			# 		case 'a': self.standard()
+			# 		case x if x in 'ibxt': 
+			# 			self.plot_interfaces()
+			# 			self.plot_analysis(x)
+			# 		case 's': self.sensitivity_analysis()
 
 	# collect information about all runs, needed for analysis processing
 	def prepare_pd(self):
-		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error'])
+		self._pd = pd.DataFrame(columns=['x_order', 't_order', 'dx', 'dt', 'error', 'interface_error'])
 		config = lambda inp: (inp.x_order, inp.t_order, 1/inp.nx, inp.dt)
 
 		for i, run in enumerate(self.runs):
 			x_order, t_order, dx, dt = config(run.config)
-			# get largest dx for dx analysis
-			# phase 1 of the final step is assumed to have the largest dx of the simulation
-			# phase 1 is the growing phase (solid phase)
 			if 'x' in self.dxdt:
-				dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
-			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm]
+				# get largest dx for dx analysis
+				# phase 1 of the final step is assumed to have the largest dx of the simulation
+				# phase 1 is the growing phase (solid phase)
+				# dx = run.solns[-1]['x'][x_order-1] - run.solns[-1]['x'][0]
+
+				# In newer versions, the maximum element size (calculated by oomph-lib) is stored in the results file
+				dx = run.results['dx'].values.max()
+			self._pd.loc[i] = [x_order, t_order, dx, dt, run.total_error_norm, run.interface_error_norm]
 
 	# post-processing for individual runs (part of 'a' type runs)
 	def _make(self, run):
 		try:
 			# self.make_anims(run)
-			# self.plot_errors(run)
-			self.plot_error_norms(run)
+			self.plot_errors(run)
+			# self.plot_error_norms(run)
 			# cProfile.runctx("self.make_surf_anims(run)", {"self": self}, {"run": run}, sort='cumtime')
 			# self.make_surf_anims(run)
 			# self.make_results_surf(run)
-			# self.make_surf_profile_anim(run)
-			self.subplot_surf_prof(run)
-			self.subplot_mesh(run)
+			if self.report:
+				self.subplot_surf_prof(run)
+			if run.config.nx == 20:
+				self.subplot_mesh(run)
 			if (run.interface is not None):
 				self.plot_interface(run)
+				self.plot_de(run)
+				self.plot_interface_temp(run)
+			
+			self.make_surf_profile_anim_zoom(run)
+			# self.make_surf_profile_anim(run)
 
 		except:
 			raise Exception(f"Crashing while processing {run.config}")
@@ -282,8 +382,13 @@ class Visualizer:
 
 		plt.cla()
 
-		fig, ax = plt.subplots(1)
-		ax.plot(run.times, run.interface, label='Interface position')
+		if self.report:
+			fig, iface_ax = plt.subplots(1)
+		else:
+			fig, (iface_ax, err_ax) = plt.subplots(2, figsize=(7,10))
+			err_ax2 = err_ax.twinx()
+		
+		iface_ax.plot(run.times, run.interface, label='Interface position')
 
 		try:
 			# perform curve-fitting and plot results
@@ -292,16 +397,37 @@ class Visualizer:
 			y_ref = f(x_ref, optimal[0], optimal[1])
 
 			print(f'{run.title} D_eff = {optimal[0]}')
-			plt.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.2f} * t}} + {optimal[1]:.2f}$')
+			# iface_ax.plot(x_ref, y_ref, ls='--', label=fr'$y=\sqrt{{{optimal[0]:.6e} * t}} + {optimal[1]:.2f}$')
+			iface_ax.plot(x_ref, y_ref, ls='--', label=fr'Fit $D_e={{{optimal[0]:.4e}}}$')
 		except:
 			print("Failed to fit h-curve")
 
-		ax.legend()
-		ax.set_xlabel('time')
-		ax.set_ylabel('interface posiion h(t)')
+		if 'expected_interface' in run.results.columns:
+			if 'De' in run.config.params.keys():
+				# label = fr'Analytical $y=\sqrt{{{run.config.params["De"]:.6e} t}}$'
+				label = fr'Analytical $D_e={{{run.config.params["De"]:.4e}}}$'
+			else:
+				label = 'analytical'
+			iface_ax.plot(run.results['time'], run.results['expected_interface'], label=label, ls=':')
 
+			if not self.report:
+				abs_plot, = err_ax.plot(run.results['time'], run.interface_errors, label='Absolute Error')
+				rel_plot, = err_ax2.plot(run.results['time'], run.interface_errors / run.results['expected_interface'], label='Relative Error', c='C1')
+				
+				err_ax.legend(handles=[abs_plot, rel_plot])
+			
+		iface_ax.legend()
+		iface_ax.set_xlabel('time')
+		iface_ax.set_ylabel(r'interface posiion $h(t)$')
+		
+		# err_ax.set_yscale('log')
 		if not self.report:
-			ax.set_title('Interface position with time')
+			err_ax.set_xlabel('Time')
+			err_ax.set_ylabel('Absolute Error')
+			err_ax2.set_ylabel('Relative error')
+
+			iface_ax.set_title('Interface position with time')
+			err_ax.set_title('Error in interface position')
 
 		fig.savefig(f'{run.out_folder}/{self.prefix}-interface.png')
 
@@ -332,6 +458,10 @@ class Visualizer:
 			ax.plot(x_ref[::3], y_ref[::3], marker=self._markers[0], ls='', ms=10, label=fr'$y=\sqrt{{{optimal[0]:.4f} * t}} + {optimal[1]:.4f}$')
 		except:
 			print("Failed to fit interface curve")
+		
+		if 'expected_interface' in self.runs[0].results.columns:
+			plt.plot(self.runs[0].results['time'], self.runs[0].results['expected_interface'], label='analytical', ls=':')
+
 
 		ax.set_xlabel('time')
 		ax.set_ylabel('Interface position $h(t)$')
@@ -350,7 +480,49 @@ class Visualizer:
 			plt.show()
 		
 		plt.close()
+
+	def plot_de(self, run):
+		def f(x, a, b):
+			return np.sqrt(x * a) + b
+
+		optimal, _ = scopt.curve_fit(f, run.times, run.interface, p0=[1.0, 0.0])
+		
+		De = np.square(run.interface) / run.times
+		# print(De)
+		# print(run.config.params['De'])
+
+		plt.plot(De[4:], label='Instantaneous De')
+		plt.axhline(run.config.params['De'], c='C1', linestyle='--', label='Analytical')
+		plt.axhline(optimal[0], c='C2', linestyle='--', label='Numerical')
+		
+		plt.xlabel('time step')
+		plt.ylabel('$D_e$')
+		plt.legend()
+		plt.savefig(f'{run.out_folder}/{self.prefix}-de_conv.png')
 	
+	def plot_interface_temp(self, run):
+		plt.cla()
+
+		fig, ax = plt.subplots(1,1)
+		x = np.zeros(run.times.shape[0])
+		# x = run.times
+		y = np.zeros_like(x)
+		for i, t in enumerate(run.times):
+			x[i] = t
+			df = run.solns[i]
+			y[i] = df[np.isclose(df['x'], run.interface[i])]['u'].iloc[0]
+
+		print(y)
+		
+		if not np.allclose(y, np.zeros_like(y)):
+			print("WARNING: temp not held to zero!!!!")
+		ax.plot(x, y)
+		ax.set_xlabel('Time')
+		ax.set_ylabel('Temperature at interface')
+		ax.set_title('Interface temperatures')
+
+		fig.savefig(f'{run.out_folder}/{self.prefix}-interface_temps.png')
+
 	# plot temperature profile at different steps in one figure (for report)
 	@mpl.rc_context({'font.size': 20})
 	def subplot_surf_prof(self, run):
@@ -377,10 +549,10 @@ class Visualizer:
 			ax.scatter(exact_data['x'][::10], exact_data['u'][::10], marker='X', c='C1', zorder=2)
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
 
-			ax.set_title(f't={run.times[i*num_frames]}')
+			ax.set_title(f't={run.times[i*num_frames]:5f}')
 
 			if i == 0:
-				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='upper left')
+				ax.legend(['Numerical', 'Analytical', 'Interface'], loc='lower right')
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Temperature')
@@ -401,12 +573,19 @@ class Visualizer:
 
 		num_frames = len(run.exact_solns) // 4
 
+		mesh_pos = np.zeros((run.config.nx+1, 4))
+
 		for i, ax in enumerate(axs.flatten()):
+			# data = run.exact_solns[i]
 			data = run.exact_solns[i*num_frames]
+			mesh_pos[:, i] = data[data['y'] == 0.0]['x'].values
+			print(f'time in col {i}={run.times[i]}')
 
 			ax.scatter(data['x'], data['y'])
 			ax.axvline(run.interface[i*num_frames], c='black', ls='--')
 			ax.set_title(f't={run.times[i*num_frames]}')
+		
+		print(mesh_pos)
 		
 		fig.supxlabel('            X')
 		fig.supylabel('Y')
@@ -529,7 +708,7 @@ class Visualizer:
 			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
 
 		def _update(n):
-			time_text.set_text(f't={run.times[n]}')
+			time_text.set_text(f't={run.times[n]:6.4f}')
 
 			data = _extract_data(run.solns[n])
 			exact_data = _extract_data(run.exact_solns[n])
@@ -543,21 +722,39 @@ class Visualizer:
 
 			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
 			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
-			line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+			
+			if not self.report:
+				line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+
+				# if run.config.params['nx1'] < 20:
+				nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+				if nx1 < 15:
+					nx1 = 15
+				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
 
 			if run.interface is not None:
 				line_interface.set_xdata([run.interface[n]])
-				diff_interface.set_xdata([run.interface[n]])
-
-			diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+				if not self.report:
+					diff_interface.set_xdata([run.interface[n]])
+			
+			if 'expected_interface' in run.results.columns:
+				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
+				if not self.report:
+					diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
 		
 		plt.cla()
 		
-		fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		if self.report:
+			fig, prof_ax = plt.subplots(1, figsize=(10,5))
+		else:
+			fig, (prof_ax, diff_ax) = plt.subplots(2, sharex=True, figsize=(8,10))
+		# fig, prof_ax= plt.subplots(1, figsize=(10,5))
 
 		time_text = prof_ax.annotate(
 			f't={run.times[0]}',
-			xy=(0.8,0.9),
+			xy=(0.6,0.9),
 			xycoords='axes fraction'
 		)
 
@@ -567,26 +764,204 @@ class Visualizer:
 
 		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
 		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
-		line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+		if not self.report:
+			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+			nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+			if nx1 < 15:
+				nx1 = 15
+			# if run.config.params['nx1'] < 21:
+			nodes_prof = prof_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff = diff_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
 
 		if run.interface is not None:
 			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
-			diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			if not self.report:
+				diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		
+		if 'expected_interface' in run.results.columns:
+			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
+			if not self.report:
+				diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
 		
 		for pos in run.config.fixed_pos:
 			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
 
 		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
 
-		prof_ax.legend(loc='upper left')
 		prof_ax.set_ylim([-1.5, 1.5])
-		prof_ax.set_ylabel('Temperature-ish')
-		prof_ax.set_title('Temperature profile')
+		prof_ax.set_xlim([data['x'].min()-0.1, data['x'].max()])
+		prof_ax.set_ylabel('Temperature')
 
-		diff_ax.set_xlabel('x')
-		diff_ax.set_ylabel('Error')
-		diff_ax.set_title('Error in profile')
-		diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+		if self.report:
+			box = prof_ax.get_position()
+			prof_ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
+			plt.tight_layout()
+		else:
+			prof_ax.legend(loc='upper left')
+			prof_ax.set_title('Temperature profile')
+
+		if not self.report:
+			diff_ax.set_xlabel('x')
+			diff_ax.set_ylabel('Error')
+			diff_ax.set_title('Error in profile')
+			diff_ax.yaxis.set_major_formatter('{x:3.1e}')
+
+		anim = FuncAnimation(fig, _update, len(run.times))
+		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
+		plt.close(fig)
+
+	def make_surf_profile_anim_zoom(self, run):
+		def _extract_data(data):
+			ys = data['y'].unique()
+			ref_y = ys[ys.shape[0] //2]
+
+			mask = np.isclose(data['y'].values, ref_y)
+
+			return pd.DataFrame(data.values[mask], data.index[mask], data.columns)
+
+		def _update(n):
+			time_text.set_text(f't={run.times[n]:6.4f}')
+
+			data = _extract_data(run.solns[n])
+			exact_data = _extract_data(run.exact_solns[n])
+			errors = _extract_data(run.errors[n])
+
+			# account for repeated points 
+			# 	avoids a line crossing the plot unnecessarily
+			num_points = len(data['x'])
+			if len(data['x']) != len(data['x'].unique()):
+				num_points //= 2
+
+			line_soln.set_data(data['x'][:num_points], data['u'][:num_points])
+			line_exact.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
+
+			line_soln_zoom.set_data(data['x'][:num_points], data['u'][:num_points])
+			line_exact_zoom.set_data(exact_data['x'][:num_points], exact_data['u'][:num_points])
+
+			if not self.report:
+				line_diff.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				diff_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+				diff_zoom_ax.set_ylim(errors['error'].min() * 1.1, errors['error'].max() * 1.1)
+
+				# if run.config.params['nx1'] < 20:
+				nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+				if nx1 < 15:
+					nx1 = 15
+				nodes_prof.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
+
+				line_diff_zoom.set_data(errors['x'][:num_points], errors['error'][:num_points])
+				nodes_prof_zoom.set_data(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15])
+				nodes_diff_zoom.set_data(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15])
+
+			if run.interface is not None:
+				line_interface.set_xdata([run.interface[n]])
+				line_interface_zoom.set_xdata([run.interface[n]])
+				if not self.report:
+					diff_interface.set_xdata([run.interface[n]])
+					diff_interface_zoom.set_xdata([run.interface[n]])
+			
+			if 'expected_interface' in run.results.columns:
+				line_interface_exp.set_xdata([run.results['expected_interface'][n]])
+				line_interface_exp_zoom.set_xdata([run.results['expected_interface'][n]])
+				if not self.report:
+					diff_interface_exp.set_xdata([run.results['expected_interface'][n]])
+					diff_interface_exp_zoom.set_xdata([run.results['expected_interface'][n]])
+			
+			prof_zoom_ax.set_xlim([run.interface[n]-1e-7, run.interface[n]+1e-7])
+			diff_zoom_ax.set_xlim([run.interface[n]-1e-7, run.interface[n]+1e-7])
+		
+		plt.cla()
+		
+		if self.report:
+			fig, prof_ax = plt.subplots(1, figsize=(10,5))
+		else:
+			mosaic = [
+				['prof', 'prof_zoom'],
+				['diff', 'diff_zoom']
+			]
+
+			fig, axs = plt.subplot_mosaic(mosaic, figsize=(16,10))
+
+			prof_ax = axs['prof']
+			diff_ax = axs['diff']
+
+			prof_zoom_ax = axs['prof_zoom']
+			diff_zoom_ax = axs['diff_zoom']
+
+		time_text = prof_ax.annotate(
+			f't={run.times[0]}',
+			xy=(0.6,0.9),
+			xycoords='axes fraction'
+		)
+
+		data = _extract_data(run.solns[0])
+		exact_data = _extract_data(run.exact_solns[0])
+		errors = _extract_data(run.errors[0])
+
+		line_soln = prof_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		line_exact = prof_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
+
+		line_soln_zoom = prof_zoom_ax.plot(data['x'], data['u'], label='Numerical')[0]
+		line_exact_zoom = prof_zoom_ax.plot(exact_data['x'], exact_data['u'], label='Analytical', ls=':')[0]
+
+		if not self.report:
+			line_diff = diff_ax.plot(errors['x'], errors['error'], label='error')[0]
+			line_diff_zoom = diff_zoom_ax.plot(errors['x'], errors['error'], label='error')[0]
+
+			nx1 = int(run.config.params['nx1'] * (run.config.x_order - 1))
+			if nx1 < 15:
+				nx1 = 15
+			# if run.config.params['nx1'] < 21:
+			nodes_prof = prof_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff = diff_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+
+			nodes_prof_zoom = prof_zoom_ax.plot(data['x'][nx1-15:nx1+15], data['u'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+			nodes_diff_zoom = diff_zoom_ax.plot(errors['x'][nx1-15:nx1+15], errors['error'][nx1-15:nx1+15], label='nodes', ls='', marker=self._markers[0])[0]
+
+		if run.interface is not None:
+			line_interface = prof_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			line_interface_zoom = prof_zoom_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+			if not self.report:
+				diff_interface = diff_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+				diff_interface_zoom = diff_zoom_ax.axvline(run.interface[0], c='black', ls='--', label='interface')
+		
+		if 'expected_interface' in run.results.columns:
+			line_interface_exp = prof_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
+			line_interface_exp_zoom = prof_zoom_ax.axvline(run.results['expected_interface'][0], c='blue', ls=':', label='Expected interface')
+			if not self.report:
+				diff_interface_exp = diff_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+				diff_interface_exp_zoom = diff_zoom_ax.axvline(run.results['expected_interface'][0], c='blue', ls='--', label='expected interface')
+		
+		for pos in run.config.fixed_pos:
+			prof_ax.axvline(pos, c='black', ls='--', label='fixed interface')
+
+		prof_ax.axhline(0.0, c='blue', ls=':', label='Expected interface temp')
+
+		prof_ax.set_ylim([-1.5, 1.5])
+		prof_ax.set_xlim([data['x'].min()-0.1, data['x'].max()])
+		prof_ax.set_ylabel('Temperature')
+
+		prof_zoom_ax.set_ylim([-0.3, 0.3])
+		prof_zoom_ax.set_xlim([run.interface[0]-0.05, run.interface[0]+0.05])
+		diff_zoom_ax.set_xlim([run.interface[0]-0.05, run.interface[0]+0.05])
+		prof_zoom_ax.set_ylabel('Temperature')
+
+		if self.report:
+			box = prof_ax.get_position()
+			prof_ax.legend(loc='center left', bbox_to_anchor=(1.0,0.5), ncol=1)
+			plt.tight_layout()
+		else:
+			prof_ax.legend(loc='upper left')
+			prof_ax.set_title('Temperature profile')
+
+		if not self.report:
+			diff_ax.set_xlabel('x')
+			diff_ax.set_ylabel('Error')
+			diff_ax.set_title('Error in profile')
+			diff_ax.yaxis.set_major_formatter('{x:3.1e}')
 
 		anim = FuncAnimation(fig, _update, len(run.times))
 		anim.save(f'{run.out_folder}/{self.prefix}-surf_prof.mp4')	
@@ -650,44 +1025,37 @@ class Visualizer:
 		plt.close(fig)
 
 	# perform and plot error analysis
-	def plot_analysis(self, rtype):
+	def plot_analysis(self):
+		# self.plot_interfaces()
 		# helper function to get legend entries
 		def _legend(x, t):
-			ret = None
-			if (rtype == 'x'):
-				match x:
-					case 2: ret = "Linear" 
-					case 3: ret = "Quadratic"
-					case 4: ret = "Cubic"
-					case _: raise Exception("Unknown element order")
-			else:
-				ret = f'BDF {t}'
-			return ret
-
-		match rtype:
-			case 'x':
-				xlabel = 'dx'
-				title = f'{self.prefix} dx error analysis'
-				fname = 'dx_errors'
-				label = 'order'
-				ref_order = 'x_order'
-				xs = np.logspace(0, -3)
-			case 'b':
-				xlabel = 'dx'
-				title = f'{self.prefix} dxdt error analysis'
-				fname = 'dxdt_errors'
-				label = 'order'
-				ref_order = 'x_order'
-				xs = np.logspace(0, -3)
-			case 't':
-				xlabel = 'dt'
-				title = f'{self.prefix} dt error analysis'
-				fname = 'dt_errors'
-				label = 'BDF'
-				ref_order = 't_order'
-				xs = np.logspace(0, -4)
-			case _:
-				raise Exception("Unknown analysis type provided")
+			match x:
+				case 2: return f"Linear BDF{t}"
+				case 3: return f"Quadratic BDF{t}"
+				case 4: return f"Cubic BDF{t}"
+				case _: raise Exception("Unknown element order")
+		
+		if 'x' in self.dxdt:
+			xlabel = 'dx'
+			ylabel = 'error'
+			title = f'{self.prefix} dx error analysis'
+			fname = 'dx_errors'
+			ref_order = 'x_order'
+			ref_variable = 'x'
+			xs = np.logspace(0, -3.5)
+		elif 't' in self.dxdt:
+			xlabel = 'dt'
+			ylabel = 'error'
+			title = f'{self.prefix} dt error analysis'
+			fname = 'dt_errors'
+			ref_order = 't_order'
+			ref_variable = 't'
+			xs = np.logspace(0, -4)
+		
+		if 'i' in self.dxdt:
+			ylabel = 'interface_error'
+			title += ' (interface)'
+			fname += '_iface'
 
 		x_orders = self._pd['x_order'].unique()
 		x_orders.sort()
@@ -695,12 +1063,12 @@ class Visualizer:
 		t_orders = self._pd['t_order'].unique()
 		t_orders.sort()
 
-		fig, ax = plt.subplots(1, subplot_kw={
+		fig, ax = plt.subplots(1, figsize=(8,5), subplot_kw={
 			'xlabel': xlabel,
 			'ylabel': 'Normalized Error',
 			'xscale': 'log',
 			'yscale': 'log',
-			'ylim': [self._pd['error'].min() * 1e-1, self._pd['error'].max() * 1e1],
+			'ylim': [self._pd[ylabel].min() * 1e-1, self._pd[ylabel].max() * 1e1],
 			'xlim': [self._pd[xlabel].min() * 0.8, self._pd[xlabel].max() * 1.2],
 		})
 
@@ -710,7 +1078,7 @@ class Visualizer:
 				df = self._pd.loc[self._pd['x_order'] == x]
 				df = df.loc[df['t_order'] == t]
 
-				ax.scatter(df[xlabel], df['error'], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
+				ax.scatter(df[xlabel], df[ylabel], label=_legend(int(x), int(t)), marker=self._markers[marker_i % len(self._markers)])
 				marker_i += 1
 
 		# plot reference lines
@@ -720,8 +1088,20 @@ class Visualizer:
 		for x in ref_orders:
 			df = self._pd.loc[self._pd[ref_order] == x]
 
-			max_point = df.loc[df[xlabel] == df[xlabel].max()]
-			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** x * max_point['error'].iloc[0], label=fr'$\mathcal{{O}}({rtype}^{int(x)})$', linestyle='--', marker='', alpha=0.8)
+			if 'i' in self.dxdt:
+				if 't' in self.dxdt:
+					# ref_power = df['x_order'].iloc[0] - 0.8
+					ref_power = 1.0
+				else:
+					ref_power = x
+			else:
+				ref_power = x
+
+			# max_point = df.loc[df[ylabel] == df[ylabel].min()]
+			# max_point = df.loc[df[ylabel] == df[ylabel].max()]
+			# max_point = df.loc[df[xlabel] == 0.1]
+			max_point = df.iloc[(df[xlabel] - 0.09).abs().argsort()[:1]]
+			ax.plot(xs, (xs / max_point[xlabel].iloc[0]) ** ref_power * max_point[ylabel].iloc[0], label=fr'$\mathcal{{O}}({ref_variable}^{{{ref_power:.2f}}})$', linestyle='--', marker='', alpha=0.8)
 
 		if not self.report:
 			fig.suptitle(title)
@@ -737,6 +1117,8 @@ class Visualizer:
 			plt.show()
 
 		plt.close(fig)
+
+		print(self._pd)
 	
 	# plot results of sensitivity analysis
 	def sensitivity_analysis(self):
@@ -808,8 +1190,11 @@ class Visualizer:
 
 # simple way to run visualizer for debug purposes outside of proper runs
 if __name__ =='__main__':
-	assert len(sys.argv) == 3
-	assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
-	assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
+	# assert len(sys.argv) == 3
+	# assert sum(c1 == c2 for c1 in "abxts" for c2 in sys.argv[2]) > 0
+	# assert sum(c1 == c2 for c1 in "bxt" for c2 in sys.argv[2]) < 2
 
-	vis = Visualizer(sys.argv[1], sys.argv[2])
+	os.chdir(sys.argv[1])
+	# vis = Visualizer(sys.argv[2], sys.argv[3], stylef='report.mplstyle')
+	vis = Visualizer(sys.argv[2], sys.argv[3])
+	# vis = Visualizer(sys.argv[2], 'x', reference='runs/reference')

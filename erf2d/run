@@ -45,11 +45,24 @@ if __name__ == '__main__':
 		help='Number of elements to simulate with, accepts multiple in list'
 	)
 
+	parser.add_argument('--nx2',
+		type=int,
+		dest='nx2',
+		# default=100,
+		help='Number of elements to simulate with in liquid phase (be careful, not meant for general use)'
+	)
+
+	parser.add_argument('--ny',
+		type=int,
+		default=1,
+		help='Number of elements in y-direction of domain'
+	)
+
 	parser.add_argument('--dts', '--dt',
 		nargs='+', 
 		type=float,
 		dest='dts',
-		default=1e-2,
+		default=1e-4,
 		help='timesteps to simulate with, accepts multiple in list'
 	)
 
@@ -59,12 +72,26 @@ if __name__ == '__main__':
 		help='Number of timesteps to simulate for, only single number'
 	)
 
+	parser.add_argument('--write_freq', '--wf', 
+		type=int,
+		dest='wf',
+		default=1,
+		help='Number of timesteps to wait for before saving results'
+	)
+
 	parser.add_argument('--type',
 		type=str,
-		choices=['a', 'x', 't', 'b', 's', 'ax', 'at', 'ab', 'as'],
+		choices=['a', 'x', 't', 'b', 'i', 's', 'ax', 'at', 'ab', 'ai', 'as'],
 		dest='dxdt',
 		default='a',
 		help="Type of analysis to perform a: standard run\nx: vary dx\nt: vary dt\ns: sensitivity analysis"
+	)
+	
+	parser.add_argument('--ref',
+		type=str,
+		dest='reference',
+		default=None,
+		help='Reference run to compare against for analysys'
 	)
 
 	parser.add_argument('--nthreads',
@@ -83,7 +110,7 @@ if __name__ == '__main__':
 	parser.add_argument('--tshift',
 		type=float,
 		dest='tshift',
-		default=0.0,
+		default=0.001,
 		help='time to start from'
 	)
 
@@ -97,7 +124,7 @@ if __name__ == '__main__':
 	parser.add_argument('--k2',
 		type=float,
 		dest='k2',
-		default=0.5,
+		default=0.25,
 		help='Phase 2 thermal conductivity'
 	)
 
@@ -111,7 +138,7 @@ if __name__ == '__main__':
 	parser.add_argument('--rho2',
 		type=float,
 		dest='rho2',
-		default=0.5,
+		default=2.0,
 		help='Phase 2 density'
 	)
 
@@ -125,7 +152,7 @@ if __name__ == '__main__':
 	parser.add_argument('--cp2',
 		type=float,
 		dest='cp2',
-		default=0.5,
+		default=0.25,
 		help='Phase 2 specific heat capacity'
 	)
 
@@ -148,6 +175,12 @@ if __name__ == '__main__':
 		dest='stylef',
 		default='pltstyle.mplstyle',
 		help='Stylesheet for matplotlib'
+	)
+
+	parser.add_argument('--water',
+		action='store_true',
+		default=False,
+		help="Use this flag to set the parameters to match water"
 	)
 
 	args = parser.parse_args()

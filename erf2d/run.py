@@ -9,6 +9,8 @@ from datetime import datetime
 from concurrent.futures import wait, ProcessPoolExecutor
 
 import numpy as np
+from scipy.optimize import newton
+from scipy.special import erf
 
 from visualizer import Visualizer
 
@@ -27,6 +29,8 @@ class Run:
 		self.kwargs = kwargs
 		self._exes = {}
 
+		self._cleanup = False
+
 		# save current directory for reference
 		self.od = os.getcwd()
 
@@ -44,13 +48,30 @@ class Run:
 		
 		print(f"Working in {self.wd}")
 
-		for path in [self.wd, f'{self.wd}/imgs']:
+		# make run directory and set cleanup flag
+		if not os.path.exists(self.wd):
+			self._cleanup = True
+			os.mkdir(self.wd)
+
+		# make remaining directories
+		for path in [f'{self.wd}/imgs']:
 			if not os.path.exists(path):
 				os.mkdir(path)
 
 		if os.path.exists(f'{self.wd}/RESLT'):
 			shutil.rmtree(f'{self.wd}/RESLT')
 		os.mkdir(f'{self.wd}/RESLT')
+
+		if kwargs['water']:
+			kwargs['k1'] = 2.22
+			kwargs['k2'] = 0.55575
+			kwargs['rho1'] = 916.2
+			kwargs['rho2'] = 999.89
+			kwargs['cp1'] = 2050.0
+			kwargs['cp2'] = 4220.0
+			kwargs['L'] = 334000.0
+
+		kwargs.pop('water')
 
 		print(f'Run.__init__ {prog=} {self.xs=} {ts=} {nxs=} {dts=} {tsteps=} {kwargs=}')
 
@@ -62,10 +83,16 @@ class Run:
 			os.chdir(self.wd)
 
 			# perform all computations
-			self.run(**kwargs)
+			try:
+				self.run(**kwargs)
+			except:
+				os.chdir(self.od)
+				if self._cleanup:
+					shutil.rmtree(self.wd)
+				raise
 
 			# post-process results
-			Visualizer(self.prog, self.dxdt, stylef=stylef)
+			Visualizer(self.prog, self.dxdt, stylef=stylef, reference=kwargs['reference'])
 			os.chdir(self.od)
 
 	# not parallelized as all processes will be writing to the same file in main directory
@@ -111,6 +138,62 @@ class Run:
 				os.rename(self.prog, f'{self.wd}/{prog_name}')
 				self._exes[(x, t)] = prog_name
 
+	def get_De(self, k1, k2, rho1, rho2, cp1, cp2, L, **kwargs):
+		def func(x):
+			D1 = k1/(rho1*cp1)
+			D2 = k2/(rho2*cp2)
+			Ts = -1.0
+			Tm = 0.0
+			Tl = 1.0
+
+			e1 = np.emath.sqrt(k1*rho1*cp1)
+			e2 = np.emath.sqrt(k2*rho2*cp2)
+
+			match self.prog:
+				case 'erf2d11':
+					return cp2*(Tm-Ts)/L - 0.5*np.emath.sqrt(np.pi*x/D2) * np.exp(0.25*x/D2) * ((e2/e1) + erf(0.5*x/D2))
+				case 'erf2d12':
+					alpha = L / (cp1 * (Tm - Ts))
+					return 1 - alpha * np.emath.sqrt(0.25 * x * np.pi) * np.exp(0.25 * x) * erf(np.emath.sqrt(0.25 * x))
+				case 'erf2d13':
+					St = L / (cp1 * (Tl - Ts))
+					beta = x / D1
+					Tp = (Tl - Tm)/(Tl - Ts)
+					er = np.emath.sqrt((k2*rho2*cp2)/(k1*rho1*cp1))
+					return 0.5 * St * np.emath.sqrt(np.pi * beta) + (Tp-1.0)*np.exp(-0.25*beta)/erf(0.5*np.emath.sqrt(beta)) + er*Tp*np.exp(-0.25 * x/D2)/(1.0-erf(0.5*np.emath.sqrt(x/D2)))
+				case 'erf2d14' | 'erf2d16' | 'erf2d17' | 'erf2d18':
+					St = L / (cp1 * (Tm - Ts))
+					T_l = (Tl - Tm) / (Tm - Ts)
+					D = D2 / D1
+					k = k2 / k1
+					return 0.5 * St * np.emath.sqrt(np.pi * x) - np.exp(-0.25 * x) / erf(0.5 * np.emath.sqrt(x)) + T_l * k * np.exp(-0.25 * x / D) / (np.emath.sqrt(D) * (1.0 - erf(0.5 * np.emath.sqrt(x / D))))
+				case 'erf2d15':
+					delT = Tm - Ts
+					St = L / cp1 * delT
+					D = D2 / D1
+					k = k2 / k1
+					T_l = (Tl - Tm) / delT
+					return 0.5 * St * np.emath.sqrt(np.pi * x) - np.exp(-0.25 * x) / erf(0.5 * np.emath.sqrt(x)) + T_l * k * np.exp(-0.25 * x / D) / (np.emath.sqrt(D) * (1.0 - erf(0.5 * np.emath.sqrt(x / D))))
+				case _:
+					return 0.5*rho1*L*np.emath.sqrt(x*np.pi) - k1*(Tm-Ts)*np.exp(-0.25*x/D1)/(np.sqrt(D1)*(1+erf(0.5*np.emath.sqrt(x/D1)))) + k2*(Tl-Tm)*np.exp(-0.25*x/D2)/(np.sqrt(D2)*(1-erf(0.5*np.emath.sqrt(x/D2))))
+		
+		De = newton(func, k1/(rho1*cp1))
+
+		if (not np.isclose(func(De), 0.0)):
+			print("Trying with D2")
+			De = newton(func, k2/(rho2*cp2))
+		
+		if (not np.isclose(func(De), 0.0)):
+			raise Exception("Unable to get analytical De, check parameters")
+
+		De = np.real(De)
+			
+		print(f'f({De}) = {func(De)}')
+
+		if func(De) is None:
+			raise Exception("De is problem")
+		return De
+
 	# wrapper for actual command that gets run
 	# this method also handles the command line arguments that need to be passed to the executable
 	def _run_base(self, x, t, nx, dt, tsteps, tshift=None, write_freq=None, **kwargs):
@@ -123,13 +206,34 @@ class Run:
 		if 'dname' not in kwargs.keys():
 			kwargs['dname'] = f'RESLT/{x}n{nx}_{t}t{dt}'
 
-		translated_kwargs = []
-		for key, value in kwargs.items():
-			if key in ['eps'] or value is None:
-				continue
+		# ke = self.get_ke(kwargs['k1'], kwargs['k2'], kwargs['rho1'], kwargs['rho2'], kwargs['cp1'], kwargs['cp2'], kwargs['L'])
+		# De = self.get_De(**kwargs)
+		# kwargs['De'] = De
 
-			translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
+		translated_kwargs = []
+		if self.prog == 'erf2d15':
+			D1 = kwargs['k1']/(kwargs['rho1']*kwargs['cp1'])
+			D2 = kwargs['k2']/(kwargs['rho2']*kwargs['cp2'])
+			St = kwargs['L'] / kwargs['cp1']
+
+			translated_kwargs.extend(['--k', str(kwargs['k2']/kwargs['k1'])])
+			translated_kwargs.extend(['--D', str(D2/D1)])
+			translated_kwargs.extend(['--De', str(kwargs['De'])])
+			translated_kwargs.extend(['--St', str(St)])
+
+			for key, value in kwargs.items():
+				if key in ['eps', 'k1', 'k2', 'rho1', 'rho2', 'cp1', 'cp2', 'L', 'water'] or value is None:
+					continue
+
+				translated_kwargs.extend([f'--{key}', str(value)])
+		else:
+			for key, value in kwargs.items():
+				if key in ['eps'] or value is None:
+					continue
+
+				translated_kwargs.extend([f'--{key}', str(value)])# if value is not str else value])
 		
+		# print(translated_kwargs)
 		print(f'Running config {x=}, {t=}, {nx=} and {dt=}')
 
 		# call executable with command line argumets
@@ -149,11 +253,13 @@ class Run:
 	
 	# method that organises and performs required runs in parallel
 	# will run all permutations of options passed to the program, with small adjustments for type of computation
-	def run(self, tshift=None, **kwargs):
+	def run(self, tshift=None, wf=None, **kwargs):
 		# calculate max number of CPUs usable/available
 		num_workers = len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts)
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
+
+		kwargs['De'] = self.get_De(**kwargs)
 		
 		with open('config', 'w') as f:
 			f.write(f'xs: {self.xs}\n')
@@ -166,15 +272,14 @@ class Run:
 
 		# run processes in parallel
 		futures = {}
-		wf = None
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:
 			# for dt error analysis
 			if 't' in self.dxdt:
 				max_dt = max(self.dts)
 				if tshift is None:
 					tshift = (max(self.ts) + 1) * max_dt
-				else:
-					tshift += (max(self.ts) + 1) * max_dt
+				# else:
+				# 	tshift += (max(self.ts) + 1) * max_dt
 				for x in self.xs:
 					for t in self.ts:
 						for nx in self.nxs:
@@ -194,6 +299,7 @@ class Run:
 									kwargs_cp = kwargs.copy()
 									kwargs_cp[v] *= (1.0 + kwargs_cp['eps'])
 									kwargs_cp['dname'] = f'RESLT/{x}n{nx}_{t}t{dt:.2e}_{kwargs_cp["k1"]:9.7f}_{kwargs_cp["k2"]:9.7f}_{kwargs_cp["rho1"]:9.7f}_{kwargs_cp["rho2"]:9.7f}_{kwargs_cp["cp1"]:9.7f}_{kwargs_cp["cp2"]:9.7f}'
+									kwargs_cp['De'] = self.get_De(**kwargs_cp)
 									futures[(x, t, nx, dt, np.random.rand(1)[0])] = executor.submit(self._run_base, x, t, nx, dt, self.tsteps, tshift=tshift, write_freq=wf, **kwargs_cp)
 			# for all other run types
 			else:
