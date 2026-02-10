@@ -1,9 +1,36 @@
 #!/usr/bin/env python3
 
-import typing
+from typing import TextIO, Self
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import StrEnum, auto
+
+@dataclass
+class Base:
+	def to_file(self, fname: str) -> None:
+		with open(fname, 'w') as f:
+			for k in fields(self):
+				f.write(f'{k.name}={self.__getattribute__(k.name)}\n')
+
+	@classmethod
+	def from_file(cls, fname: str) -> Self:
+		clsinfo = fields(cls)
+		obj = {k.name: None for k in clsinfo}
+		types = {k.name: k.type for k in clsinfo}
+
+		with open(fname, 'r') as f:
+			while line := f.readline():
+				k, v = line.split('=')
+				obj[k] = types[k](v) 
+		
+		return Params(**obj)
+
+	def __str__(self) -> str:
+		string = ""
+		for k in fields(self):
+			string += f"{k.name}={self.__getattribute__(k.name)} "
+		
+		return string
 
 @dataclass(frozen=True)
 class Material:
@@ -14,7 +41,7 @@ class Material:
 
 	def to_file(
 		self,
-		file: typing.TextIO,
+		file: TextIO,
 		tag: str
 	) -> None:
 		file.write(f'{tag}.k={self.k}\n')
@@ -37,6 +64,30 @@ class System:
 			self.liquid.to_file(f, 'liquid')
 			f.write(f'L={self.L}\n')
 			f.write(f'De={self.De}\n')
+	
+	def from_file(self) -> Self:
+		water = Material(
+			name="water",
+			k=0.55575,
+			rho=999.89,
+			cp=4220.0
+		)
+
+		ice = Material(
+			name="ice",
+			k=2.2,
+			rho=916.2,
+			cp=2050.0
+		)
+
+		system = System(
+			water,
+			ice,
+			334000.0,
+			0.011587153186771986
+		)
+
+		return system
 
 class AnalysisType(StrEnum):
 	standard = auto()
@@ -45,7 +96,7 @@ class AnalysisType(StrEnum):
 	sensitivity = auto()
 
 @dataclass
-class SimParams:
+class SimParams(Base):
 	xs: int | list[int]
 	ts: int | list[int]
 	nxs: int | list[int]
@@ -53,4 +104,18 @@ class SimParams:
 	tstart: float
 	tend: float
 	write_freq: int
-	type: AnalysisType
+	analysis_type: AnalysisType
+
+@dataclass
+class Params(Base):
+	x: int
+	t: int
+	nx: int
+	dt: float
+	tstart: float
+	tend: float
+	write_freq: int
+
+	@property
+	def title(self) -> str:
+		return f'x={self.x} t={self.t} nx={self.nx} dt={self.dt}'
