@@ -140,8 +140,29 @@ class Visualiser:
 			self.savefig(fig, run.out_dir, 'errors')	
 
 	def plot_interface(self, run) -> None:
-		pass
-		# raise NotImplementedError()
+		if self.report:
+			axs = {}
+			fig, axs['iface'] = plt.subplots(1)
+		else:
+			fig, axs = plt.subplot_mosaic(
+				[
+					['iface'],
+					['error']
+				],
+				figsize=(7, 10)
+			)
+
+		run.plot_interface(axs['iface'])
+
+		if not self.report:
+			run.plot_interface_error(axs['error'])
+
+			axs['iface'].set_title('Interface position with time')
+			axs['error'].set_title('Error in interface position')
+		
+		self.savefig(fig, run.out_dir, 'interface')
+
+
 
 	def plot_de(self, run) -> None:
 		pass

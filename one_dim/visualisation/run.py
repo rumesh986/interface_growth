@@ -5,8 +5,9 @@ from typing import Self
 
 import numpy as np
 import polars as pl
+from scipy.optimize import curve_fit
 
-from systems.systems import Params, AnalysisType
+from systems.systems import Params, AnalysisType, System
 
 class Run:
 	def __init__(
@@ -21,13 +22,15 @@ class Run:
 	):
 		self.inp_dir = inp_dir
 		self.out_dir = out_dir
-		self.params = Params.from_file('config')
+		self.params = Params.from_file(f'{self.inp_dir}/params')
+		self.system = System.from_file('system')
 		self.reference = reference
 
-		print(os.getcwd())
+		self._De = None
 
 		self.results = pl.read_csv(f'{self.inp_dir}/{resultsf}.{ext}', separator=' ').with_columns(
-				interface_errors=(pl.col('exact_h') - pl.col('h')).abs()
+				abs_error_h=(pl.col('exact_h') - pl.col('h')).abs(),
+				rel_error_h=((pl.col('exact_h') - pl.col('h')) / pl.col('h') ).abs()
 			).with_row_index('step')
 		# self.results = pd.read_csv(f'{self.inp_dir}/{resultsf}.{self.ext}', sep=' ')
 		self.times = self.results['time'] #.values
@@ -51,7 +54,7 @@ class Run:
 
 			size = self.results[self.start_index:, 'error'].shape[0]
 			self.total_error_norm = np.linalg.norm(self.results[self.start_index:, 'error']) / size
-			self.interface_error_norm = np.linalg.norm(self.results[self.start_index:, 'interface_errors']) / size
+			self.interface_error_norm = np.linalg.norm(self.results[self.start_index:, 'abs_error_h']) / size
 
 			self.create_outdir()	
 
@@ -80,6 +83,20 @@ class Run:
 	def create_outdir(self) -> None:
 		if not os.path.exists(self.out_dir):
 			os.mkdir(self.out_dir)
+
+	@property
+	def fitted_De(self) -> float | None:
+		if self._De is None:
+			def f(x, a, b):
+				return np.sqrt(x*a) + b
+
+			try:
+				optimal, _ = curve_fit(f, self.results['time'], self.results['h'], p0=[1.0, 0.0])
+				self._De = optimal[0]
+			except Exception as e:
+				print(f"Failed to fit De for {self.params.title}, error: {e}")
+		
+		return self._De
 	
 	def plot_error_norm(self, ax) -> None:
 		ax.semilogy(self.results['time'], self.results['error'])
@@ -101,3 +118,29 @@ class Run:
 
 		if data is None:
 			return df
+
+	def plot_interface(self, ax) -> None:
+		ax.plot(self.results['time'], self.results['h'], label='Interface location')
+
+		print(self.fitted_De)
+		if self.fitted_De is not None:
+			x = np.linspace(self.results[0, 'time'], self.results[-1, 'time'])
+			ax.plot(x, np.sqrt(x * self.fitted_De), ls='--', label=fr'Fitted $D_e={{{self.fitted_De:.4e}}}$')
+		
+		ax.plot(self.results['time'], self.results['exact_h'], ls=':', label=fr'Analytical $D_e={{{self.system.De:4e}}}$')
+
+		ax.legend()
+		ax.set_xlabel('time')
+		ax.set_ylabel(r'Interface location $h(t)$')
+	
+	def plot_interface_error(self, abs_ax) -> None:
+		rel_ax = abs_ax.twinx()
+
+		abs_plot, = abs_ax.plot(self.results['time'], self.results['abs_error_h'], label='Absolute Error')
+		rel_plot, = rel_ax.plot(self.results['time'], self.results['rel_error_h'], label='Relative Error', c='C1')
+
+		abs_ax.legend(handles=[abs_plot, rel_plot])
+
+		abs_ax.set_xlabel('Time')
+		abs_ax.set_ylabel('Absolute Error')
+		rel_ax.set_ylabel('Relative Error')
