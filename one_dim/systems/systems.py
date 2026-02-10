@@ -99,7 +99,7 @@ class AnalysisType(StrEnum):
 class SimParams(Base):
 	xs: int | list[int]
 	ts: int | list[int]
-	nxs: int | list[int]
+	nxs: tuple[int, int] | list[tuple[int, int]]
 	dts: float | list[float]
 	tstart: float
 	tend: float
@@ -110,7 +110,8 @@ class SimParams(Base):
 class Params(Base):
 	x: int
 	t: int
-	nx: int
+	nx1: int
+	nx2: int
 	dt: float
 	tstart: float
 	tend: float
@@ -118,4 +119,9 @@ class Params(Base):
 
 	@property
 	def title(self) -> str:
-		return f'x={self.x} t={self.t} nx={self.nx} dt={self.dt}'
+		print(self.nx1)
+		return f'x={self.x} t={self.t} nx=({self.nx1}, {self.nx2}) dt={self.dt}'
+	
+	# @property
+	# def nx(self) -> int:
+	# 	return self.nx1 + self.nx2

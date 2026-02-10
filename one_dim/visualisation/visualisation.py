@@ -20,9 +20,8 @@ class Visualiser:
 		self,
 		prefix: str,
 		analysis_type: AnalysisType,
-		resd: str = 'RESLT',
-		outd: str = 'imgs',
-		interactive: bool = False,
+		results_dir: str = 'RESLT',
+		out_dir: str = 'imgs',
 		style: PltStyle = PltStyle.standard,
 		reference: Run = None,
 		*args,
@@ -30,20 +29,19 @@ class Visualiser:
 	):
 		self.prefix = prefix
 		self.analysis_type = analysis_type
-		self.outd = outd
-		self.interactive = interactive
+		self.out_dir = out_dir
 		self.style = style
 		self.reference = reference
 		self.report = self.style == PltStyle.report
 
 		plt.style.use(f'{os.path.dirname(__file__)}/{self.style}')
 
-		if not os.path.exists(self.outd):
-			os.mkdir(self.outd)
+		if not os.path.exists(self.out_dir):
+			os.mkdir(self.out_dir)
 
 		self.runs = []
-		for rundir in os.listdir(resd):
-			rund = f'{resd}/{rundir}'
+		for rundir in os.listdir(results_dir):
+			rund = f'{results_dir}/{rundir}'
 			if not os.path.isdir(rund):
 				continue
 
@@ -51,15 +49,11 @@ class Visualiser:
 
 			self.runs.append(Run(
 				rund,
-				f'{self.outd}/{rundir}',
+				f'{self.out_dir}/{rundir}',
 				analysis_type,
 				reference = self.reference
 			))
-		
-		if not self.interactive:
-			self.default_run(*args, **kwargs)
 	
-	def default_run(self, *args, **kwargs) -> None:
 		self.aggregate_data = pl.DataFrame()
 		for run in self.runs:
 			df = pl.DataFrame(data={
@@ -73,7 +67,8 @@ class Visualiser:
 			self.aggregate_data.vstack(df, in_place=True)
 		
 		self.aggregate_data.rechunk()
-
+		
+	def default_run(self, *args, **kwargs) -> None:
 		match self.analysis_type:
 			case AnalysisType.standard:	self.standard(*args, **kwargs)
 			case AnalysisType.dx | AnalysisType.dt:	self.plot_analysis(*args, **kwargs)
@@ -85,7 +80,6 @@ class Visualiser:
 			self.plot_errors(run)
 			self.plot_interface(run)
 			self.plot_de(run)
-			self.plot_interface_temp(run)
 			self.anim_surf_prof(run)
 
 			# if self.report:
