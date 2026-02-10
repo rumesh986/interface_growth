@@ -56,6 +56,12 @@ class Run:
 			self.total_error_norm = np.linalg.norm(self.results[self.start_index:, 'error']) / size
 			self.interface_error_norm = np.linalg.norm(self.results[self.start_index:, 'abs_error_h']) / size
 
+			self.interface_node = self.step(0).filter(pl.col('x').is_close(self.results[0, 'h']))[0, 'node']
+
+			if not self.steps.filter(pl.col('node').eq(self.interface_node) & ~pl.col('u').is_close(0.0)).is_empty():
+				print("\n\nWARNING: non-zero temperature detected at interface, check results!")
+				print(f"system: {self.params}\n\n")
+
 			self.create_outdir()	
 
 	def step(self, n: int) -> pl.DataFrame:

@@ -179,10 +179,6 @@ class Visualiser:
 		pass
 		# raise NotImplementedError()
 
-	def plot_interface_temp(self, run) -> None:
-		pass
-		# raise NotImplementedError()
-
 	def anim_surf_prof(self, run) -> None:
 		pass
 		# raise NotImplementedError()
