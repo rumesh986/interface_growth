@@ -162,7 +162,18 @@ class Visualiser:
 		
 		self.savefig(fig, run.out_dir, 'interface')
 
+	def plot_interfaces(self) -> None:
+		fig, ax = plt.subplots(1,1)
 
+		self.runs[0].plot_interface(ax, label=self.runs[0].params.title)
+		for run in self.runs[1:]:
+			run.plot_interface(ax, False, label=run.params.title)
+
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0 + box.height * 0.005, box.width, box.height * 0.995])
+		ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3, prop={'size': 8})
+
+		self.savefig(fig, self.out_dir, 'interfaces')
 
 	def plot_de(self, run) -> None:
 		pass
@@ -175,10 +186,6 @@ class Visualiser:
 	def anim_surf_prof(self, run) -> None:
 		pass
 		# raise NotImplementedError()
-
-
-	def plot_interfaces(self) -> None:
-		pass
 
 	def plot_analysis(self) -> None:
 		pass

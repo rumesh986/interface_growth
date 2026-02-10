@@ -119,15 +119,17 @@ class Run:
 		if data is None:
 			return df
 
-	def plot_interface(self, ax) -> None:
-		ax.plot(self.results['time'], self.results['h'], label='Interface location')
+	def plot_interface(self, ax, de=True, label=None) -> None:
+		if label is None:
+			label = 'Interface location'
+		ax.plot(self.results['time'], self.results['h'], label=label)
 
-		print(self.fitted_De)
-		if self.fitted_De is not None:
-			x = np.linspace(self.results[0, 'time'], self.results[-1, 'time'])
-			ax.plot(x, np.sqrt(x * self.fitted_De), ls='--', label=fr'Fitted $D_e={{{self.fitted_De:.4e}}}$')
-		
-		ax.plot(self.results['time'], self.results['exact_h'], ls=':', label=fr'Analytical $D_e={{{self.system.De:4e}}}$')
+		if de: 
+			if self.fitted_De is not None:
+				x = np.linspace(self.results[0, 'time'], self.results[-1, 'time'])
+				ax.plot(x, np.sqrt(x * self.fitted_De), ls='--', label=fr'Fitted $D_e={{{self.fitted_De:.4e}}}$')
+			
+			ax.plot(self.results['time'], self.results['exact_h'], ls=':', label=fr'Analytical $D_e={{{self.system.De:4e}}}$')
 
 		ax.legend()
 		ax.set_xlabel('time')
