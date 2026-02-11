@@ -152,3 +152,13 @@ class Run:
 		abs_ax.set_xlabel('Time')
 		abs_ax.set_ylabel('Absolute Error')
 		rel_ax.set_ylabel('Relative Error')
+	
+	def plot_mesh(self, ax, step: int, cmap: str = 'jet') :
+		frame = self.steps.filter(step=step)
+
+		plot = ax.scatter(frame['x'], frame['y'], c=frame['u'], cmap=cmap)
+
+		ax.axvline(self.results[step, 'h'], c='black', ls='--', label='Interface')
+		ax.set_title(f't={self.results[step, "time"]:.4f}')
+
+		return plot

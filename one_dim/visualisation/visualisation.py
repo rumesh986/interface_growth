@@ -168,6 +168,36 @@ class Visualiser:
 		ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3, prop={'size': 8})
 
 		self.savefig(fig, self.out_dir, 'interfaces')
+	
+	def plot_mesh(self, run, num_ax=4):
+		nrows = int(np.ceil(np.sqrt(num_ax)))
+		ncols = int(np.ceil(num_ax / nrows))
+
+		fig, axs = plt.subplots(
+			nrows, 
+			ncols,
+			sharex=True,
+			sharey=True,
+			figsize=(14, 10),
+			layout="compressed"
+		)
+
+		step = int(np.floor(run.results.shape[0] / num_ax))
+		for i, ax in enumerate(axs.flat):
+			if (i*step > run.results.shape[0]):
+				run.plot_mesh(ax, run.results.shape[0]-1)
+				break
+			cbar_plot = run.plot_mesh(ax, i * step)
+		
+		fig.colorbar(cbar_plot, ax=axs.flatten())
+		
+		if not self.report:
+			fig.suptitle('Nodal positions')
+		fig.supxlabel('X')
+		fig.supylabel('Y')
+
+		self.savefig(fig, self.out_dir, 'mesh')
+
 
 	def plot_de(self, run) -> None:
 		pass
