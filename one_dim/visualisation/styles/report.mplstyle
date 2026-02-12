@@ -6,3 +6,5 @@ font.size: 18
 
 lines.linewidth: 3
 lines.markersize: 10
+
+scatter.marker: x

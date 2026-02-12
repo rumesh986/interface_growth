@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from enum import StrEnum
+from enum import StrEnum, auto
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -12,8 +12,9 @@ from visualisation.run import Run
 from systems.systems import AnalysisType
 
 class PltStyle(StrEnum):
-	report = 'styles/report.mplstyle'
-	standard = 'styles/standard.mplstyle'
+	report = auto()
+	standard = auto()
+
 
 class Visualiser:
 	def __init__(
@@ -34,7 +35,7 @@ class Visualiser:
 		self.reference = reference
 		self.report = self.style == PltStyle.report
 
-		plt.style.use(f'{os.path.dirname(__file__)}/{self.style}')
+		plt.style.use(f"visualisation.styles.{self.style}")
 
 		if not os.path.exists(self.out_dir):
 			os.mkdir(self.out_dir)
