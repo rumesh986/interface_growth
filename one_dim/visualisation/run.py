@@ -162,3 +162,16 @@ class Run:
 		ax.set_title(f't={self.results[step, "time"]:.4f}')
 
 		return plot
+
+	def plot_profile(self, ax, step: int, y_idx: int = 0, markerstep: int=10):
+		frame = self.reshape_data(step, 'u')
+		exact_frame = self.reshape_data(step, 'exact_u')
+
+		ax.plot(frame['x'], frame[:, y_idx+1], label='Numerical')
+		# ax.plot(exact_frame[::markerstep, 'x'], exact_frame[::markerstep, y_idx+1], marker='x', ls=' ')
+		ax.scatter(exact_frame[::markerstep, 'x'], exact_frame[::markerstep, y_idx+1], c='C1', label='Analytical')
+		# ax.scatter(frame[::10, 'x'], frame[::10, y_idx+1], c='C1', zorder=2)
+		ax.axvline(self.results[step, 'h'], c='C2', ls='--', label='Numerical Interface')
+		ax.axvline(self.results[step, 'exact_h'], c='C3', ls='--', label='Analytical Interface')
+
+		ax.set_title(f't={self.results[step, "time"]:.4f}')

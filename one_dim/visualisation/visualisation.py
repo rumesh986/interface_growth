@@ -102,11 +102,11 @@ class Visualiser:
 		for run in self.runs:
 			self.plot_errors(run)
 
-	def savefig(self, fig, outdir, title):
+	def savefig(self, fig, outdir, title, ext='png'):
 		if self.report:
-			title = f'{outdir}/{self.prefix}-report-{title}.png'
+			title = f'{outdir}/{self.prefix}-report-{title}.{ext}'
 		else:
-			title = f'{outdir}/{self.prefix}-{title}.png'
+			title = f'{outdir}/{self.prefix}-{title}.{ext}'
 
 		fig.savefig(title)
 
@@ -182,12 +182,12 @@ class Visualiser:
 			layout="compressed"
 		)
 
-		step = int(np.floor(run.results.shape[0] / num_ax))
+		frame_step = int(np.floor(run.results.shape[0] / num_ax))
 		for i, ax in enumerate(axs.flat):
-			if (i*step > run.results.shape[0]):
+			if (i*frame_step > run.results.shape[0]):
 				run.plot_mesh(ax, run.results.shape[0]-1)
 				break
-			cbar_plot = run.plot_mesh(ax, i * step)
+			cbar_plot = run.plot_mesh(ax, i * frame_step)
 		
 		fig.colorbar(cbar_plot, ax=axs.flatten())
 		
@@ -196,8 +196,39 @@ class Visualiser:
 		fig.supxlabel('X')
 		fig.supylabel('Y')
 
-		self.savefig(fig, self.out_dir, 'mesh')
+		self.savefig(fig, run.out_dir, 'mesh')
 
+	def plot_profiles(self, run, num_ax=4) -> None:
+		nrows = int(np.ceil(np.sqrt(num_ax)))
+		ncols = int(np.ceil(num_ax / nrows))
+
+		fig, axs = plt.subplots(
+			nrows,
+			ncols,
+			sharex=True,
+			sharey=True,
+			figsize=(14, 10),
+			layout="compressed"
+		)
+
+		frame_step = int(np.floor(run.results.shape[0]) / num_ax)
+
+		for i, ax in enumerate(axs.flat):
+			frame = i * frame_step
+			if frame > run.results.shape[0]:
+				run.plot_profile(ax, run.results.shape[0] - 1)
+				break
+
+			run.plot_profile(ax, frame)
+
+		axs.flat[0].legend()
+
+		if not self.report:
+			fig.suptitle('Temperature profiles')
+		fig.supxlabel('X')
+		fig.supylabel('Temperature')
+
+		self.savefig(fig, run.out_dir, 'profiles')
 
 	def plot_de(self, run) -> None:
 		pass
