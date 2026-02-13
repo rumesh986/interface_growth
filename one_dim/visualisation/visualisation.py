@@ -81,7 +81,7 @@ class Visualiser:
 			self.plot_errors(run)
 			self.plot_interface(run)
 			self.plot_de(run)
-			self.anim_surf_prof(run)
+			self.anim_profile(run)
 
 			# if self.report:
 				# self.subplot_surf_prof(run)
@@ -235,9 +235,27 @@ class Visualiser:
 		pass
 		# raise NotImplementedError()
 
-	def anim_surf_prof(self, run) -> None:
-		pass
-		# raise NotImplementedError()
+	def anim_profile(self, run, zoom: bool = False) -> None:
+		if self.report:
+			fig, ax = plt.subplots(1)
+			anim = run.anim_profile(fig, prof=ax, zoom=zoom)
+		else:
+			fig, axs = plt.subplot_mosaic(
+				[
+					['prof'],
+					['error']
+				],
+				sharex=True,
+				figsize=(8, 10),
+			)
+				
+			anim = run.anim_profile(fig, prof=axs['prof'], error=axs['error'], zoom=zoom)
+
+			axs['prof'].set_xlabel('')
+			axs['prof'].set_title('Temperature profile')
+			axs['error'].set_title('Error in profile')
+
+		anim.save(f'{run.out_dir}/{self.prefix}-profile.mp4')
 
 	def plot_analysis(self) -> None:
 		pass

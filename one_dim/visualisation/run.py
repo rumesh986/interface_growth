@@ -6,6 +6,7 @@ from typing import Self
 import numpy as np
 import polars as pl
 from scipy.optimize import curve_fit
+from matplotlib.animation import FuncAnimation
 
 from systems.systems import Params, AnalysisType, System
 
@@ -153,7 +154,7 @@ class Run:
 		abs_ax.set_ylabel('Absolute Error')
 		rel_ax.set_ylabel('Relative Error')
 	
-	def plot_mesh(self, ax, step: int, cmap: str = 'jet') :
+	def plot_mesh(self, ax, step: int, cmap: str = 'jet') -> None:
 		frame = self.steps.filter(step=step)
 
 		plot = ax.scatter(frame['x'], frame['y'], c=frame['u'], cmap=cmap)
@@ -163,15 +164,131 @@ class Run:
 
 		return plot
 
-	def plot_profile(self, ax, step: int, y_idx: int = 0, markerstep: int=10):
+	def plot_profile(self, ax, step: int, y_idx: int = 0, markerstep: int=10) -> None:
 		frame = self.reshape_data(step, 'u')
 		exact_frame = self.reshape_data(step, 'exact_u')
 
 		ax.plot(frame['x'], frame[:, y_idx+1], label='Numerical')
-		# ax.plot(exact_frame[::markerstep, 'x'], exact_frame[::markerstep, y_idx+1], marker='x', ls=' ')
 		ax.scatter(exact_frame[::markerstep, 'x'], exact_frame[::markerstep, y_idx+1], c='C1', label='Analytical')
-		# ax.scatter(frame[::10, 'x'], frame[::10, y_idx+1], c='C1', zorder=2)
+
 		ax.axvline(self.results[step, 'h'], c='C2', ls='--', label='Numerical Interface')
 		ax.axvline(self.results[step, 'exact_h'], c='C3', ls='--', label='Analytical Interface')
 
 		ax.set_title(f't={self.results[step, "time"]:.4f}')
+
+	def anim_profile(self, fig, prof, error, nodes: int | None = 15, zoom: bool = False):
+		def _update(step):
+			
+			for time in times:
+				time.set_text(f't={self.results[step, "time"]:.4f}')
+
+			if prof is not None:
+				frame_num = self.reshape_data(step, 'u')
+				frame_exact = self.reshape_data(step, 'exact_u')
+
+				prof_lines['num'].set_data(frame_num['x'], frame_num[:, 1])
+				prof_lines['ana'].set_data(frame_exact['x'], frame_exact[:, 1])
+
+				prof_lines['iface_num'].set_xdata([self.results[step, 'h']])
+				prof_lines['iface_ana'].set_xdata([self.results[step, 'exact_h']])
+
+				if nodes is not None:
+					prof_lines['nodes'].set_offsets(frame_num[node_range, 'x':2])
+				
+				if zoom:
+					zoom_lines['num'].set_data(frame_num['x'], frame_num[:, 1])
+					zoom_lines['ana'].set_data(frame_exact['x'], frame_exact[:, 1])
+
+					h = self.results[step, 'h']
+					exact_h = self.results[step, 'exact_h']
+
+					zoom_lines['iface_num'].set_xdata([h])
+					zoom_lines['iface_ana'].set_xdata([exact_h])
+
+					x_halfrange = np.abs(h - exact_h)
+					zoom_ax.set_xlim(h-2*x_halfrange, h+2*x_halfrange)
+
+				
+			if error is not None:
+				frame = self.reshape_data(step, 'error')
+
+				error_lines['error'].set_data(frame['x'], frame[:, 1])
+				error.set_ylim(frame[:, 1].min() * 1.1, frame[:, 1].max() * 1.1)
+
+				error_lines['iface_num'].set_xdata([self.results[step, 'h']])
+				error_lines['iface_ana'].set_xdata([self.results[step, 'exact_h']])
+
+				if nodes is not None:
+					error_lines['nodes'].set_offsets(frame[node_range, 'x':2])
+	
+		times = []
+		node_range = list(range((self.params.nx1*(self.params.x-1))-nodes, (self.params.nx1*(self.params.x-1))+nodes))
+		
+		if prof is not None:
+			prof_lines = {}
+			times.append(prof.annotate(
+				f't={self.results[0, "time"]:.4f}',
+				xy=(0.6, 0.9),
+				xycoords='axes fraction'
+			))
+
+			frame_num = self.reshape_data(0, 'u')
+			frame_exact = self.reshape_data(0, 'exact_u')
+
+			prof_lines['num'], = prof.plot(frame_num['x'], frame_num[:, 1], label='Numerical')
+			prof_lines['ana'], = prof.plot(frame_exact['x'], frame_exact[:, 1], ls='--', label='Analytical')
+
+			prof_lines['iface_num'] = prof.axvline(self.results[0, 'h'], ls='--', label='Numerical Interface', c='C2')
+			prof_lines['iface_ana'] = prof.axvline(self.results[0, 'exact_h'], ls='--', label='Analytical Interface', c='C3')
+
+			if nodes is not None:
+				prof_lines['nodes'] = prof.scatter(frame_num[node_range, 'x'], frame_num[node_range, 1], label='nodes')
+			
+			if zoom:
+				zoom_lines = {}
+				zoom_ax = prof.inset_axes(
+					[0.4, 0.1, 0.2, 0.7],
+					xlim=(0.0, 0.2),
+					ylim=(-5e-5, 5e-5)
+				)
+				prof.indicate_inset_zoom(zoom_ax)
+				fig.add_axes(zoom_ax)
+
+				zoom_lines['num'], = zoom_ax.plot(frame_num['x'], frame_num[:, 1], label='Numerical')
+				zoom_lines['ana'], = zoom_ax.plot(frame_exact['x'], frame_exact[:, 1], ls='--', label='Analytical')
+
+				zoom_lines['iface_num'] = zoom_ax.axvline(self.results[0, 'h'], ls='--', label='Numerical Interface', c='C2')
+				zoom_lines['iface_ana'] = zoom_ax.axvline(self.results[0, 'exact_h'], ls='--', label='Analytical Interface', c='C3')
+
+
+			prof.legend()
+
+			prof.set_ylabel('Temperature')
+			prof.set_xlabel('x')
+		
+		if error is not None:
+			error_lines = {}
+			times.append(error.annotate(
+				f't={self.results[0, "time"]:.4f}',
+				xy=(0.6, 0.9),
+				xycoords='axes fraction'
+			))
+
+			frame = self.reshape_data(0, 'error')
+			error_lines['error'], = error.plot(frame['x'], frame[:, 1], label='Error')
+			error_lines['iface_num'] = error.axvline(self.results[0, 'h'], ls='--', label='Numerical Interface', c='C2')
+			error_lines['iface_ana'] = error.axvline(self.results[0, 'exact_h'], ls='--', label='Analytical Interface', c='C3')
+
+			if nodes is not None:
+				error_lines['nodes'] = error.scatter(frame[node_range, 'x'], frame[node_range, 1], label='nodes')
+
+			error.legend()
+
+			error.set_ylabel('Error')
+			error.set_xlabel('x')
+
+		return FuncAnimation(
+			fig, 
+			_update,
+			self.results.shape[0]
+		)
