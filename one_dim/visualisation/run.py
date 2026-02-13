@@ -33,10 +33,13 @@ class Run:
 				abs_error_h=(pl.col('exact_h') - pl.col('h')).abs(),
 				rel_error_h=((pl.col('exact_h') - pl.col('h')) / pl.col('h') ).abs()
 			).with_row_index('step')
-		# self.results = pd.read_csv(f'{self.inp_dir}/{resultsf}.{self.ext}', sep=' ')
 		self.times = self.results['time'] #.values
-		# self.interface = self.results['h']
-		# self.error_norms = self.results['error']
+
+		self.start_index = self.params.t+1
+
+		size = self.results[self.start_index:, 'error'].shape[0]
+		self.total_error_norm = np.linalg.norm(self.results[self.start_index:, 'error']) / size
+		self.interface_error_norm = np.linalg.norm(self.results[self.start_index:, 'abs_error_h']) / size
 
 		self.steps = pl.DataFrame()
 		if analysis_type == AnalysisType.standard:
@@ -51,11 +54,6 @@ class Run:
 			self.errors = self.steps['time', 'x', 'y', 'error']
 			self.solns = self.steps['time', 'x', 'y', 'u']
 			self.exact = self.steps['time', 'x', 'y', 'exact_u']
-			self.start_index = self.params.t+1
-
-			size = self.results[self.start_index:, 'error'].shape[0]
-			self.total_error_norm = np.linalg.norm(self.results[self.start_index:, 'error']) / size
-			self.interface_error_norm = np.linalg.norm(self.results[self.start_index:, 'abs_error_h']) / size
 
 			self.interface_node = self.step(0).filter(pl.col('x').is_close(self.results[0, 'h']))[0, 'node']
 
@@ -84,7 +82,7 @@ class Run:
 		return df.pivot(on='y', index='x', values=key)
 	
 	@property
-	def dx(self):
+	def max_dA(self):
 		return self.results['dA'].max()
 	
 	def create_outdir(self) -> None:

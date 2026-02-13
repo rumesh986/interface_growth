@@ -60,10 +60,10 @@ class Visualiser:
 			df = pl.DataFrame(data={
 				'x': [run.params.x],
 				't': [run.params.t],
-				'dx': [run.dx],
+				'dA': [run.max_dA],
 				'dt': [run.params.dt],
-				'error': [run.total_error_norm],
-				'interface_error': [run.interface_error_norm]
+				'bulk_error': [run.total_error_norm],
+				'iface_error': [run.interface_error_norm]
 			})
 			self.aggregate_data.vstack(df, in_place=True)
 		
@@ -257,8 +257,112 @@ class Visualiser:
 
 		anim.save(f'{run.out_dir}/{self.prefix}-profile.mp4')
 
-	def plot_analysis(self) -> None:
-		pass
+	def plot_analysis(self, ref: int | str = 0.09) -> None:
+		def _label(col):
+			x, t = col.strip('{}').split(',')
+
+			match int(x):
+				case 2: return f'Linear BDF{t}'
+				case 3: return f'Quadratic BDF{t}'
+				case 4: return f'Cubic BDF{t}'
+				case _: raise ValueError("Invalid element order")
+
+		match self.analysis_type:
+			case AnalysisType.dx:
+				xlabel = 'dA'
+				fname = 'dx_errors'
+				ref_variable = 'x'
+			case AnalysisType.dt:
+				xlabel = 'dt'
+				fname = 'dt_errors'
+				ref_variable = 't'
+
+		if self.report:
+			axs = {}
+			fig1, axs['bulk'] = plt.subplots(
+				1, 
+				figsize=(9, 6),
+				subplot_kw={
+					'xscale': 'log',
+					'yscale': 'log'
+				}
+			)
+			fig2, axs['iface'] = plt.subplots(
+				1, 
+				figsize=(9, 6),
+				subplot_kw={
+					'xscale': 'log',
+					'yscale': 'log'
+				}
+			)
+		else:
+			fig, axs = plt.subplot_mosaic(
+				[
+					['bulk'],
+					['iface']
+				],
+				sharex=True,
+				figsize=(8, 10),
+				subplot_kw={
+					'xlabel': xlabel,
+					'ylabel': 'Normalized $L_2$ norm of error',
+					'xscale': 'log',
+					'yscale': 'log'
+				},
+				per_subplot_kw={
+					'bulk': {
+						'title': 'Bulk error norms'
+					},
+					'iface': {
+						'title': 'Interface error norms'
+					}
+				}
+			)
+
+		iface_df = self.aggregate_data.pivot(index=xlabel, on=['x', 't'], values='iface_error')
+		bulk_df = self.aggregate_data.pivot(index=xlabel, on=['x', 't'], values='bulk_error')
+
+		for i in range(1, bulk_df.shape[1]):
+			axs['bulk'].scatter(bulk_df[:, 0], bulk_df[:, i], label=_label(bulk_df.columns[i]))
+			axs['iface'].scatter(iface_df[:, 0], iface_df[:, i], label=_label(iface_df.columns[i]))
+
+		xs = np.linspace(self.aggregate_data[xlabel].min(), self.aggregate_data[xlabel].max())
+		for i in self.aggregate_data[ref_variable].unique().sort():
+			if type(ref) == float:
+				ref_point = self.aggregate_data.filter(pl.col(ref_variable) == i).sort((pl.col(xlabel) - ref).abs())[0]
+			elif ref == 'max':
+				ref_point = self.aggregate_data.filter(pl.col(ref_variable) == i).sort(xlabel, descending=True)[0]
+			elif ref == 'min':
+				ref_point = self.aggregate_data.filter(pl.col(ref_variable) == i).sort(xlabel, descending=False)[0]
+			else:
+				raise ValueError('Invalid reference point argument')
+			
+			axs['bulk'].plot(
+				xs, 
+				(xs/ref_point[0, xlabel]) ** i * ref_point[0, 'bulk_error'], 
+				label=f'$\mathcal{{O}}({ref_variable}^{i})$', 
+				ls='--', 
+				alpha=0.8
+			)
+			axs['iface'].plot(
+				xs, 
+				(xs/ref_point[0, xlabel]) ** i * ref_point[0, 'iface_error'], 
+				label=f'$\mathcal{{O}}({ref_variable}^{i})$', 
+				ls='--', 
+				alpha=0.8
+			)
+
+
+		if self.report:
+			for ax in axs.values():
+				box = ax.get_position()
+				ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+				plt.tight_layout()
+			self.savefig(fig1, self.out_dir, f'{fname}_bulk')
+			self.savefig(fig2, self.out_dir, f'{fname}_iface')
+		else:
+			axs['bulk'].legend()
+			self.savefig(fig, self.out_dir, fname)
 
 	def sensitivity_analysis(self) -> None:
-		pass
+		raise NotImplementedError()
