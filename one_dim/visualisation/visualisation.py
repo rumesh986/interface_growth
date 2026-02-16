@@ -232,8 +232,14 @@ class Visualiser:
 		self.savefig(fig, run.out_dir, 'profiles')
 
 	def plot_de(self, run) -> None:
-		pass
-		# raise NotImplementedError()
+		fig, ax = plt.subplots(1)
+
+		run.plot_de(ax)
+
+		if not self.report:
+			ax.set_title('$D_e$ analytical vs numerical')
+
+		self.savefig(fig, run.out_dir, 'de')
 
 	def anim_profile(self, run, zoom: bool = False) -> None:
 		if self.report:
@@ -351,7 +357,6 @@ class Visualiser:
 				ls='--', 
 				alpha=0.8
 			)
-
 
 		if self.report:
 			for ax in axs.values():

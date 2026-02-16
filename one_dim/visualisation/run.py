@@ -33,7 +33,7 @@ class Run:
 				abs_error_h=(pl.col('exact_h') - pl.col('h')).abs(),
 				rel_error_h=((pl.col('exact_h') - pl.col('h')) / pl.col('h') ).abs()
 			).with_row_index('step')
-		self.times = self.results['time'] #.values
+		self.times = self.results['time'] 
 
 		self.start_index = self.params.t+1
 
@@ -139,6 +139,17 @@ class Run:
 		ax.legend()
 		ax.set_xlabel('time')
 		ax.set_ylabel(r'Interface location $h(t)$')
+	
+	def plot_de(self, ax) -> None:
+		ax.plot(np.square(self.results['h']) / self.results['time'], label='Instantaneous $D_e$')
+
+		ax.axhline(self.system.De, c='C1', ls='--', label='Analytical')
+		ax.axhline(self.fitted_De, c='C2', ls='--', label='Numerical')
+
+
+		ax.set_xlabel('time step')
+		ax.set_ylabel('$D_e$')
+		ax.legend()
 	
 	def plot_interface_error(self, abs_ax) -> None:
 		rel_ax = abs_ax.twinx()
