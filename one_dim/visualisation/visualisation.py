@@ -57,7 +57,7 @@ class Visualiser:
 			df = pl.DataFrame(data={
 				'x': [run.params.x],
 				't': [run.params.t],
-				'dA': [run.max_dA],
+				'dA': [run.max_elem_size],
 				'dt': [run.params.dt],
 				'bulk_error': [run.total_error_norm],
 				'iface_error': [run.interface_error_norm]

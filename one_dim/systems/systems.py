@@ -122,6 +122,6 @@ class Params(Base):
 		print(self.nx1)
 		return f'x={self.x} t={self.t} nx=({self.nx1}, {self.nx2}) dt={self.dt}'
 	
-	# @property
-	# def nx(self) -> int:
-	# 	return self.nx1 + self.nx2
+	@property
+	def nx(self) -> int:
+		return self.nx1 + self.nx2
