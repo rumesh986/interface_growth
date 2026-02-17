@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 import os
 from enum import StrEnum, auto
-from concurrent.futures import ProcessPoolExecutor
+# from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import polars as pl
@@ -14,7 +12,6 @@ from systems.systems import AnalysisType
 class PltStyle(StrEnum):
 	report = auto()
 	standard = auto()
-
 
 class Visualiser:
 	def __init__(
@@ -81,7 +78,10 @@ class Visualiser:
 			self.plot_errors(run)
 			self.plot_interface(run)
 			self.plot_de(run)
-			self.anim_profile(run)
+			self.anim_profile(run, not self.report)
+			
+			self.plot_mesh(run)
+			self.plot_profiles(run)
 
 			# if self.report:
 				# self.subplot_surf_prof(run)
@@ -98,10 +98,6 @@ class Visualiser:
 		# with ProcessPoolExecutor(max_workers=nworkers) as executor:
 		# 	for run, threads in zip(self.runs, executor.map(self._make, self.runs)):
 		# 		print(f'Standard processing for: \n{run.params}')
-	
-	def trial(self):
-		for run in self.runs:
-			self.plot_errors(run)
 
 	def savefig(self, fig, outdir, title, ext='png'):
 		if self.report:
@@ -110,6 +106,7 @@ class Visualiser:
 			title = f'{outdir}/{self.prefix}-{title}.{ext}'
 
 		fig.savefig(title)
+		plt.close()
 
 	def plot_errors(self, run) -> None:
 		if self.report:
@@ -245,6 +242,7 @@ class Visualiser:
 		if self.report:
 			fig, ax = plt.subplots(1)
 			anim = run.anim_profile(fig, prof=ax, zoom=zoom)
+			title = f'{run.out_dir}/{self.prefix}-report-profile.mp4'
 		else:
 			fig, axs = plt.subplot_mosaic(
 				[
@@ -260,8 +258,10 @@ class Visualiser:
 			axs['prof'].set_xlabel('')
 			axs['prof'].set_title('Temperature profile')
 			axs['error'].set_title('Error in profile')
+			title = f'{run.out_dir}/{self.prefix}-profile.mp4'
 
-		anim.save(f'{run.out_dir}/{self.prefix}-profile.mp4')
+		anim.save(title)
+		plt.close()
 
 	def plot_analysis(self, ref: int | str = 0.09) -> None:
 		def _label(col):
