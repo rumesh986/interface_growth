@@ -1,7 +1,8 @@
 import os
+import shutil
 import subprocess
-from datetime import datetime
 from time import sleep
+from datetime import datetime
 
 from concurrent.futures import ProcessPoolExecutor
 
@@ -17,7 +18,9 @@ class Build:
 		dname: str | None = None,
 		workspacesf: str = 'workspaces',
 		results_dir: str = 'RESLT',
-		nthreads: int = os.cpu_count()
+		nthreads: int = os.cpu_count(),
+		*args,
+		**kwargs
 	) -> None:
 		self.prog = prog
 		self.params = params

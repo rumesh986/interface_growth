@@ -6,24 +6,24 @@ from visualisation.visualisation import Visualiser
 if __name__ == '__main__':
 	params, system, args = cmd.parse_cmdline_args()
 
+	prog = args.pop('prog')
+	source_dir = args.pop('source')
+
 	run = RunLocal(
-		prog=args.prog,
+		prog=prog,
 		params=params,
-		source_dir=args.source,
+		source_dir=source_dir,
 		system=system,
-		dname=args.dname,
-		nthreads=args.nthreads
+		**args
 	)
 
 	run.build_all()
-
 	run.run_all()
 
-	print(args)
-
 	vis = Visualiser(
-		prefix=args.prog,
-		**vars(args)
+		prefix=prog,
+		analysis_type=params.analysis_type,
+		**args
 	)
 
-	vis.default_run(**vars(args))
+	vis.default_run(**args)

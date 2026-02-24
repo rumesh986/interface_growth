@@ -164,18 +164,20 @@ def parse_cmdline_args():
 			for nx1 in args.nx1:
 				nxs.append((nx1, nx1))
 
+	args = vars(args)
+
 	params = SimParams(
-		args.xs,
-		args.ts,
+		args.pop('xs'),
+		args.pop('ts'),
 		nxs,
-		args.dts,
-		args.tstart,
-		args.tend,
-		args.wf,
-		args.analysis_type
+		args.pop('dts'),
+		args.pop('tstart'),
+		args.pop('tend'),
+		args.pop('wf'),
+		args.pop('analysis_type')
 	)
 
-	match args.material:
+	match args.pop('material'):
 		case 'water': system = DefaultMaterialSystems.water_ice
 		case 'custom': raise NotImplementedError()
 
