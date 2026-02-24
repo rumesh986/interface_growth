@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from typing import TextIO, Self
+from itertools import product
+from typing import TextIO, Self, Iterator
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 from enum import StrEnum, auto
 
-@dataclass
+@dataclass(frozen=True)
 class Base:
 	def to_file(self, fname: str) -> None:
 		with open(fname, 'w') as f:
@@ -15,13 +16,13 @@ class Base:
 	@classmethod
 	def from_file(cls, fname: str) -> Self:
 		clsinfo = fields(cls)
-		obj = {k.name: None for k in clsinfo}
+		obj = {}
 		types = {k.name: k.type for k in clsinfo}
 
 		with open(fname, 'r') as f:
 			while line := f.readline():
 				k, v = line.split('=')
-				obj[k] = types[k](v) 
+				obj[k] = types[k](v)
 		
 		return Params(**obj)
 
@@ -47,6 +48,13 @@ class Material:
 		file.write(f'{tag}.k={self.k}\n')
 		file.write(f'{tag}.rho={self.rho}\n')
 		file.write(f'{tag}.cp={self.cp}\n')
+	
+	def args(self, index: int) -> list[str]:
+		return [
+			f'--k{index}', str(self.k),
+			f'--rho{index}', str(self.rho),
+			f'--cp{index}', str(self.cp),
+		]
 
 @dataclass
 class System:
@@ -81,13 +89,22 @@ class System:
 		)
 
 		system = System(
-			water,
 			ice,
+			water,
 			334000.0,
 			0.011587153186771986
 		)
 
 		return system
+	
+	@property
+	def args(self) -> list[str]:
+		return [
+			*self.solid.args(1),
+			*self.liquid.args(2),
+			'--L', str(self.L),
+			'--De', str(self.De)
+		]
 
 class AnalysisType(StrEnum):
 	standard = auto()
@@ -95,18 +112,7 @@ class AnalysisType(StrEnum):
 	dt = auto()
 	sensitivity = auto()
 
-@dataclass
-class SimParams(Base):
-	xs: int | list[int]
-	ts: int | list[int]
-	nxs: tuple[int, int] | list[tuple[int, int]]
-	dts: float | list[float]
-	tstart: float
-	tend: float
-	write_freq: int
-	analysis_type: AnalysisType
-
-@dataclass
+@dataclass(frozen=True)
 class Params(Base):
 	x: int
 	t: int
@@ -116,6 +122,21 @@ class Params(Base):
 	tstart: float
 	tend: float
 	write_freq: int
+	nx: int = field(init=False)
+
+	def __post_init__(self):
+		object.__setattr__(self, 'nx', self.nx1 + self.nx2)
+
+	@property
+	def args(self) -> list[str]:
+		return [
+			'--nx1', str(self.nx1),
+			'--nx2', str(self.nx2),
+			'--dt', str(self.dt),
+			'--tstart', str(self.tstart),
+			'--tend', str(self.tend),
+			'--write-freq', str(self.write_freq)
+		]
 
 	@property
 	def title(self) -> str:
@@ -123,5 +144,53 @@ class Params(Base):
 		return f'x={self.x} t={self.t} nx=({self.nx1}, {self.nx2}) dt={self.dt}'
 	
 	@property
-	def nx(self) -> int:
-		return self.nx1 + self.nx2
+	def short_title(self) -> str:
+		return f'{self.x}n{self.nx1}+{self.nx2}_{self.t}t{self.dt}'
+
+@dataclass(frozen=True)
+class SimParams(Base):
+	xs: list[int]
+	ts: list[int]
+	nxs: list[tuple[int, int]]
+	dts: list[float]
+	tstart: float
+	tend: float
+	write_freq: int
+	analysis_type: AnalysisType
+	num_jobs: int = field(init=False)
+
+	def __post_init__(self):
+		if type(self.xs) is int:
+			object.__setattr__(self, 'xs', [self.xs])
+		
+		if type(self.ts) is int:
+			object.__setattr__(self, 'ts', [self.ts])
+		
+		if type(self.nxs) is int:
+			object.__setattr__(self, 'nxs', [(self.nxs, self.nxs)])
+		elif type(self.nxs) is tuple:
+			object.__setattr__(self, 'nxs', [self.nxs])
+
+		if type(self.dts) is float:
+			object.__setattr__(self, 'dts', [self.dts])
+		
+		object.__setattr__(self, 'num_jobs', len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts))
+
+	@property
+	def jobs(self) -> Iterator[Params]:
+		for x, t, (nx1, nx2), dt in product(self.xs, self.ts, self.nxs, self.dts):
+			if self.analysis_type == AnalysisType.dt:
+				wf = int(max(self.dts) / dt)
+			else:
+				wf = self.write_freq
+
+			yield Params(
+				x,
+				t,
+				nx1,
+				nx2,
+				dt,
+				self.tstart,
+				self.tend,
+				wf
+			)
