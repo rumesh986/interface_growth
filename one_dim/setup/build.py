@@ -16,12 +16,14 @@ class Build:
 		system: MaterialSystem,
 		dname: str | None = None,
 		workspacesf: str = 'workspaces',
+		results_dir: str = 'RESLT',
 		nthreads: int = os.cpu_count()
 	) -> None:
 		self.prog = prog
 		self.params = params
 		self.source_dir = source_dir
 		self.system = system
+		self.results_dir = results_dir
 		self.nthreads = nthreads
 
 		if dname is None:

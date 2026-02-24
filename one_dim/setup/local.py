@@ -35,7 +35,8 @@ class RunLocal(Build):
 			num_workers = self.nthreads
 		
 		os.chdir(self.wd)
-		self.params.to_file('params')
+		self.params.to_file(f'{self.results_dir}/params')
+		self.system.to_file(f'{self.results_dir}/system')
 
 		futures = {}
 		with ProcessPoolExecutor(max_workers=num_workers) as executor:

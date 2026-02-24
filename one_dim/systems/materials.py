@@ -1,5 +1,5 @@
 from typing import TextIO, Self
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 @dataclass(frozen=True)
 class Material:
@@ -13,9 +13,8 @@ class Material:
 		file: TextIO,
 		tag: str
 	) -> None:
-		file.write(f'{tag}.k={self.k}\n')
-		file.write(f'{tag}.rho={self.rho}\n')
-		file.write(f'{tag}.cp={self.cp}\n')
+		for k in fields(self):
+			file.write(f'{tag}.{k.name}={self.__getattribute__(k.name)}\n')
 	
 	def args(self, index: int) -> list[str]:
 		return [
@@ -41,30 +40,37 @@ class MaterialSystem:
 			f.write(f'L={self.L}\n')
 			f.write(f'De={self.De}\n')
 	
-	def from_file(self) -> Self:
-		water = Material(
-			name="water",
-			k=0.55575,
-			rho=999.89,
-			cp=4220.0
-		)
+	@classmethod
+	def from_file(cls, fname: str) -> Self:
+		solid = {}
+		liquid = {}
+		L = None
+		De = None
 
-		ice = Material(
-			name="ice",
-			k=2.2,
-			rho=916.2,
-			cp=2050.0
-		)
+		material_types = {k.name: k.type for k in fields(Material)}
 
-		system = MaterialSystem(
-			ice,
-			water,
-			334000.0,
-			0.011587153186771986
-		)
+		with open(fname, 'r') as f:
+			while line := f.readline():
+				k,v = line.split('=')
 
-		return system
-	
+				match k:
+					case tag if tag.startswith('solid'):
+						_, k2 = tag.split('.')
+						solid[k2] = material_types[k2](v.strip())
+					case tag if tag.startswith('liquid'):
+						_, k2 = tag.split('.')
+						liquid[k2] = material_types[k2](v.strip())
+					case 'L': 
+						L = float(v)
+					case 'De': 
+						De = float(v)
+					case _: raise ValueError('Unknown key in system file')
+
+		if L is None or De is None:
+			raise Exception("Could not find all required information in system file")
+
+		return cls(Material(**solid), Material(**liquid), L, De)
+
 	@property
 	def args(self) -> list[str]:
 		return [
