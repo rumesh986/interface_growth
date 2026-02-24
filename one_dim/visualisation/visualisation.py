@@ -7,7 +7,8 @@ import polars as pl
 import matplotlib.pyplot as plt
 
 from visualisation.run import Run
-from systems.systems import AnalysisType, System
+from systems.params import AnalysisType
+from systems.materials import MaterialSystem
 
 class PltStyle(StrEnum):
 	report = auto()
@@ -37,7 +38,7 @@ class Visualiser:
 		if not os.path.exists(self.out_dir):
 			os.mkdir(self.out_dir)
 
-		system = System.from_file(f'{results_dir}/system')
+		system = MaterialSystem.from_file(f'{results_dir}/system')
 
 		self.runs = []
 		for rundir in os.listdir(results_dir):
@@ -279,6 +280,8 @@ class Visualiser:
 				xlabel = 'dt'
 				fname = 'dt_errors'
 				ref_variable = 't'
+			case _:
+				raise ValueError()
 
 		if self.report:
 			axs = {}

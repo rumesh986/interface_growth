@@ -6,7 +6,8 @@ from time import sleep
 from concurrent.futures import ProcessPoolExecutor
 
 from setup.build import Build
-from systems.systems import System, SimParams, Params, AnalysisType
+from systems.params import SimParams, Params, AnalysisType
+from systems.materials import System
 
 class RunLocal(Build):
 	def run(self, params: Params, *args, **kwargs) -> None:
@@ -28,7 +29,6 @@ class RunLocal(Build):
 			with open(f'{self.wd}/{self.bins[(params.x, params.t)]}.stdout', 'r') as f:
 				print(f.read())
 			raise
-
 
 	def run_all(self, *args, **kwargs) -> None:
 		num_workers = self.params.num_jobs

@@ -6,7 +6,8 @@ import polars as pl
 from matplotlib.pyplot import Axes, Figure
 from matplotlib.animation import Animation
 
-from systems.systems import Params, System
+from systems.params import Params
+from systems.materials import MaterialSystem
 
 class OneDCols(StrEnum):
 	time = 'time'
@@ -44,7 +45,7 @@ class RunBase:
 		self,
 		inp_dir: str,
 		out_dir: str,
-		system: System,
+		system: MaterialSystem,
 		load_data: bool = True,
 		reference: Self | None = None,
 		stepsf: str = 'steps/step',

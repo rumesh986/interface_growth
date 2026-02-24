@@ -5,7 +5,8 @@ from time import sleep
 
 from concurrent.futures import ProcessPoolExecutor
 
-from systems.systems import System, SimParams, Params, AnalysisType
+from systems.params import SimParams, Params, AnalysisType
+from systems.materials import System
 
 class Build:
 	def __init__(self, 
@@ -29,10 +30,13 @@ class Build:
 			dname = f'{self.prog}_{datetime.today().strftime("%Y-%m-%d_%H:%M:%S")}'
 
 		self.od = os.getcwd()
-		self.wd = f'{self.od}/{workspacesf}/{dname}'
+		self.wd = f'{self.od}/{workspacesf}/{prog}/{dname}'
 
 		if not os.path.exists(f'{self.od}/{workspacesf}'):
 			os.mkdir(f'{self.od}/{workspacesf}')
+		
+		if not os.path.exists(f'{self.od}/{workspacesf}/{prog}'):
+			os.mkdir(f'{self.od}/{workspacesf}/{prog}')
 
 	def build_all(self) -> None:
 		os.chdir(self.source_dir)
