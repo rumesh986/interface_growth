@@ -38,6 +38,10 @@ class Build:
 		if not os.path.exists(f'{self.od}/{workspacesf}/{prog}'):
 			os.mkdir(f'{self.od}/{workspacesf}/{prog}')
 
+		if kwargs['clear_results'] and os.path.exists(f'{self.wd}/{self.results_dir}'):
+			shutil.rmtree(f'{self.wd}/{self.results_dir}')
+		os.mkdir(f'{self.wd}/{self.results_dir}')
+
 	def build_all(self) -> None:
 		os.chdir(self.source_dir)
 

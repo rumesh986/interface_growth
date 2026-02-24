@@ -141,6 +141,11 @@ def parse_cmdline_args():
 		help='Length of animation when using standard processing, in seconds'
 	)
 
+	parser.add_argument('--clear-results',
+		action='store_true',
+		help='Delete existing results folders if they exist'
+	)
+
 	args = parser.parse_args()
 
 	if args.nxs is not None and args.nx2 is not None:
