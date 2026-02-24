@@ -119,9 +119,18 @@ class Run(RunBase):
 
 		ax.set_title(f't={self.results[step, self.COLS.time]:.4f}')
 
-	def anim_profile(self, fig: Figure, prof: Axes | None = None, error: Axes | None = None, nodes: int | None = 15, zoom: bool = False, *args, **kwargs) -> Animation:
+	def anim_profile(
+		self, 
+		fig: Figure, 
+		prof: Axes | None = None, 
+		error: Axes | None = None, 
+		nodes: int = 15, 
+		zoom: bool = False, 
+		*args, 
+		**kwargs
+	) -> Animation:
+
 		def _update(step):
-			
 			for time in times:
 				time.set_text(f't={self.results[step, self.COLS.time]:.4f}')
 
@@ -135,7 +144,7 @@ class Run(RunBase):
 				prof_lines['iface_num'].set_xdata([self.results[step, self.COLS.h]])
 				prof_lines['iface_ana'].set_xdata([self.results[step, self.COLS.exact_h]])
 
-				if nodes is not None:
+				if nodes > 0:
 					prof_lines['nodes'].set_offsets(frame_num[node_range, self.COLS.x:2])
 				
 				if zoom:
@@ -161,10 +170,11 @@ class Run(RunBase):
 				error_lines['iface_num'].set_xdata([self.results[step, self.COLS.h]])
 				error_lines['iface_ana'].set_xdata([self.results[step, self.COLS.exact_h]])
 
-				if nodes is not None:
+				if nodes > 0:
 					error_lines['nodes'].set_offsets(frame[node_range, self.COLS.x:2])
 	
 		times = []
+		nodes = min([self.params.nx1, self.params.nx2, nodes])
 		node_range = list(range((self.params.nx1*(self.params.x-1))-nodes, (self.params.nx1*(self.params.x-1))+nodes))
 		
 		if prof is not None:
@@ -184,7 +194,7 @@ class Run(RunBase):
 			prof_lines['iface_num'] = prof.axvline(self.results[0, self.COLS.h], ls='--', label='Numerical Interface', c='C2')
 			prof_lines['iface_ana'] = prof.axvline(self.results[0, self.COLS.exact_h], ls='--', label='Analytical Interface', c='C3')
 
-			if nodes is not None:
+			if nodes > 0:
 				prof_lines['nodes'] = prof.scatter(frame_num[node_range, self.COLS.x], frame_num[node_range, 1], label='nodes')
 			
 			if zoom:
@@ -222,7 +232,7 @@ class Run(RunBase):
 			error_lines['iface_num'] = error.axvline(self.results[0, self.COLS.h], ls='--', label='Numerical Interface', c='C2')
 			error_lines['iface_ana'] = error.axvline(self.results[0, self.COLS.exact_h], ls='--', label='Analytical Interface', c='C3')
 
-			if nodes is not None:
+			if nodes > 0:
 				error_lines['nodes'] = error.scatter(frame[node_range, self.COLS.x], frame[node_range, 1], label='nodes')
 
 			error.legend()
