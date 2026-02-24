@@ -56,7 +56,7 @@ class MaterialSystem:
 			cp=2050.0
 		)
 
-		system = System(
+		system = MaterialSystem(
 			ice,
 			water,
 			334000.0,
@@ -90,7 +90,7 @@ class DefaultMaterials:
 	)
 
 class DefaultMaterialSystems:
-	water_ice = System(
+	water_ice = MaterialSystem(
 		DefaultMaterials.ice,
 		DefaultMaterials.water,
 		334000.0,

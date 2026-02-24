@@ -1,3 +1,5 @@
+from warnings import warn
+
 import numpy as np
 import polars as pl
 from scipy.optimize import curve_fit
@@ -125,7 +127,7 @@ class Run(RunBase):
 		prof: Axes | None = None, 
 		error: Axes | None = None, 
 		nodes: int = 15, 
-		zoom: bool = False, 
+		zoom: bool = False,
 		*args, 
 		**kwargs
 	) -> Animation:
@@ -239,6 +241,9 @@ class Run(RunBase):
 
 			error.set_ylabel('Error')
 			error.set_xlabel('x')
+
+		if 'anim_length' in kwargs:
+			warn("Animation length control has not been implemented yet")
 
 		return FuncAnimation(
 			fig, 

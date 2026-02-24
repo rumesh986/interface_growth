@@ -6,18 +6,16 @@ from time import sleep
 from concurrent.futures import ProcessPoolExecutor
 
 from systems.params import SimParams, Params, AnalysisType
-from systems.materials import System
+from systems.materials import MaterialSystem
 
 class Build:
 	def __init__(self, 
 		prog: str,
 		params: SimParams,
 		source_dir: str,
-		system: System,
+		system: MaterialSystem,
 		dname: str | None = None,
 		workspacesf: str = 'workspaces',
-		debug: bool = False,
-		interactive: bool = False,
 		nthreads: int = os.cpu_count()
 	) -> None:
 		self.prog = prog

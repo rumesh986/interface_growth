@@ -27,7 +27,7 @@ class _Base:
 				k, v = line.split('=')
 				obj[k] = types[k](v)
 		
-		return Params(**obj)
+		return cls(**obj)
 
 	def __str__(self) -> str:
 		string = ""
@@ -85,20 +85,6 @@ class SimParams(_Base):
 	num_jobs: int = field(init=False)
 
 	def __post_init__(self):
-		if type(self.xs) is int:
-			object.__setattr__(self, 'xs', [self.xs])
-		
-		if type(self.ts) is int:
-			object.__setattr__(self, 'ts', [self.ts])
-		
-		if type(self.nxs) is int:
-			object.__setattr__(self, 'nxs', [(self.nxs, self.nxs)])
-		elif type(self.nxs) is tuple:
-			object.__setattr__(self, 'nxs', [self.nxs])
-
-		if type(self.dts) is float:
-			object.__setattr__(self, 'dts', [self.dts])
-		
 		object.__setattr__(self, 'num_jobs', len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts))
 
 	@property

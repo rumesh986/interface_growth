@@ -19,9 +19,9 @@ class Visualiser:
 		self,
 		prefix: str,
 		analysis_type: AnalysisType,
+		style: PltStyle = PltStyle.standard,
 		results_dir: str = 'RESLT',
 		out_dir: str = 'imgs',
-		style: PltStyle = PltStyle.standard,
 		reference: Run = None,
 		*args,
 		**kwargs
@@ -77,11 +77,11 @@ class Visualiser:
 			case AnalysisType.sensitivity: 	self.sensitivity_analysis(*args, **kwargs)
 		self.plot_interfaces()
 	
-	def _make(self, run) -> None:
+	def _make(self, run, *args, **kwargs) -> None:
 		self.plot_errors(run)
 		self.plot_interface(run)
 		self.plot_de(run)
-		self.anim_profile(run, not self.report)
+		self.anim_profile(run, not self.report, *args, **kwargs)
 		
 		self.plot_mesh(run)
 		self.plot_profiles(run)
@@ -92,7 +92,7 @@ class Visualiser:
 	def standard(self, nworkers=10, *args, **kwargs) -> None:
 		for run in self.runs:
 			print(f'Standard processing for: \n{run.params}')
-			self._make(run)
+			self._make(run, *args, **kwargs)
 		# with ProcessPoolExecutor(max_workers=nworkers) as executor:
 		# 	for run, threads in zip(self.runs, executor.map(self._make, self.runs)):
 		# 		print(f'Standard processing for: \n{run.params}')
@@ -236,7 +236,7 @@ class Visualiser:
 
 		self.savefig(fig, run.out_dir, 'de')
 
-	def anim_profile(self, run, zoom: bool = False) -> None:
+	def anim_profile(self, run, zoom: bool = False, *args, **kwargs) -> None:
 		if self.report:
 			fig, ax = plt.subplots(1)
 			anim = run.anim_profile(fig, prof=ax, zoom=zoom)
@@ -251,7 +251,7 @@ class Visualiser:
 				figsize=(8, 10),
 			)
 				
-			anim = run.anim_profile(fig, prof=axs['prof'], error=axs['error'], zoom=zoom)
+			anim = run.anim_profile(fig, prof=axs['prof'], error=axs['error'], zoom=zoom, *args, **kwargs)
 
 			axs['prof'].set_xlabel('')
 			axs['prof'].set_title('Temperature profile')

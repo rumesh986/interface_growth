@@ -7,7 +7,6 @@ from concurrent.futures import ProcessPoolExecutor
 
 from setup.build import Build
 from systems.params import SimParams, Params, AnalysisType
-from systems.materials import System
 
 class RunLocal(Build):
 	def run(self, params: Params, *args, **kwargs) -> None:
