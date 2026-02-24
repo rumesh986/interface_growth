@@ -1,6 +1,8 @@
 **/RESLT*/**
 **/imgs/**
 **/runs/**
+**/workspaces/**
+**/build/**
 **/*.o
 **/*.pyc
 **/*.Po
