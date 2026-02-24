@@ -7,7 +7,7 @@ import polars as pl
 import matplotlib.pyplot as plt
 
 from visualisation.run import Run
-from systems.systems import AnalysisType
+from systems.systems import AnalysisType, System
 
 class PltStyle(StrEnum):
 	report = auto()
@@ -37,6 +37,8 @@ class Visualiser:
 		if not os.path.exists(self.out_dir):
 			os.mkdir(self.out_dir)
 
+		system = System.from_file(f'{results_dir}/system')
+
 		self.runs = []
 		for rundir in os.listdir(results_dir):
 			rund = f'{results_dir}/{rundir}'
@@ -48,7 +50,8 @@ class Visualiser:
 			self.runs.append(Run(
 				rund,
 				f'{self.out_dir}/{rundir}',
-				analysis_type,
+				system,
+				analysis_type == AnalysisType.standard,
 				reference = self.reference
 			))
 	
@@ -74,22 +77,16 @@ class Visualiser:
 		self.plot_interfaces()
 	
 	def _make(self, run) -> None:
-		try:
-			self.plot_errors(run)
-			self.plot_interface(run)
-			self.plot_de(run)
-			self.anim_profile(run, not self.report)
-			
-			self.plot_mesh(run)
-			self.plot_profiles(run)
+		self.plot_errors(run)
+		self.plot_interface(run)
+		self.plot_de(run)
+		self.anim_profile(run, not self.report)
+		
+		self.plot_mesh(run)
+		self.plot_profiles(run)
 
-			# if self.report:
-				# self.subplot_surf_prof(run)
-			
-			if run.params.nx == 20:
-				self.subplot_mesh(run)
-		except:
-			raise Exception("SMTH WENT WRONG")
+		if run.params.nx == 20:
+			self.plot_mesh(run)
 	
 	def standard(self, nworkers=10, *args, **kwargs) -> None:
 		for run in self.runs:
