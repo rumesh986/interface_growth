@@ -164,6 +164,11 @@ def parse_cmdline_args():
 		help='Delete existing results folders if they exist'
 	)
 
+	parser.add_argument('--no-vis',
+		action='store_true',
+		help='Do not do any post-processing'
+	)
+
 	args = parser.parse_args()
 
 	if args.nxs is not None and args.nx2 is not None:
