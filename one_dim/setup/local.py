@@ -11,9 +11,21 @@ from systems.params import SimParams, Params, AnalysisType
 class RunLocal(Build):
 	def run(self, params: Params, *args, **kwargs) -> None:
 		try:
-			cmd_args = self.process_args(params, *args, **kwargs)
+			dname = f'{self.wd}/{self.results_dir}/{params.directory}'
 
-			with open(f'{self.wd}/{self.bins[(params.x, params.t)]}_{params.short_title}.stdout', 'w') as f:
+			if kwargs['clear_results'] and os.path.exists(dname):
+				shutil.rmtree(dname)
+			os.mkdir(dname)
+
+			params.to_file(f'{dname}/params')
+			self.system.to_file(f'{dname}/system')
+
+			kwargs['dname'] = dname
+
+			cmd_args = self.process_args(params, *args, **kwargs)
+			outfile = f'{self.wd}/{self.bins[(params.x, params.t)]}_{params.short_title}.stdout'
+
+			with open(outfile, 'w') as f:
 				cmd = [f'./{self.bins[(params.x, params.t)]}', *cmd_args]
 				f.write(f'COMMAND: {cmd}\n\n')
 				f.flush()
@@ -25,7 +37,7 @@ class RunLocal(Build):
 				)
 		except subprocess.CalledProcessError as e:
 			print(f'run failed with params: {params}')
-			with open(f'{self.wd}/{self.bins[(params.x, params.t)]}.stdout', 'r') as f:
+			with open(outfile, 'r') as f:
 				print(f.read())
 			raise
 

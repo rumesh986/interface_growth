@@ -71,6 +71,10 @@ class Params(_Base):
 	@property
 	def short_title(self) -> str:
 		return f'{self.x}n{self.nx1}+{self.nx2}_{self.t}t{self.dt}'
+	
+	@property
+	def directory(self) -> str:
+		return f'{self.x}n{self.nx1}+{self.nx2}_{self.t}t{self.dt:.2e}'
 
 @dataclass(frozen=True)
 class SimParams(_Base):

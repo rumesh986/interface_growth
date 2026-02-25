@@ -41,6 +41,9 @@ class Build:
 		if not os.path.exists(f'{self.od}/{workspacesf}/{prog}'):
 			os.mkdir(f'{self.od}/{workspacesf}/{prog}')
 
+		if not os.path.exists(self.wd):
+			os.mkdir(self.wd)
+
 		if kwargs['clear_results'] and os.path.exists(f'{self.wd}/{self.results_dir}'):
 			shutil.rmtree(f'{self.wd}/{self.results_dir}')
 		os.mkdir(f'{self.wd}/{self.results_dir}')
