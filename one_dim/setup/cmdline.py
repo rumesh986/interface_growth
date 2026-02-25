@@ -120,6 +120,24 @@ def parse_cmdline_args():
 		help='Material system to use'
 	)
 
+	materials_group.add_argument('--Ts',
+		type=float,
+		default=-1.0,
+		help='Boundary condition at x = 0.0 (solid)'
+	)
+
+	materials_group.add_argument('--Tm',
+		type=float,
+		default=.0,
+		help='Boundary condition at interface'
+	)
+
+	materials_group.add_argument('--Tl',
+		type=float,
+		default=1.0,
+		help='Boundary condition at x = 1.0 (liquid)'
+	)
+
 	post_group.add_argument('--type',
 		type=AnalysisType,
 		dest='analysis_type',
