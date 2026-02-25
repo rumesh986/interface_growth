@@ -75,14 +75,9 @@ class Build:
 			*params.args,
 			*self.system.args
 		]
-
-		if len(args) > 0:
-			print(args)
-			print(len(args))
-			ret.extend(args)
 		
 		for k, v in kwargs.items():
-			print(f'{k}={v}')
-			ret.extend([f'--{k}', str(v)])
+			if v is not None:
+				ret.extend([f'--{k}', str(v)])
 
 		return ret

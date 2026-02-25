@@ -174,20 +174,21 @@ def parse_cmdline_args():
 	if args.nxs is not None and args.nx2 is not None:
 		parser.error('argument --nx2 not allowed with argument --nx/--nxs')
 
+	args = vars(args)
+
 	nxs = []
-	if args.nxs is not None:
-		for pair in args.nxs:
+	if args.get('nxs') is not None:
+		for pair in args.pop('nxs'):
 			nx1, nx2 = pair.split(',')
 			nxs.append((int(nx1), int(nx2)))
 	else:
-		if args.nx2 is not None:
-			for nx1, nx2 in product(args.nx1, args.nx2):
+		if args.get('nx2') is not None:
+			for nx1, nx2 in product(args.pop('nx1'), args.pop('nx2')):
 				nxs.append((nx1, nx2))
 		else:
-			for nx1 in args.nx1:
+			for nx1 in args.pop('nx1'):
 				nxs.append((nx1, nx1))
 
-	args = vars(args)
 
 	params = SimParams(
 		args.pop('xs'),
