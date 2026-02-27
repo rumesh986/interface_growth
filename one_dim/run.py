@@ -18,7 +18,14 @@ if __name__ == '__main__':
 	)
 
 	run.build_all()
-	run.run_all()
+
+	if args.pop('no_run'):
+		exit(0)
+
+	run.run_all(**args)
+
+	if args.pop('no_vis'):
+		exit(0)
 
 	vis = Visualiser(
 		prefix=prog,
@@ -27,3 +34,4 @@ if __name__ == '__main__':
 	)
 
 	vis.default_run(**args)
+	# vis.anim_profile(vis.runs[0])

@@ -169,6 +169,11 @@ def parse_cmdline_args():
 		help='Do not do any post-processing'
 	)
 
+	parser.add_argument('--no-run',
+		action='store_true',
+		help='Do not run program (exit after building)'
+	)
+
 	args = parser.parse_args()
 
 	if args.nxs is not None and args.nx2 is not None:
