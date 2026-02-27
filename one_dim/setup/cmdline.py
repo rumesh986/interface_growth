@@ -99,7 +99,7 @@ def parse_cmdline_args():
 		help='End time of simulation'
 	)
 
-	params_group.add_argument('--write_freq', '--wf', 
+	params_group.add_argument('--write-freq', '--wf', 
 		type=int,
 		dest='wf',
 		default=1,

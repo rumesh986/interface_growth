@@ -27,7 +27,7 @@ class OneDCols(StrEnum):
 	abs_error = 'abs_error'
 	rel_error = 'rel_error'
 	
-	elem_size = 'dA'
+	elem_size = 'area'
 	
 	node = 'node'
 	step = 'step'
@@ -103,7 +103,7 @@ class RunBase:
 				f'{self._inp_dir}/{self._stepsf}{i}.{self._ext}', 
 				separator=self._PL_SEPARATOR
 			).with_columns([
-				pl.lit(self.results[i, self.COLS.time]).alias(self.COLS.time),
+				pl.lit(t).alias(self.COLS.time),
 				pl.lit(i).alias(self.COLS.step)
 			]).with_row_index(self.COLS.node)
 
