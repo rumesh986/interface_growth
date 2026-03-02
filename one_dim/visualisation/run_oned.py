@@ -32,11 +32,6 @@ class Run_OneD(RunBase):
 
 	@property
 	@override
-	def max_elem_size(self) -> float:
-		return self.results[self.COLS.elem_size].max()
-
-	@property
-	@override
 	def fitted_De(self) -> float | None:
 		if self._De is None:
 			def f(x, a, b):

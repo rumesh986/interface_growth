@@ -53,6 +53,7 @@ class RunBase(ABC):
 		resultsf: str = 'results',
 		paramsf: str = 'params',
 		systemf: str = 'system',
+		ifacef: str = 'interface',
 		ext: str = 'dat',
 	) -> None:
 		self._inp_dir = inp_dir
@@ -62,6 +63,7 @@ class RunBase(ABC):
 		self.reference = reference
 		self._resultsf = resultsf
 		self._stepsf = stepsf
+		self._ifacef = ifacef
 		self._ext = ext
 
 		self._De: float = None
@@ -133,6 +135,10 @@ class RunBase(ABC):
 			pl.col(self.COLS.error).abs().alias(self.COLS.abs_error),
 			(pl.col(self.COLS.error) / pl.col(self.COLS.exact_temp)).abs().alias(self.COLS.rel_error),
 		])
+	
+	@property
+	def max_elem_size(self) -> float:
+		return self.results[self.COLS.elem_size].max()
 
 	@abstractmethod
 	def load_additional_data(self) -> None:
@@ -146,11 +152,6 @@ class RunBase(ABC):
 	@property
 	@abstractmethod	
 	def interface_error_norm(self) -> float:
-		raise NotImplementedError()
-
-	@property
-	@abstractmethod	
-	def max_elem_size(self) -> float:
 		raise NotImplementedError()
 
 	@property
