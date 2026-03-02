@@ -68,15 +68,11 @@ namespace params {
 		if (x[0] < h) {
 			double denom = 0.5 / sqrt(t);
 			u = (erf(x[0] * denom) / erf(h * denom)) - 1.0;
-			// printf("solid: ");
 		} else {
 			double denom = 0.5 / sqrt(D * t);
 			double trans_tl = (T_l - T_m) / (T_m - T_s);
 			u = trans_tl * (erf(x[0] * denom) - erf(h * denom)) / (1.0 - erf(h * denom));
-			// printf("liquid: ");
 		}
-
-		// printf("x0=%16.14f x1=%16.14f u=%16.14f h=%16.14f De=%16.14f\n", x[0], x[1], u, h, De);
 	}
 
 	Vector<unsigned int> pinned_boundaries = {
@@ -223,15 +219,6 @@ class OneDimStefanProblem : public Problem {
 			}
 
 			bulk_mesh_pt->node_update();
-
-			for (unsigned int i = 0; i < params::ny; i++) {
-				unsigned int base = i * params::nx;
-
-				for (unsigned int e = params::nxs[0]; e < params::nx; e++) {
-					EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->element_pt(base + e));
-					printf("yi=%u e=%u alpha=%8.6f beta=%8.6f\n", i, e, elem->alpha(), elem->beta());
-				}
-			}
 		}
 
 		void actions_before_newton_step() {};
@@ -425,6 +412,11 @@ int main(int argc, char **argv) {
 	sprintf(fname, "%s/results.dat", info.directory().c_str());
 	FILE *file = fopen(fname, "w");
 	fprintf(file, "time error h exact_h area\n");
+	fclose(file);
+
+	sprintf(fname, "%s/dim", info.directory().c_str());
+	file = fopen(fname, "w");
+	fprintf(file, "1");
 	fclose(file);
 
 	printf("Output directory: %s\n", info.directory().c_str());
