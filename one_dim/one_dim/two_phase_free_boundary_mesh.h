@@ -176,7 +176,7 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 		inline void fill_in_generic_residual_contribution_ust_heat_flux(Vector<double> &residuals, DenseMatrix<double> &jacobian, bool compute_jacobian) {
 			if (this->ndof() == 0) return;
 
-			Vector<double> s(1), n(2);
+			Vector<double> s(1), normal(2);
 			Shape phi(this->nnode()), psi(this->nnode());
 			
 			for (unsigned int ipt = 0; ipt < this->integral_pt()->nweight(); ipt++) {
@@ -184,9 +184,10 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 
 				double J = this->shape_and_test(s, phi, psi);
 				double W = J * this->integral_pt()->weight(ipt);
-				this->outer_unit_normal(s, n);
-				double n_mag = sqrt(n[0]*n[0] + n[1]*n[1]);
-				printf("normal: n0=%16.14f n1=%16.14f mag=%16.14f\n", n[0], n[1], n_mag);
+				this->outer_unit_normal(s, normal);
+				double n_mag = sqrt(normal[0]*normal[0] + normal[1]*normal[1]);
+				// printf("normal: n0=%16.14f n1=%16.14f mag=%16.14f\n", n[0], n[1], n_mag);
+				// for error checking...
 				if (n_mag - 1.0 > 1e-6) {
 					printf("WARNING: normal not quite a unit\n\n\n");
 				}
@@ -200,13 +201,13 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 					Data *geom = this->external_data_pt(geom_indices[node]);
 
 					double dhdt = geom->time_stepper_pt()->time_derivative(1, geom, 0);
-					residuals[local_eqn] -= phi(n) * St * dhdt * W;
+					residuals[local_eqn] -= phi(n) * St * dhdt * normal[0] * W;
 
 					if (compute_jacobian) {
 						int h_eqn = this->external_local_eqn(geom_indices[node], 0);
 						if (h_eqn < 0) continue;
 
-						jacobian(local_eqn, h_eqn) -= phi(n) * St * geom->time_stepper_pt()->weight(1, 0) * W;
+						jacobian(local_eqn, h_eqn) -= phi(n) * St * geom->time_stepper_pt()->weight(1, 0) * normal[0] * W;
 					}
 				}
 			}
