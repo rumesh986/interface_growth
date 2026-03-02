@@ -22,7 +22,7 @@ class Visualiser:
 		style: PltStyle = PltStyle.standard,
 		results_dir: str = 'RESLT',
 		out_dir: str = 'imgs',
-		reference: Run = None,
+		reference: Run | None = None,
 		*args,
 		**kwargs
 	):
@@ -346,14 +346,14 @@ class Visualiser:
 			axs['bulk'].plot(
 				xs, 
 				(xs/ref_point[0, xlabel]) ** i * ref_point[0, 'bulk_error'], 
-				label=f'$\mathcal{{O}}({ref_variable}^{i})$', 
+				label=rf'$\mathcal{{O}}({ref_variable}^{i})$', 
 				ls='--', 
 				alpha=0.8
 			)
 			axs['iface'].plot(
 				xs, 
 				(xs/ref_point[0, xlabel]) ** i * ref_point[0, 'iface_error'], 
-				label=f'$\mathcal{{O}}({ref_variable}^{i})$', 
+				label=rf'$\mathcal{{O}}({ref_variable}^{i})$', 
 				ls='--', 
 				alpha=0.8
 			)

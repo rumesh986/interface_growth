@@ -22,8 +22,6 @@ class _Base:
 		obj = {}
 		types = {k.name: k.type for k in clsinfo if k.init}
 
-		print(clsinfo)
-
 		with open(fname, 'r') as f:
 			while line := f.readline():
 				k, v = line.split('=')

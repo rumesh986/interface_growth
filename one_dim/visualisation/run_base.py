@@ -58,7 +58,6 @@ class RunBase:
 		self.out_dir = out_dir
 		self.system = system
 		self.params = Params.from_file(f'{inp_dir}/{paramsf}')
-		# self.system = System.from_file(f'{inp_dir}/{systemf}')
 		self.reference = reference
 		self._resultsf = resultsf
 		self._stepsf = stepsf
