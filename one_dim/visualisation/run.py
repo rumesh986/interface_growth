@@ -1,4 +1,5 @@
 from warnings import warn
+from typing import override
 
 import numpy as np
 import polars as pl
@@ -8,8 +9,18 @@ from matplotlib.animation import Animation, FuncAnimation
 
 from visualisation.run_base import RunBase
 
-class Run(RunBase):
+class Run:
+	def __new__(cls, *args, **kwargs):
+		with open(f'{args[0]}/dim') as f:
+			dim = int(f.readline())
+
+		match dim:
+			case 1: return Run_OneD(*args, **kwargs)
+			case _: raise NotImplementedError()
+
+class Run_OneD(RunBase):
 	@property
+	@override
 	def total_error_norm(self) -> float:
 		if self._total_error_norm is None:
 			self._total_error_norm = np.linalg.norm(self.results[self.params.t+1:, self.COLS.error]) / self.results[self.params.t+1:].shape[0]
@@ -17,6 +28,7 @@ class Run(RunBase):
 		return self._total_error_norm
 
 	@property
+	@override
 	def interface_error_norm(self) -> float:
 		if self._interface_error_norm is None:
 			self._interface_error_norm = np.linalg.norm(self.results[self.params.t+1:, self.COLS.abs_error_h]) / self.results[self.params.t+1:].shape[0]
@@ -24,10 +36,12 @@ class Run(RunBase):
 		return self._interface_error_norm
 
 	@property
+	@override
 	def max_elem_size(self) -> float:
 		return self.results[self.COLS.elem_size].max()
 
 	@property
+	@override
 	def fitted_De(self) -> float | None:
 		if self._De is None:
 			def f(x, a, b):
@@ -41,6 +55,7 @@ class Run(RunBase):
 		
 		return self._De
 	
+	@override
 	def plot_error_norm(self, ax: Axes, *args, **kwargs) -> None:
 		ax.semilogy(self.results[self.COLS.time], self.results[self.COLS.error])
 		ax.set_xlabel('Time')
@@ -62,6 +77,7 @@ class Run(RunBase):
 		if data is None:
 			return df
 
+	@override
 	def plot_interface(self, ax: Axes, de: bool = True, label: str = 'Interface location', *args, **kwargs) -> None:
 		ax.plot(self.results[self.COLS.time], self.results[self.COLS.h], label=label)
 
@@ -76,6 +92,7 @@ class Run(RunBase):
 		ax.set_xlabel('time')
 		ax.set_ylabel(r'Interface location $h(t)$')
 	
+	@override
 	def plot_de(self, ax: Axes) -> None:
 		ax.plot(np.square(self.results[self.COLS.h]) / self.results[self.COLS.time], label='Instantaneous $D_e$')
 
@@ -87,6 +104,7 @@ class Run(RunBase):
 		ax.set_ylabel('$D_e$')
 		ax.legend()
 	
+	@override
 	def plot_interface_error(self, abs_ax: Axes, *args, **kwargs) -> None:
 		rel_ax = abs_ax.twinx()
 
@@ -99,6 +117,7 @@ class Run(RunBase):
 		abs_ax.set_ylabel('Absolute Error')
 		rel_ax.set_ylabel('Relative Error')
 	
+	@override
 	def plot_mesh(self, ax: Axes, step: int, cmap: str = 'jet', *args, **kwargs) -> None:
 		frame = self.steps.filter(step=step)
 
@@ -109,6 +128,7 @@ class Run(RunBase):
 
 		return plot
 
+	@override
 	def plot_profile(self, ax: Axes, step: int, y_idx: int = 0, markerstep: int = 10, *args, **kwargs) -> None:
 		frame = self.reshape_data(step, self.COLS.temp)
 		exact_frame = self.reshape_data(step, self.COLS.exact_temp)

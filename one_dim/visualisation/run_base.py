@@ -1,6 +1,7 @@
 import os
 from typing import Self
 from enum import StrEnum
+from abc import ABC, abstractmethod
 
 import polars as pl
 from matplotlib.pyplot import Axes, Figure
@@ -32,7 +33,7 @@ class OneDCols(StrEnum):
 	node = 'node'
 	step = 'step'
 
-class RunBase:
+class RunBase(ABC):
 	COLS: StrEnum = OneDCols
 	
 	_PL_SEPARATOR = ' '
@@ -119,23 +120,7 @@ class RunBase:
 	def create_outdir(self) -> None:
 		if not os.path.exists(self.out_dir):
 			os.mkdir(self.out_dir)
-	
-	@property
-	def total_error_norm(self) -> float:
-		raise NotImplementedError()
-	
-	@property
-	def interface_error_norm(self) -> float:
-		raise NotImplementedError()
-	
-	@property
-	def max_elem_size(self) -> float:
-		raise NotImplementedError()
-	
-	@property
-	def fitted_de(self) -> float | None:
-		raise NotImplementedError()
-	
+
 	def errors_at_node(self, node: int | None = None) -> pl.DataFrame:
 		if node is None:
 			node = self.step(self.params.t+1)[self.COLS.error].arg_max()
@@ -146,27 +131,55 @@ class RunBase:
 			pl.col(self.COLS.error).abs().alias(self.COLS.abs_error),
 			(pl.col(self.COLS.error) / pl.col(self.COLS.exact_temp)).abs().alias(self.COLS.rel_error),
 		])
-	
+
+	@property
+	@abstractmethod	
+	def total_error_norm(self) -> float:
+		raise NotImplementedError()
+
+	@property
+	@abstractmethod	
+	def interface_error_norm(self) -> float:
+		raise NotImplementedError()
+
+	@property
+	@abstractmethod	
+	def max_elem_size(self) -> float:
+		raise NotImplementedError()
+
+	@property
+	@abstractmethod	
+	def fitted_De(self) -> float | None:
+		raise NotImplementedError()
+
+	@abstractmethod	
 	def plot_error_norm(self, ax: Axes, *args, **kwargs) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_error_at_node(self, ax: Axes, data: pl.DataFrame | None = None, node: int | None = None, *args, **kwargs) -> pl.DataFrame | None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_interface(self, ax: Axes, de: bool = True, label: str = 'Interface location', *args, **kwargs) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_interface_error(self, abs_ax: Axes, *args, **kwargs) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_de(self, ax: Axes) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_mesh(self, ax: Axes, step: int, cmap: str = 'jet', *args, **kwargs) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def plot_profile(self, ax: Axes, step: int, y_idx: int = 0, markerstep: int = 10, *args, **kwargs) -> None:
 		raise NotImplementedError()
 
+	@abstractmethod
 	def anim_profile(self, fig: Figure, prof: Axes | None = None, error: Axes | None = None, nodes: int | None = 15, zoom: bool = False, *args, **kwargs) -> Animation:
 		raise NotImplementedError()
