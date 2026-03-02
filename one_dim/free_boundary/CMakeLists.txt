@@ -79,5 +79,10 @@ cust_add_executables(
   SOURCES one_dim1.cc two_phase_free_boundary_mesh.h
 )
 
+cust_add_executables(
+  TARGET two_dim1
+  SOURCES two_dim1.cc two_phase_free_boundary_mesh.h
+)
+
 message(VERBOSE "Leaving one_dim subdirectory")
 # ------------------------------------------------------------------------------
