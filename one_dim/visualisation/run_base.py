@@ -83,6 +83,8 @@ class RunBase(ABC):
 				print(f"system: {self.params}\n\n")
 			
 			self.create_outdir()
+		
+		self.load_additional_data()
 	
 	def load_results(self) -> None:
 		self.results = pl.read_csv(
@@ -131,6 +133,10 @@ class RunBase(ABC):
 			pl.col(self.COLS.error).abs().alias(self.COLS.abs_error),
 			(pl.col(self.COLS.error) / pl.col(self.COLS.exact_temp)).abs().alias(self.COLS.rel_error),
 		])
+
+	@abstractmethod
+	def load_additional_data(self) -> None:
+		raise NotImplemented()
 
 	@property
 	@abstractmethod	
