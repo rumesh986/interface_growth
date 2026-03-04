@@ -62,8 +62,17 @@ namespace params {
 		flux = 0.0;
 	}
 
+	void get_initial_interface_profile(const double &zeta, double &r) {
+		r = 0.2 * sin(8.0 * MathematicalConstants::Pi * zeta) + 0.2;
+		// r = 0.0;
+	}
+
 	void get_exact_u(const double &t, const Vector<double> &x, double &u) {
-		double h = sqrt(De * t);
+		double h_ana = sqrt(De * t);
+		double eps = 0.0;
+		get_initial_interface_profile(x[1], eps);
+
+		double h = h_ana + eps;
 
 		if (x[0] < h) {
 			double denom = 0.5 / sqrt(t);
@@ -76,11 +85,12 @@ namespace params {
 	}
 
 	Vector<unsigned int> pinned_boundaries = {
+		1,
 		3
 	};
 
 	Vector<unsigned int> analytical_boundaries = {
-		1
+		// 1
 	};
 
 	std::map<unsigned int, UnsteadyHeatEquations<X_ORDER>::UnsteadyHeatSourceFctPt> flux_boundaries = {
@@ -242,9 +252,12 @@ class TwoDimStefanProblem : public Problem {
 			time_pt()->dt() = params::dt;
 
 			double h = sqrt(params::De * time);
+			double eps;
 			for (unsigned int s = 0; s < bulk_mesh_pt->nspine(); s++) {
-				bulk_mesh_pt->spine_pt(s)->height() = h;
-				geometry->geom_data_pt(s)->set_value(0, h);
+				Spine *spine = bulk_mesh_pt->spine_pt(s);
+				params::get_initial_interface_profile(spine->geom_parameter(0), eps);
+				spine->height() = h + eps;
+				geometry->geom_data_pt(s)->set_value(0, h + eps);
 			}
 			bulk_mesh_pt->node_update();
 
@@ -267,8 +280,10 @@ class TwoDimStefanProblem : public Problem {
 
 				double h = sqrt(params::De * time);
 				for (unsigned int s = 0; s < bulk_mesh_pt->nspine(); s++) {
-					bulk_mesh_pt->spine_pt(s)->height() = h;
-					geometry->geom_data_pt(s)->set_value(0, h);
+					Spine *spine = bulk_mesh_pt->spine_pt(s);
+					params::get_initial_interface_profile(spine->geom_parameter(0), eps);
+					spine->height() = h + eps;
+					geometry->geom_data_pt(s)->set_value(0, h + eps);
 				}
 				bulk_mesh_pt->node_update();
 
