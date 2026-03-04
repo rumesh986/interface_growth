@@ -78,16 +78,20 @@ class Visualiser:
 		self.plot_interfaces()
 	
 	def _make(self, run, *args, **kwargs) -> None:
-		self.plot_errors(run)
-		self.plot_interface(run)
-		self.plot_de(run)
-		self.anim_profile(run, not self.report, *args, **kwargs)
-		
-		self.plot_mesh(run)
-		self.plot_profiles(run)
+		funcs = [
+			self.plot_errors,
+			self.plot_interface,
+			self.plot_de,
+			self.anim_profile,
+			self.plot_mesh,
+			self.plot_profiles,
+		]
 
-		if run.params.nx == 20:
-			self.plot_mesh(run)
+		for func in funcs:
+			try:
+				func(run, *args, **kwargs)
+			except Exception as e:
+				print(f"Failed to run {func}, exception {e}")
 	
 	def standard(self, nworkers=10, *args, **kwargs) -> None:
 		for run in self.runs:
@@ -127,7 +131,7 @@ class Visualiser:
 			axs['max'].set_title(f'Magnitude of errors at x={df[0, "x"]}')
 			fig.suptitle(fr'Errors ({run.params.title})')
 
-			self.savefig(fig, run.out_dir, 'errors')	
+			self.savefig(fig, run.out_dir, 'errors')
 
 	def plot_interface(self, run) -> None:
 		if self.report:
@@ -177,6 +181,9 @@ class Visualiser:
 			figsize=(14, 10),
 			layout="compressed"
 		)
+
+		if axs is not list:
+			axs = np.array(axs)
 
 		frame_step = int(np.floor(run.results.shape[0] / num_ax))
 		for i, ax in enumerate(axs.flat):

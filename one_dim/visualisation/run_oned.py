@@ -74,9 +74,9 @@ class Run_OneD(RunBase):
 		if de: 
 			if self.fitted_De is not None:
 				x = np.linspace(self.results[0, self.COLS.time], self.results[-1, self.COLS.time])
-				ax.plot(x, np.sqrt(x * self.fitted_De), ls='--', label=fr'Fitted $D_e={{{self.fitted_De:.4e}}}$')
+				ax.plot(x, np.sqrt(x * self.fitted_De), ls='--', label=fr'Fitted $D_e={{{self.fitted_De:.5f}}}$')
 			
-			ax.plot(self.results[self.COLS.time], self.results[self.COLS.exact_h], ls=':', label=fr'Analytical $D_e={{{self.system.De:4e}}}$')
+			ax.plot(self.results[self.COLS.time], self.results[self.COLS.exact_h], ls=':', label=fr'Analytical $D_e={{{self.system.De:.5f}}}$')
 
 		ax.legend()
 		ax.set_xlabel('time')
