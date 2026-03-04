@@ -1,3 +1,0 @@
-figure.figsize: 7, 5
-figure.autolayout: True
-axes.prop_cycle: cycler('color', ['F74B4B', '56B4E9', '009E73', 'F0E442', '0072B2', 'D55E00', 'CC79A7', 'B757D0', 'E69F00'])

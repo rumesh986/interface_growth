@@ -110,7 +110,7 @@ class Visualiser:
 		fig.savefig(title)
 		plt.close()
 
-	def plot_errors(self, run) -> None:
+	def plot_errors(self, run, *args, **kwargs) -> None:
 		if self.report:
 			axs = {}
 			fig1, axs['norm'] = plt.subplots(1)
@@ -133,7 +133,7 @@ class Visualiser:
 
 			self.savefig(fig, run.out_dir, 'errors')
 
-	def plot_interface(self, run) -> None:
+	def plot_interface(self, run, *args, **kwargs) -> None:
 		if self.report:
 			axs = {}
 			fig, axs['iface'] = plt.subplots(1)
@@ -156,7 +156,7 @@ class Visualiser:
 		
 		self.savefig(fig, run.out_dir, 'interface')
 
-	def plot_interfaces(self) -> None:
+	def plot_interfaces(self, *args, **kwargs) -> None:
 		fig, ax = plt.subplots(1,1)
 
 		self.runs[0].plot_interface(ax, label=self.runs[0].params.title)
@@ -169,7 +169,7 @@ class Visualiser:
 
 		self.savefig(fig, self.out_dir, 'interfaces')
 	
-	def plot_mesh(self, run, num_ax=4):
+	def plot_mesh(self, run, num_ax=4, *args, **kwargs) -> None:
 		nrows = int(np.ceil(np.sqrt(num_ax)))
 		ncols = int(np.ceil(num_ax / nrows))
 
@@ -201,7 +201,7 @@ class Visualiser:
 
 		self.savefig(fig, run.out_dir, 'mesh')
 
-	def plot_profiles(self, run, num_ax=4) -> None:
+	def plot_profiles(self, run, num_ax=4, *args, **kwargs) -> None:
 		nrows = int(np.ceil(np.sqrt(num_ax)))
 		ncols = int(np.ceil(num_ax / nrows))
 
@@ -233,7 +233,7 @@ class Visualiser:
 
 		self.savefig(fig, run.out_dir, 'profiles')
 
-	def plot_de(self, run) -> None:
+	def plot_de(self, run, *args, **kwargs) -> None:
 		fig, ax = plt.subplots(1)
 
 		run.plot_de(ax)

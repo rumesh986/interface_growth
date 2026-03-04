@@ -5,7 +5,8 @@
             "includePath": [
                 "${default}",
                 "/home/u5665436/repo/oomph-lib/src/generic",
-                "/home/u5665436/repo/oomph-lib/src/poisson"
+                "/home/u5665436/repo/oomph-lib/src/poisson",
+                "/home/u5665436/repo/oomph-lib/install/include/oomphlib/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang-18",

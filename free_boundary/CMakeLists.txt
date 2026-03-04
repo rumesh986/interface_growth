@@ -5,7 +5,7 @@ message(VERBOSE "Entered one_dim subdirectory")
 cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 project(one_dim C CXX Fortran)
 if(NOT oomphlib_FOUND)
-  find_package(oomphlib CONFIG REQUIRED PATHS "../../../../install")
+  find_package(oomphlib CONFIG REQUIRED PATHS "../../../install")
 endif()
 
 # Add a block of this type for your own executable

@@ -62,5 +62,6 @@
 		"iomanip": "cpp",
 		"limits": "cpp",
 		"cinttypes": "cpp"
-	}
+	},
+	"cmake.sourceDirectory": "/home/u5665436/repo/oomph-lib/user_drivers/interface_growth/one_dim/erf2d"
 }
