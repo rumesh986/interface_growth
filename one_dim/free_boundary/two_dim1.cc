@@ -41,7 +41,7 @@ namespace params {
 	double T_l = NAN;
 
 	double xs[3] = {0.0, 0.5, 1.0};
-	double ys[2] = {0.0, 0.0001};
+	double ys[2] = {0.0, 1.0};
 
 	unsigned int nxs[2] = {10, 10};
 	unsigned int nx = 0;
@@ -311,7 +311,6 @@ class TwoDimStefanProblem : public Problem {
 			fclose(file);
 
 			sprintf(fname, "%s/interface.dat", info.directory().c_str());
-			printf("FNAME: %s\n", fname);
 			file = fopen(fname, "w");
 			fprintf(file, "time");
 			for (unsigned int n = 0; n < bulk_mesh_pt->nboundary_node(interface_boundary_index); n++) {

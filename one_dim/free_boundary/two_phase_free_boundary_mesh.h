@@ -264,12 +264,15 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			return _geometry;
 		}
 
-		Spine *_create_new_spine(unsigned int s, const double h) {
+		Spine *_create_new_spine(unsigned int s, const double h, const Vector<double> params) {
 			Spine *spine = new Spine(h);
 			// spine->spine_height_pt()->pin(0);
 			spine->spine_height_pt()->pin_all();
-			Spine_pt.push_back(spine);
 			spine->add_geom_data_pt(_geometry->geom_data_pt(s));
+			spine->set_geom_parameter(params);
+			Spine_pt.push_back(spine);
+
+			printf("Creating spine %d (%p) with data %p -> %p\n", s, spine, _geometry->geom_data_pt(s), spine->geom_data_pt(1));
 
 			return spine;
 		}
@@ -296,7 +299,8 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			unsigned int yi;
 			for (yi = 0; yi < ny-1; yi++) {
 				for (unsigned int s = 0; s < nnode_1d-1; s++) {
-					Spine *spine = _create_new_spine(s, h);
+					Vector<double> parameters = {((double)yi + (double)s/(double)(nnode_1d-1)) / (double)ny};
+					Spine *spine = _create_new_spine(yi * (nnode_1d-1) + s, h, parameters);
 
 					unsigned int xi;
 					for (xi = 0; xi < nx1-1; xi++) {
@@ -325,7 +329,8 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 
 			yi = ny-1;
 			for (unsigned int s = 0; s < nnode_1d; s++) {
-				Spine *spine = _create_new_spine(s, h);
+				Vector<double> parameters = {((double)yi + (double)s/(double)(nnode_1d-1)) / (double)ny};
+				Spine *spine = _create_new_spine(yi * (nnode_1d-1) + s, h, parameters);
 
 				unsigned int xi;
 				for (xi = 0; xi < nx1-1; xi++) {
