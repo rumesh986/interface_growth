@@ -220,6 +220,7 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 	private:
 		const unsigned int _free_boundary_index = 4;
 		const unsigned int nx1, nx2, nx, ny;
+		const bool _periodic;
 
 		FreeBoundaryElement *_geometry;
 	public:
@@ -228,12 +229,20 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			unsigned int ny,
 			double *xs,
 			double *ys,
+			double gamma,
+			bool periodic,
 			TimeStepper *timestepper
 		) : RectangularQuadMesh<EL>(nxs[0]+nxs[1], ny, xs[0], xs[2], ys[0], ys[1], timestepper),
-			nx1(nxs[0]), nx2(nxs[1]), nx(nxs[0]+nxs[1]), ny(ny) {
+			nx1(nxs[0]), nx2(nxs[1]), nx(nxs[0]+nxs[1]), ny(ny), _periodic(periodic) {
+
+			// periodicity in y
+			if (_periodic) {
+				for (unsigned int n = 0; n < nboundary_node(0); n++) {
+					boundary_node_pt(2, n)->make_periodic(boundary_node_pt(0, n));
+				}
+			}
 
 			this->set_nboundary(5);
-			
 			for (unsigned int e = 0; e < ny; e++) {
 				EL *elem = dynamic_cast<EL *>(this->element_pt((nxs[0]+nxs[1])*e + nxs[0]));
 				unsigned int nnode_1d = elem->nnode_1d();
@@ -245,18 +254,19 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 				}
 			}
 			
-			unsigned int nnode_freeboundary = nboundary_node(_free_boundary_index);
-			_geometry = new FreeBoundaryElement(xs, ys, nnode_freeboundary, timestepper);
+			unsigned int nspine = nboundary_node(_free_boundary_index);
+			if (_periodic) nspine--;
+			_geometry = new FreeBoundaryElement(xs, ys, nspine, gamma, timestepper);
 			_geometry->free_boundary_index() = _free_boundary_index;
-			for (unsigned int n = 0; n < nnode_freeboundary; n++) {
-				Node *node = boundary_node_pt(_free_boundary_index, n);
-				_geometry->add_node(node, n);
-			}
 
 			construct_spines(xs[1]);
 
 			for (unsigned int n = 0; n < nnode(); n++) {
 				spine_node_update(node_pt(n));
+			}
+
+			for (unsigned int s = 0; s < Spine_pt.size(); s++) {
+				printf("Spine %u: %p\n", s, Spine_pt[s]->geom_data_pt(1));
 			}
 		}
 
@@ -272,7 +282,7 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			spine->set_geom_parameter(params);
 			Spine_pt.push_back(spine);
 
-			printf("Creating spine %d (%p) with data %p -> %p\n", s, spine, _geometry->geom_data_pt(s), spine->geom_data_pt(1));
+			// printf("Creating spine %d (%p) with data %p -> %p\n", s, spine, _geometry->geom_data_pt(s), spine->geom_data_pt(1));
 
 			return spine;
 		}
@@ -294,10 +304,11 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 		void construct_spines(double h) {
 			unsigned int nnode_1d = finite_element_pt(0)->nnode_1d();
 			unsigned int nspine = nboundary_node(_free_boundary_index);
+			if (_periodic) nspine--;
 			Spine_pt.reserve(nspine);
 
 			unsigned int yi;
-			for (yi = 0; yi < ny-1; yi++) {
+			for (yi = 0; yi < ny; yi++) {
 				for (unsigned int s = 0; s < nnode_1d-1; s++) {
 					Vector<double> parameters = {((double)yi + (double)s/(double)(nnode_1d-1)) / (double)ny};
 					Spine *spine = _create_new_spine(yi * (nnode_1d-1) + s, h, parameters);
@@ -328,32 +339,36 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			}
 
 			yi = ny-1;
-			for (unsigned int s = 0; s < nnode_1d; s++) {
-				Vector<double> parameters = {((double)yi + (double)s/(double)(nnode_1d-1)) / (double)ny};
-				Spine *spine = _create_new_spine(yi * (nnode_1d-1) + s, h, parameters);
+			unsigned int s = nnode_1d-1;
+			Vector<double> parameters = {((double)yi + (double)s/(double)(nnode_1d-1)) / (double)ny};
+			Spine *spine;
+			if (_periodic) {
+				spine = Spine_pt[0];
+			} else {
+				spine = _create_new_spine(yi * (nnode_1d-1) + s, h, parameters);
+			}
 
-				unsigned int xi;
-				for (xi = 0; xi < nx1-1; xi++) {
-					for (unsigned int n = 0; n < nnode_1d-1; n++) {
-						_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)xi + (double)n/(double)(nnode_1d-1))/(double)nx1, 0, spine);
-					}
-				}
-
-				xi = nx1-1;
-				for (unsigned int n = 0; n < nnode_1d; n++) {
+			unsigned int xi;
+			for (xi = 0; xi < nx1-1; xi++) {
+				for (unsigned int n = 0; n < nnode_1d-1; n++) {
 					_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)xi + (double)n/(double)(nnode_1d-1))/(double)nx1, 0, spine);
 				}
+			}
 
-				for (xi = nx1; xi < nx-1; xi++) {
-					for (unsigned int n = 0; n < nnode_1d-1; n++) {
-						_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)(xi-nx1) + (double)n/(double)(nnode_1d-1))/(double)nx2, 1, spine);
-					}
-				}
+			xi = nx1-1;
+			for (unsigned int n = 0; n < nnode_1d; n++) {
+				_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)xi + (double)n/(double)(nnode_1d-1))/(double)nx1, 0, spine);
+			}
 
-				xi = nx-1;
-				for (unsigned int n = 0; n < nnode_1d; n++) {
+			for (xi = nx1; xi < nx-1; xi++) {
+				for (unsigned int n = 0; n < nnode_1d-1; n++) {
 					_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)(xi-nx1) + (double)n/(double)(nnode_1d-1))/(double)nx2, 1, spine);
 				}
+			}
+
+			xi = nx-1;
+			for (unsigned int n = 0; n < nnode_1d; n++) {
+				_add_spine_to_node(yi*nx + xi, s*nnode_1d+n, ((double)(xi-nx1) + (double)n/(double)(nnode_1d-1))/(double)nx2, 1, spine);
 			}
 
 			printf("Created %lu/%u spines\n\n", Spine_pt.size(), nspine);
