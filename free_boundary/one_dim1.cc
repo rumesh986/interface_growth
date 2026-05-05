@@ -102,7 +102,7 @@ class OneDimStefanProblem : public Problem {
 		OneDimStefanProblem() {
 			add_time_stepper_pt(new BDF<T_ORDER>(true));
 
-			bulk_mesh_pt = new TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>>(params::nxs, params::ny, params::xs, params::ys, time_stepper_pt());
+			bulk_mesh_pt = new TwoPhaseFreeBoundarySpineMesh<SpineElement<EL>>(params::nxs, params::ny, params::xs, params::ys, 0.0, true, time_stepper_pt());
 			bulk_mesh_pt->setup_boundary_element_info();
 			add_sub_mesh(bulk_mesh_pt);
 			geometry = bulk_mesh_pt->geometry();
@@ -119,15 +119,6 @@ class OneDimStefanProblem : public Problem {
 				int face_index = bulk_mesh_pt->face_index_at_boundary(interface_boundary_index, e);
 				if (face_index == 1) {
 					auto flux_elem = new FreeBoundaryFluxElement<EL>(elem, face_index, params::St);
-
-					// each flux elem now has mapping for all boundary nodes
-					// need to remove the additional data if this works as expected
-					for (unsigned int n = 0; n < bulk_mesh_pt->nboundary_node(interface_boundary_index); n++) {
-						Node *node = bulk_mesh_pt->boundary_node_pt(interface_boundary_index, n);
-						Data *data = geometry->get_data_for_node(node);
-						flux_elem->add_node_data(node, data);
-					}
-
 					surf_mesh_pt->add_element_pt(flux_elem);
 				}
 			}
