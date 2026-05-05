@@ -90,16 +90,9 @@ class FreeBoundaryElement : public GeneralisedElement,
 
 			unpin_free_boundary();
 			destroy_geom_data = true;
-		}
 
-		void add_node(Node *node_pt, unsigned int i) {
-			node_int_map[i] = add_internal_data(geom_data_pt(i));
-			node_ext_map[i] = add_external_data(node_pt);
-			node_data_map[node_pt] = geom_data_pt(i);
-		}
-
-		Data*& get_data_for_node(Node *node_pt) {
-			return node_data_map[node_pt];
+			for (unsigned int i = 0; i < nnode; i++)
+				add_internal_data(geom_data_pt(i));
 		}
 
 		unsigned int& free_boundary_index() {
@@ -125,26 +118,7 @@ class FreeBoundaryElement : public GeneralisedElement,
 			fill_in_generic_residual_contribution(residuals, jacobian, true);
 		}
 
-		inline void fill_in_generic_residual_contribution(Vector<double> &residuals, DenseMatrix<double> &jacobian, bool compute_jacobian) {
-			if (ndof() == 0) return;
-
-			for (unsigned int i = 0; i < ngeom_data(); i++) {
-				int local_eqn = internal_local_eqn(node_int_map[i], 0);
-				if (local_eqn < 0) continue;
-
-				Node *node_pt = dynamic_cast<Node *>(external_data_pt(node_ext_map[i]));
-				if (node_pt == NULL || !node_pt->is_on_boundary(boundary_index)) continue; 
-
-				residuals[local_eqn] = node_pt->value(0);
-
-				if (compute_jacobian) {
-					int local_unknown = external_local_eqn(node_ext_map[i], 0);
-					if (local_unknown < 0) continue;
-
-					jacobian(local_eqn, local_unknown) = 1.0;
-				}
-			}
-		}
+		inline void fill_in_generic_residual_contribution(Vector<double> &residuals, DenseMatrix<double> &jacobian, bool compute_jacobian) {}
 };
 
 template<class EL>
@@ -160,10 +134,13 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 			unsigned int face_index,
 			double _St,
 			double _gamma = 0.0
-		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St), gamma(_gamma) {}
-
-		void add_node_data(Node *node_pt, Data *data_pt) {
-			geom_indices[node_pt] = this->add_external_data(data_pt);
+		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St), gamma(_gamma) {
+			
+			for (unsigned int n = 0; n < this->nnode(); n++) {
+				SpineNode *node = dynamic_cast<SpineNode *>(this->node_pt(n));
+				printf("node: %p data: %p\n", node, node->spine_pt()->geom_data_pt(1));
+				geom_indices[this->node_pt(n)] = this->add_external_data(node->spine_pt()->geom_data_pt(1));
+			}
 		}
 	
 	protected:
@@ -194,6 +171,25 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 					printf("WARNING: normal not quite a unit\n\n\n");
 				}
 
+				// very bad way of getting curvature: kappa = ||dt/ds||, t=tangent
+				Vector<double> s2(1, 0.0), normal2(2, 0.0), grad(2, 0.0);
+				double eps = 1e-5; // small displacement for FD
+				Vector<Vector<double>> tangent1, tangent2;
+				tangent1.resize(1);
+				tangent1[0].resize(2);
+
+				tangent2.resize(1);
+				tangent2[0].resize(2);
+
+				s2[0] = s[0] + eps;
+				this->continuous_tangent_and_outer_unit_normal(s2, tangent1, normal2);
+				s2[0] = s[0] - eps;
+				this->continuous_tangent_and_outer_unit_normal(s2, tangent2, normal2);
+
+				grad[0] = (tangent1[0][0] - tangent2[0][0]) / (2.0 * eps);
+				grad[1] = (tangent1[0][1] - tangent2[0][1]) / (2.0 * eps);
+
+				double kappa = VectorHelpers::magnitude(grad);
 
 				for (unsigned int n = 0; n < this->nnode(); n++) {
 					int local_eqn = this->nodal_local_eqn(n, 0);
@@ -201,15 +197,17 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 
 					Node *node = this->node_pt(n);
 					Data *geom = this->external_data_pt(geom_indices[node]);
-
+					int h_eqn = this->external_local_eqn(geom_indices[node], 0);
+					if (h_eqn < 0) continue;
+					
 					double dhdt = geom->time_stepper_pt()->time_derivative(1, geom, 0);
 					residuals[local_eqn] -= phi(n) * St * dhdt * normal[0] * W;
+					
+					residuals[h_eqn] += phi(n) * node->value(0) * W + gamma * phi(n) * kappa * W;
 
 					if (compute_jacobian) {
-						int h_eqn = this->external_local_eqn(geom_indices[node], 0);
-						if (h_eqn < 0) continue;
-
 						jacobian(local_eqn, h_eqn) -= phi(n) * St * geom->time_stepper_pt()->weight(1, 0) * normal[0] * W;
+						jacobian(h_eqn, local_eqn) += phi(n) * W;
 					}
 				}
 			}
