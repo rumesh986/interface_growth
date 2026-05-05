@@ -1,5 +1,9 @@
 from typing import TextIO, Self
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, InitVar, field
+
+import numpy as np
+from scipy.special import erf
+from scipy.optimize import newton
 
 @dataclass(frozen=True)
 class Material:
@@ -22,13 +26,33 @@ class Material:
 			f'--rho{index}', str(self.rho),
 			f'--cp{index}', str(self.cp),
 		]
+	
+	@property
+	def alpha(self):
+		return self.rho * self.cp
+	@property
+	def beta(self):
+		return self.k
+
+	@property
+	def D(self):
+		return self.beta / self.alpha
 
 @dataclass
 class MaterialSystem:
 	solid: Material
 	liquid: Material
 	L: float
-	De: float
+
+	Ts: float
+	Tm: float
+	Tl: float
+
+	De: float = field(default=None)
+
+	def __post_init__(self):
+		if self.De is None:
+			self.De = self._calculate_De()
 
 	def to_file(
 		self,
@@ -37,8 +61,9 @@ class MaterialSystem:
 		with open(fname, 'w') as f:
 			self.solid.to_file(f, 'solid')
 			self.liquid.to_file(f, 'liquid')
-			f.write(f'L={self.L}\n')
-			f.write(f'De={self.De}\n')
+			for k in fields(self):
+				if k.type is float:
+					f.write(f'{k.name}={self.__getattribute__(k.name)}\n')
 	
 	@classmethod
 	def from_file(cls, fname: str) -> Self:
@@ -48,6 +73,8 @@ class MaterialSystem:
 		De = None
 
 		material_types = {k.name: k.type for k in fields(Material)}
+		cls_types = {k.name: k.type for k in fields(cls)}
+		obj = {}
 
 		with open(fname, 'r') as f:
 			while line := f.readline():
@@ -60,16 +87,15 @@ class MaterialSystem:
 					case tag if tag.startswith('liquid'):
 						_, k2 = tag.split('.')
 						liquid[k2] = material_types[k2](v.strip())
-					case 'L': 
-						L = float(v)
-					case 'De': 
-						De = float(v)
+					# case key if key in ['L', 'De', 'Ts', 'Tm', 'Tl']:
+					case key if cls_types[key] is float:
+						obj[key] = float(v)
 					case _: raise ValueError('Unknown key in system file')
 
-		if L is None or De is None:
-			raise Exception("Could not find all required information in system file")
+		obj['solid'] = Material(**solid)
+		obj['liquid'] = Material(**liquid)
 
-		return cls(Material(**solid), Material(**liquid), L, De)
+		return cls(**obj)
 
 	@property
 	def args(self) -> list[str]:
@@ -79,6 +105,34 @@ class MaterialSystem:
 			'--L', str(self.L),
 			'--De', str(self.De)
 		]
+	
+	def _calculate_De(self):
+		alpha = self.liquid.alpha / self.solid.alpha
+		beta = self.liquid.beta / self.solid.beta
+		D = beta / alpha
+
+		def func(x):
+			if self.Tl > self.Tm:
+				# standard case 
+				delT = self.Tm - self.Ts
+				Tl = (self.Tl - self.Tm) / delT
+				St = self.L / (self.solid.cp * delT)
+
+				return 0.5 * St * np.sqrt(np.pi * x) - np.exp(-0.25 * x) / erf(0.5*np.sqrt(x)) + Tl * np.sqrt(alpha * beta) * np.exp(-0.25*x/D) / (1.0 - erf(0.5 * np.sqrt(x/D)))
+			else:
+				# undercooled case
+				delT = self.Tm - self.Tl
+				Ts = (self.Ts - self.Tm) / delT
+				St = self.L / (self.solid.cp * delT)
+
+				return 0.5 * St * np.sqrt(np.pi * x) + Ts * np.exp(-0.25 * x) / erf(0.5*np.sqrt(x)) - np.sqrt(alpha * beta) * np.exp(-0.25*x/D) / (1.0 - erf(0.5 * np.sqrt(x/D)))
+		
+		De  = newton(func, self.solid.D)
+
+		if not np.isclose(func(De), 0.0):
+			raise Exception("Unable to get analytical De for this system, check parameters")
+		
+		return De
 
 class DefaultMaterials:
 	water = Material(
@@ -95,10 +149,45 @@ class DefaultMaterials:
 		cp=2050.0
 	)
 
+	unst_sol = Material(
+		'solid',
+		80.00027655422495,
+		50.00017412673422,
+		0.8000061456494434 
+	)
+
+	unst_liq = Material(
+		'liquid',
+		5.000020485498144, 
+		1.0000068284993815, 
+		1.0000068284993815
+	)
+
 class DefaultMaterialSystems:
-	water_ice = MaterialSystem(
+	water_ice_std = MaterialSystem(
 		DefaultMaterials.ice,
 		DefaultMaterials.water,
 		334000.0,
-		0.011587153186771986
+		-1.0,
+		0.0,
+		1.0
+	)
+
+	water_ice_und = MaterialSystem(
+		DefaultMaterials.ice,
+		DefaultMaterials.water,
+		334000.0,
+		-1.0,
+		0.0,
+		-1.0
+	)
+
+	unstable = MaterialSystem(
+		DefaultMaterials.unst_sol,
+		DefaultMaterials.unst_liq,
+		2.000010242749072,
+		0.0,
+		0.0,
+		-1.0,
+		0.00032
 	)

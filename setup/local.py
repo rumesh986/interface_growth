@@ -23,7 +23,7 @@ class RunLocal(Build):
 			kwargs['dname'] = dname
 
 			cmd_args = self.process_args(params, *args, **kwargs)
-			outfile = f'{self.wd}/{self.bins[(params.x, params.t)]}_{params.short_title}.stdout'
+			outfile = f'{dname}/stdout'
 
 			with open(outfile, 'w') as f:
 				cmd = [f'./{self.bins[(params.x, params.t)]}', *cmd_args]

@@ -44,6 +44,7 @@ class Params(_Base):
 	t: int
 	nx1: int
 	nx2: int
+	ny: int
 	dt: float
 	tstart: float
 	tend: float
@@ -58,6 +59,7 @@ class Params(_Base):
 		return [
 			'--nx1', str(self.nx1),
 			'--nx2', str(self.nx2),
+			'--ny', str(self.ny),
 			'--dt', str(self.dt),
 			'--tstart', str(self.tstart),
 			'--tend', str(self.tend),
@@ -67,21 +69,22 @@ class Params(_Base):
 	@property
 	def title(self) -> str:
 		print(self.nx1)
-		return f'x={self.x} t={self.t} nx=({self.nx1}, {self.nx2}) dt={self.dt}'
+		return f'x={self.x} t={self.t} nx=({self.nx1}, {self.nx2}) ny={self.ny} dt={self.dt}'
 	
 	@property
 	def short_title(self) -> str:
-		return f'{self.x}n{self.nx1}+{self.nx2}_{self.t}t{self.dt}'
+		return f'{self.x}n{self.nx1}+{self.nx2}_{self.ny}_{self.t}t{self.dt}'
 	
 	@property
 	def directory(self) -> str:
-		return f'{self.x}n{self.nx1}+{self.nx2}_{self.t}t{self.dt:.2e}'
+		return f'{self.x}n{self.nx1}+{self.nx2}_{self.ny}_{self.t}t{self.dt:.2e}'
 
 @dataclass(frozen=True)
 class SimParams(_Base):
 	xs: list[int]
 	ts: list[int]
 	nxs: list[tuple[int, int]]
+	nys: list[int]
 	dts: list[float]
 	tstart: float
 	tend: float
@@ -94,7 +97,7 @@ class SimParams(_Base):
 
 	@property
 	def jobs(self) -> Iterator[Params]:
-		for x, t, (nx1, nx2), dt in product(self.xs, self.ts, self.nxs, self.dts):
+		for x, t, (nx1, nx2), ny, dt in product(self.xs, self.ts, self.nxs, self.nys, self.dts):
 			if self.analysis_type == AnalysisType.dt:
 				wf = int(max(self.dts) / dt)
 			else:
@@ -105,6 +108,7 @@ class SimParams(_Base):
 				t,
 				nx1,
 				nx2,
+				ny,
 				dt,
 				self.tstart,
 				self.tend,

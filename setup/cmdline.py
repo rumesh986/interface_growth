@@ -72,8 +72,9 @@ def parse_cmdline_args():
 	)
 
 	params_group.add_argument('--ny',
+		nargs='+',
 		type=int,
-		default=1,
+		default=[1],
 		help='Number of elements in y-direction of domain'
 	)
 
@@ -115,8 +116,8 @@ def parse_cmdline_args():
 
 	materials_group.add_argument('--material',
 		type=str,
-		choices=['water', 'custom'],
-		default='water',
+		choices=['water_und', 'water_std', 'unstable', 'custom'],
+		default='water_und',
 		help='Material system to use'
 	)
 
@@ -194,11 +195,15 @@ def parse_cmdline_args():
 			for nx1 in args.pop('nx1'):
 				nxs.append((nx1, nx1))
 
+	nys = []
+	for ny in args.pop('ny'):
+		nys.append(ny)
 
 	params = SimParams(
 		args.pop('xs'),
 		args.pop('ts'),
 		nxs,
+		nys,
 		args.pop('dts'),
 		args.pop('tstart'),
 		args.pop('tend'),
@@ -207,7 +212,9 @@ def parse_cmdline_args():
 	)
 
 	match args.pop('material'):
-		case 'water': system = DefaultMaterialSystems.water_ice
+		case 'water_und': system = DefaultMaterialSystems.water_ice_und
+		case 'water_std': system = DefaultMaterialSystems.water_ice_std
+		case 'unstable': system = DefaultMaterialSystems.unstable
 		case 'custom': raise NotImplementedError()
 
 	return params, system, args
