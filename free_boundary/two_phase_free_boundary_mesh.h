@@ -152,13 +152,15 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 	private:
 		double St;
 		std::map<Node *, int> geom_indices;
+		double gamma;
 
 	public:
 		FreeBoundaryFluxElement(
 			EL *bulk_elem,
 			unsigned int face_index,
-			double _St
-		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St) {}
+			double _St,
+			double _gamma = 0.0
+		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St), gamma(_gamma) {}
 
 		void add_node_data(Node *node_pt, Data *data_pt) {
 			geom_indices[node_pt] = this->add_external_data(data_pt);
@@ -256,7 +258,7 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 			
 			unsigned int nspine = nboundary_node(_free_boundary_index);
 			if (_periodic) nspine--;
-			_geometry = new FreeBoundaryElement(xs, ys, nspine, gamma, timestepper);
+			_geometry = new FreeBoundaryElement(xs, ys, nspine, timestepper);
 			_geometry->free_boundary_index() = _free_boundary_index;
 
 			construct_spines(xs[1]);
