@@ -17,21 +17,21 @@ if __name__ == '__main__':
 		**args
 	)
 
-	run.build_all()
+	if args.pop('build') is True:
+		run.build_all()
 
-	if args.pop('no_run'):
-		exit(0)
+	if args.pop('run') is True:
+		try:
+			run.run_all(**args)
+		except Exception as e:
+			if not args.pop('force_vis'):
+				raise e
 
-	run.run_all(**args)
+	if args.pop('vis') is True:
+		vis = Visualiser(
+			prefix=prog,
+			analysis_type=params.analysis_type,
+			**args
+		)
 
-	if args.pop('no_vis'):
-		exit(0)
-
-	vis = Visualiser(
-		prefix=prog,
-		analysis_type=params.analysis_type,
-		**args
-	)
-
-	vis.default_run(**args)
-	# vis.anim_profile(vis.runs[0])
+		vis.default_run(**args)

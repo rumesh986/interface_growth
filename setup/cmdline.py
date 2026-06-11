@@ -1,6 +1,6 @@
 import os
 from itertools import product
-from argparse import ArgumentParser, ArgumentError
+from argparse import ArgumentParser, ArgumentError, BooleanOptionalAction
 
 from systems.params import SimParams, AnalysisType
 from systems.materials import MaterialSystem
@@ -165,14 +165,27 @@ def parse_cmdline_args():
 		help='Delete existing results folders if they exist'
 	)
 
-	parser.add_argument('--no-vis',
-		action='store_true',
-		help='Do not do any post-processing'
+	parser.add_argument('--build',
+		action=BooleanOptionalAction,
+		default=True,
+		help='Build program'
 	)
 
-	parser.add_argument('--no-run',
+	parser.add_argument('--run',
+		action=BooleanOptionalAction,
+		default=True,
+		help='run program'
+	)
+
+	parser.add_argument('--vis',
+		action=BooleanOptionalAction,
+		default=True,
+		help='Perform post-processing'
+	)
+
+	parser.add_argument('--force-vis',
 		action='store_true',
-		help='Do not run program (exit after building)'
+		help='Perform post-processing even if main run fails to converge'
 	)
 
 	args = parser.parse_args()
