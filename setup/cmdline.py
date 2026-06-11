@@ -3,7 +3,7 @@ from itertools import product
 from argparse import ArgumentParser, ArgumentError
 
 from systems.params import SimParams, AnalysisType
-from systems.materials import DefaultMaterialSystems
+from systems.materials import MaterialSystem
 from visualisation.visualisation import PltStyle
 
 def parse_cmdline_args():
@@ -116,7 +116,7 @@ def parse_cmdline_args():
 
 	materials_group.add_argument('--material',
 		type=str,
-		choices=['water_und', 'water_std', 'unstable', 'custom'],
+		choices=MaterialSystem.list_default_materials(),
 		default='water_und',
 		help='Material system to use'
 	)
@@ -211,10 +211,6 @@ def parse_cmdline_args():
 		args.pop('analysis_type')
 	)
 
-	match args.pop('material'):
-		case 'water_und': system = DefaultMaterialSystems.water_ice_und
-		case 'water_std': system = DefaultMaterialSystems.water_ice_std
-		case 'unstable': system = DefaultMaterialSystems.unstable
-		case 'custom': raise NotImplementedError()
+	system = MaterialSystem.default_material(args.pop('material'))
 
 	return params, system, args

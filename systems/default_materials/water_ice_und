@@ -1,0 +1,13 @@
+solid.name=ice
+solid.k=2.2
+solid.rho=916.2
+solid.cp=2050.0
+liquid.name=water
+liquid.k=0.55575
+liquid.rho=999.89
+liquid.cp=4220.0
+L=334000.0
+Ts=-1.0
+Tm=0.0
+Tl=-1.0
+De=0.012961193876533085

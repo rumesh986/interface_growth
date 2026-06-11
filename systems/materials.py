@@ -1,4 +1,6 @@
-from typing import TextIO, Self
+import os
+from importlib import resources
+from typing import TextIO, Self, ClassVar
 from dataclasses import dataclass, fields, InitVar, field
 
 import numpy as np
@@ -106,6 +108,16 @@ class MaterialSystem:
 			'--De', str(self.De)
 		]
 	
+	@classmethod
+	def list_default_materials(cls) -> List[str]:
+		material_dir = resources.files('systems').joinpath('default_materials')
+		return os.listdir(material_dir)
+	
+	@classmethod
+	def default_material(cls, name: str) -> Self:
+		material_dir = resources.files('systems').joinpath('default_materials')
+		return cls.from_file(f'{material_dir}/{name}')
+	
 	def _calculate_De(self):
 		alpha = self.liquid.alpha / self.solid.alpha
 		beta = self.liquid.beta / self.solid.beta
@@ -133,61 +145,3 @@ class MaterialSystem:
 			raise Exception("Unable to get analytical De for this system, check parameters")
 		
 		return De
-
-class DefaultMaterials:
-	water = Material(
-		name="water",
-		k=0.55575,
-		rho=999.89,
-		cp=4220.0
-	)
-
-	ice = Material(
-		name="ice",
-		k=2.2,
-		rho=916.2,
-		cp=2050.0
-	)
-
-	unst_sol = Material(
-		'solid',
-		80.00027655422495,
-		50.00017412673422,
-		0.8000061456494434 
-	)
-
-	unst_liq = Material(
-		'liquid',
-		5.000020485498144, 
-		1.0000068284993815, 
-		1.0000068284993815
-	)
-
-class DefaultMaterialSystems:
-	water_ice_std = MaterialSystem(
-		DefaultMaterials.ice,
-		DefaultMaterials.water,
-		334000.0,
-		-1.0,
-		0.0,
-		1.0
-	)
-
-	water_ice_und = MaterialSystem(
-		DefaultMaterials.ice,
-		DefaultMaterials.water,
-		334000.0,
-		-1.0,
-		0.0,
-		-1.0
-	)
-
-	unstable = MaterialSystem(
-		DefaultMaterials.unst_sol,
-		DefaultMaterials.unst_liq,
-		2.000010242749072,
-		0.0,
-		0.0,
-		-1.0,
-		0.00032
-	)
