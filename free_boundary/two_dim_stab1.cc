@@ -52,9 +52,9 @@ namespace params {
 	unsigned int write_freq = 1;
 	std::string dname;
 
-	double v = -0.1;
+	// double v = -0.1;
 	// double v = 0.0;
-	double gamma = 0.0;
+	double gamma = 1.0;
 	// double gamma = 0.0;
 
 	unsigned int tsteps;
@@ -68,12 +68,13 @@ namespace params {
 	}
 
 	void get_initial_interface_profile(const double &zeta, double &r) {
-		r = 0.01 * sin(4.0 * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
-		// r = 0.0;
+		double k = 8.0;
+		double A = 0.001;
+		r = A * sin(k * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
 	}
 
 	double get_exact_h(const double &t) {
-		return sqrt(De * t) + 0.5;
+		return sqrt(De * t);
 	}
 
 	void get_exact_u(const double &t, const Vector<double> &x, double &u) {
@@ -87,12 +88,9 @@ namespace params {
 			double denom = 0.5 / sqrt(t);
 			double trans_Ts = (T_s - T_m) / (T_m - T_l);
 			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom));
-			// u = (erf(x[0] * denom) / erf(h * denom)) - 1.0;
 		} else {
 			double denom = 0.5 / sqrt(D * t);
 			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom));
-			// double trans_tl = (T_l - T_m) / (T_m - T_s);
-			// u = trans_tl * (erf(x[0] * denom) - erf(h * denom)) / (1.0 - erf(h * denom));
 		}
 	}
 
@@ -102,7 +100,7 @@ namespace params {
 	};
 
 	Vector<unsigned int> analytical_boundaries = {
-		// 1
+
 	};
 
 	std::map<unsigned int, UnsteadyHeatEquations<X_ORDER>::UnsteadyHeatSourceFctPt> flux_boundaries = {
@@ -142,7 +140,9 @@ class TwoDimStefanProblem : public Problem {
 				EL *elem = dynamic_cast<EL *>(bulk_mesh_pt->boundary_element_pt(interface_boundary_index, e));
 				int face_index = bulk_mesh_pt->face_index_at_boundary(interface_boundary_index, e);
 				if (face_index == 1) {
-					auto flux_elem = new FreeBoundaryFluxElement<EL>(elem, face_index, params::St, params::gamma);
+					auto flux_elem = new FreeBoundaryFluxElement<EL>(elem, face_index);
+					flux_elem->St() = params::St;
+					flux_elem->gamma() = params::gamma;
 					surf_mesh_pt->add_element_pt(flux_elem);
 				}
 			}
@@ -229,7 +229,6 @@ class TwoDimStefanProblem : public Problem {
 			for (unsigned int s = 0; s < bulk_mesh_pt->nspine(); s++) {
 				double h_pred = geometry->geom_data_pt(s)->value(time_stepper_pt()->predictor_storage_index(), 0);
 				bulk_mesh_pt->spine_pt(s)->height() = h_pred;
-				// *geometry->geom_data_pt(s)->value_pt(0) = h_pred;
 				geometry->geom_data_pt(s)->set_value(0, h_pred);
 			}
 
@@ -491,7 +490,7 @@ int main(int argc, char **argv) {
 	printf("\tliquid: k=%8.6f rho=%8.6f cp=%8.6f\n", params::liquid.k, params::liquid.rho, params::liquid.cp);
 	printf("\tL=%8.6f De=%8.6f\n", params::L, params::De);
 	printf("\tTs=%8.6f Tm=%8.6f Tl=%8.6f\n", params::T_s, params::T_m, params::T_l);
-	printf("\talpha=%8.6f beta=%8.6f St=%8.6f\n", params::alpha, params::beta, params::St);
+	printf("\talpha=%8.6f beta=%8.6f St=%8.6f gamma=%8.6f\n", params::alpha, params::beta, params::St, params::gamma);
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", params::xs[0], params::xs[1], params::xs[2]);
 
 	auto problem = TwoDimStefanProblem<QUnsteadyHeatElement<2, X_ORDER>>();

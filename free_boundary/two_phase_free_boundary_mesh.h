@@ -124,25 +124,39 @@ class FreeBoundaryElement : public GeneralisedElement,
 template<class EL>
 class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 	private:
-		double St;
-		std::map<Node *, int> geom_indices;
-		double gamma;
+		double _St = 1.0;
+		double _gamma = 0.0;
+		Vector<int> geom_indices;
+		const unsigned int T_index = 0;
+		const unsigned int Kx_index = 1;
+		const unsigned int Ky_index = 2;
 
 	public:
 		FreeBoundaryFluxElement(
 			EL *bulk_elem,
-			unsigned int face_index,
-			double _St,
-			double _gamma = 0.0
-		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index), St(_St), gamma(_gamma) {
+			unsigned int face_index
+		) : UnsteadyHeatFluxElement<EL>(bulk_elem, face_index) {
 			
+			geom_indices.reserve(this->nnode());
 			for (unsigned int n = 0; n < this->nnode(); n++) {
 				SpineNode *node = dynamic_cast<SpineNode *>(this->node_pt(n));
-				printf("node: %p data: %p\n", node, node->spine_pt()->geom_data_pt(1));
-				geom_indices[this->node_pt(n)] = this->add_external_data(node->spine_pt()->geom_data_pt(1));
+				geom_indices[n] = this->add_external_data(node->spine_pt()->geom_data_pt(1));
 			}
+
+			Vector<unsigned int> temp(this->nnode(), 2);
+			this->resize_nodes(temp);
+		}
+
+		~FreeBoundaryFluxElement() {}
+
+		double & St() {
+			return _St;
 		}
 	
+		double & gamma() {
+			return _gamma;
+		}
+
 	protected:
 		inline void fill_in_contribution_to_residuals(Vector<double> &residuals) {
 			fill_in_generic_residual_contribution_ust_heat_flux(residuals, GeneralisedElement::Dummy_matrix, false);
@@ -152,62 +166,106 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 			fill_in_generic_residual_contribution_ust_heat_flux(residuals, jacobian, true);
 		}
 
+		double get_angle(Vector<double> &a, Vector<double> &b) {
+			double dot = VectorHelpers::dot(a, b);
+			double mag = sqrt((a[0]*a[0] + a[1]*a[1])) * sqrt(b[0]*b[0] + b[1]* b[1]);
+			double inp = dot / mag;
+			if (fabs(inp) > 1.0) {
+				printf("\nWeird input received!\n");
+				printf("\tinp=%e dot=%e mag=%e\n", inp, dot, mag);
+			}
+			return std::acos(inp);
+		}
+
+	public:
 		inline void fill_in_generic_residual_contribution_ust_heat_flux(Vector<double> &residuals, DenseMatrix<double> &jacobian, bool compute_jacobian) {
 			if (this->ndof() == 0) return;
 
-			Vector<double> s(1), normal(2);
+			Vector<double> s(1, 0.0);
 			Shape phi(this->nnode()), psi(this->nnode());
-			
+			DShape dphi(this->nnode(), 1);
+
 			for (unsigned int ipt = 0; ipt < this->integral_pt()->nweight(); ipt++) {
 				for (unsigned int i = 0; i < s.size(); i++) s[i] = this->integral_pt()->knot(ipt, i);
 
-				double J = this->shape_and_test(s, phi, psi);
-				double W = J * this->integral_pt()->weight(ipt);
-				this->outer_unit_normal(s, normal);
-				double n_mag = sqrt(normal[0]*normal[0] + normal[1]*normal[1]);
-				// printf("normal: n0=%16.14f n1=%16.14f mag=%16.14f\n", n[0], n[1], n_mag);
-				// for error checking...
-				if (n_mag - 1.0 > 1e-6) {
-					printf("WARNING: normal not quite a unit\n\n\n");
+				double J = this->shape_and_test(s, psi, phi);
+				this->dshape_local(s, phi, dphi);
+				double w = this->integral_pt()->weight(ipt);
+				double W = J * w;
+
+				Vector<double> tangent(2, 0.0), th(2, 0.0), nh(2, 0.0);
+				for (unsigned int l = 0; l < this->nnode(); l++) {
+					for (unsigned int i = 0; i < 2; i++) {
+						tangent[i] += this->nodal_position(l, i) * dphi(l, 0);
+					}
+				}
+				
+				double tangent_mag = VectorHelpers::magnitude(tangent);
+				for (unsigned int i = 0; i < 2; i++) th[i] = tangent[i] / tangent_mag;
+				nh[0] = th[1];
+				nh[1] = -th[0];
+
+				Vector<DenseMatrix<double>> dthdX(this->nnode()), dnhdX(this->nnode());
+				if (compute_jacobian) {
+					for (unsigned int l = 0; l < this->nnode(); l++) {
+						dthdX[l].resize(2, 2, 0.0);
+						dnhdX[l].resize(2, 2, 0.0);
+					} 
+
+					for (unsigned int l = 0; l < this->nnode(); l++) {
+						dthdX[l](0, 0) = dphi(l, 0) * (1.0 - th[0] * th[0]) / tangent_mag;
+						dthdX[l](0, 1) = dphi(l, 0) * (0.0 - th[0] * th[1]) / tangent_mag;
+						dthdX[l](1, 0) = dphi(l, 0) * (0.0 - th[1] * th[0]) / tangent_mag;
+						dthdX[l](1, 1) = dphi(l, 0) * (1.0 - th[1] * th[1]) / tangent_mag;
+
+						for (unsigned int j = 0; j < 2; j++) {
+							dnhdX[l](0, j) = dthdX[l](1, j);
+							dnhdX[l](1, j) = -dthdX[l](0, j);
+						}
+					}
 				}
 
-				// very bad way of getting curvature: kappa = ||dt/ds||, t=tangent
-				Vector<double> s2(1, 0.0), normal2(2, 0.0), grad(2, 0.0);
-				double eps = 1e-5; // small displacement for FD
-				Vector<Vector<double>> tangent1, tangent2;
-				tangent1.resize(1);
-				tangent1[0].resize(2);
-
-				tangent2.resize(1);
-				tangent2[0].resize(2);
-
-				s2[0] = s[0] + eps;
-				this->continuous_tangent_and_outer_unit_normal(s2, tangent1, normal2);
-				s2[0] = s[0] - eps;
-				this->continuous_tangent_and_outer_unit_normal(s2, tangent2, normal2);
-
-				grad[0] = (tangent1[0][0] - tangent2[0][0]) / (2.0 * eps);
-				grad[1] = (tangent1[0][1] - tangent2[0][1]) / (2.0 * eps);
-
-				double kappa = VectorHelpers::magnitude(grad);
-
-				for (unsigned int n = 0; n < this->nnode(); n++) {
-					int local_eqn = this->nodal_local_eqn(n, 0);
-					if (local_eqn < 0) continue;
-
-					Node *node = this->node_pt(n);
-					Data *geom = this->external_data_pt(geom_indices[node]);
-					int h_eqn = this->external_local_eqn(geom_indices[node], 0);
-					if (h_eqn < 0) continue;
-					
+				for (unsigned int l = 0; l < this->nnode(); l++) {
+					Data *geom = this->external_data_pt(geom_indices[l]);
 					double dhdt = geom->time_stepper_pt()->time_derivative(1, geom, 0);
-					residuals[local_eqn] -= phi(n) * St * dhdt * normal[0] * W;
-					
-					residuals[h_eqn] += phi(n) * node->value(0) * W + gamma * phi(n) * kappa * W;
+					Vector<double> Kappa(2, 0.0);
+					Kappa[0] = this->nodal_value(l, Kx_index);
+					Kappa[1] = this->nodal_value(l, Ky_index);
+					double kappa = VectorHelpers::dot(Kappa, nh);
+
+					int X_eqn = this->external_local_eqn(geom_indices[l], 0);
+					int T_eqn = this->nodal_local_eqn(l, T_index);
+					int Kx_eqn = this->nodal_local_eqn(l, Kx_index);
+					int Ky_eqn = this->nodal_local_eqn(l, Ky_index);
+
+					residuals[X_eqn] += phi(l) * (this->nodal_value(l, T_index) + _gamma * kappa) * W;
+					residuals[T_eqn] -= phi(l) * _St * dhdt * nh[0] * W;
+					residuals[Kx_eqn] += phi(l) * this->nodal_value(l, Kx_index) * W + dphi(l, 0) * th[0] * w;
+					residuals[Ky_eqn] += phi(l) * this->nodal_value(l, Ky_index) * W + dphi(l, 0) * th[1] * w;
 
 					if (compute_jacobian) {
-						jacobian(local_eqn, h_eqn) -= phi(n) * St * geom->time_stepper_pt()->weight(1, 0) * normal[0] * W;
-						jacobian(h_eqn, local_eqn) += phi(n) * W;
+						jacobian(X_eqn, T_eqn) += phi(l) * W;
+
+						jacobian(X_eqn, Kx_eqn) += phi(l) * _gamma * nh[0] * W;
+						jacobian(X_eqn, Ky_eqn) += phi(l) * _gamma * nh[1] * W;
+						for (unsigned int p = 0; p < this->nnode(); p++) {
+							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
+							jacobian(X_eqn, P_eqn) += phi(l) * _gamma * (Kappa[0] * dnhdX[p](0, 0) + Kappa[1] * dnhdX[p](1, 0)) * W;
+						}
+
+						jacobian(T_eqn, X_eqn) -= phi(l) * _St * geom->time_stepper_pt()->weight(1, 0) * nh[0] * W;
+						for (unsigned int p = 0; p < this->nnode(); p++) {
+							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
+							jacobian(T_eqn, P_eqn) -= phi(l) * _St * dhdt * dnhdX[p](0, 0) * W;
+						}
+
+						jacobian(Kx_eqn, Kx_eqn) += phi(l) * W;
+						jacobian(Ky_eqn, Ky_eqn) += phi(l) * W;
+						for (unsigned int p = 0; p < this->nnode(); p++) {
+							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
+							jacobian(Kx_eqn, P_eqn) += dphi(l, 0) * dthdX[p](0, 0) * w;
+							jacobian(Ky_eqn, P_eqn) += dphi(l, 0) * dthdX[p](1, 0) * w;
+						}
 					}
 				}
 			}
@@ -263,10 +321,6 @@ class TwoPhaseFreeBoundarySpineMesh : public RectangularQuadMesh<EL>,
 
 			for (unsigned int n = 0; n < nnode(); n++) {
 				spine_node_update(node_pt(n));
-			}
-
-			for (unsigned int s = 0; s < Spine_pt.size(); s++) {
-				printf("Spine %u: %p\n", s, Spine_pt[s]->geom_data_pt(1));
 			}
 		}
 
