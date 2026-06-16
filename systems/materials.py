@@ -120,6 +120,18 @@ class MaterialSystem:
 	def default_material(cls, name: str) -> Self:
 		material_dir = resources.files('systems').joinpath('default_materials')
 		return cls.from_file(f'{material_dir}/{name}')
+
+	@property
+	def alpha(self):
+		return self.liquid.alpha / self.solid.alpha
+
+	@property
+	def beta(self):
+		return self.liquid.beta / self.solid.beta
+	
+	@property
+	def St(self):
+		return self.L / (self.solid.cp * (self.Tm - self.Tl))
 	
 	def _calculate_De(self):
 		alpha = self.liquid.alpha / self.solid.alpha
