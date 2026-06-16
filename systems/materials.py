@@ -45,6 +45,7 @@ class MaterialSystem:
 	solid: Material
 	liquid: Material
 	L: float
+	gamma: float
 
 	Ts: float
 	Tm: float
@@ -73,6 +74,7 @@ class MaterialSystem:
 		liquid = {}
 		L = None
 		De = None
+		gamma = None
 
 		material_types = {k.name: k.type for k in fields(Material)}
 		cls_types = {k.name: k.type for k in fields(cls)}
@@ -105,7 +107,8 @@ class MaterialSystem:
 			*self.solid.args(1),
 			*self.liquid.args(2),
 			'--L', str(self.L),
-			'--De', str(self.De)
+			'--De', str(self.De),
+			'--gamma', str(self.gamma)
 		]
 	
 	@classmethod
