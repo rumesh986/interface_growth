@@ -7,6 +7,7 @@
 // still accepts dimensinoal inputs and outputs non-dimensional values
 
 #include <cmath>
+#include <regex>
 #include <filesystem>
 
 #include "generic.h"
@@ -30,6 +31,7 @@ namespace params {
 
 	double L = NAN;
 	double De = NAN;
+	double gamma = 0.0;
 
 	double alpha = 0.0;
 	double beta = 0.0;
@@ -51,11 +53,6 @@ namespace params {
 	double tend = 1.0;
 	unsigned int write_freq = 1;
 	std::string dname;
-
-	// double v = -0.1;
-	// double v = 0.0;
-	double gamma = 1.0;
-	// double gamma = 0.0;
 
 	unsigned int tsteps;
 
@@ -413,19 +410,6 @@ class TwoDimStefanProblem : public Problem {
 int main(int argc, char **argv) {
 	CommandLineArgs::setup(argc, argv);
 
-	CommandLineArgs::specify_command_line_flag("--k1", &params::solid.k);
-	CommandLineArgs::specify_command_line_flag("--rho1", &params::solid.rho);
-	CommandLineArgs::specify_command_line_flag("--cp1", &params::solid.cp);
-	CommandLineArgs::specify_command_line_flag("--k2", &params::liquid.k);
-	CommandLineArgs::specify_command_line_flag("--rho2", &params::liquid.rho);
-	CommandLineArgs::specify_command_line_flag("--cp2", &params::liquid.cp);
-	CommandLineArgs::specify_command_line_flag("--L", &params::L);
-	CommandLineArgs::specify_command_line_flag("--De", &params::De);
-
-	CommandLineArgs::specify_command_line_flag("--Ts", &params::T_s);
-	CommandLineArgs::specify_command_line_flag("--Tm", &params::T_m);
-	CommandLineArgs::specify_command_line_flag("--Tl", &params::T_l);
-
 	CommandLineArgs::specify_command_line_flag("--nx1", &params::nxs[0]);
 	CommandLineArgs::specify_command_line_flag("--nx2", &params::nxs[1]);
 	CommandLineArgs::specify_command_line_flag("--ny", &params::ny);
@@ -438,19 +422,6 @@ int main(int argc, char **argv) {
 	CommandLineArgs::parse_and_assign();
 	CommandLineArgs::output();
 
-	params::tsteps = (unsigned int) ((params::tend - params::tstart) / params::dt);
-	printf("tsteps set to %u\n", params::tsteps);
-
-	if (isnan(params::solid.k) || isnan(params::solid.rho) || isnan(params::solid.cp) ||
-		isnan(params::liquid.k) || isnan(params::liquid.rho) || isnan(params::liquid.cp) ||
-		isnan(params::L) || isnan(params::De) || 
-		isnan(params::T_s) || isnan(params::T_m) || isnan(params::T_l)
-	) {
-		
-		printf("Properties not set correctly, exiting...\n\n");
-		exit(1);
-	}
-
 	if (!CommandLineArgs::command_line_flag_has_been_set("--dname")) {
 		char temp[256];
 		sprintf(temp, "RESLT/%dn%u+%u_%dt%.2e", X_ORDER, params::nxs[0], params::nxs[1], T_ORDER, params::dt);
@@ -462,6 +433,86 @@ int main(int argc, char **argv) {
 		printf("Directory %s exists\n", params::dname.c_str());
 	} else {
 		std::filesystem::create_directories(params::dname.c_str());
+	}
+
+	char material_fname[256];
+	sprintf(material_fname, "%s/system", params::dname.c_str());
+	std::ifstream file(material_fname);
+	if (!file.is_open()) {
+		printf("Failed to open material file, exiting...\n");
+		exit(1);
+	}
+
+	std::string line;
+	std::regex re;
+	std::cmatch matches;
+	while (std::getline(file, line)) {
+		if (line.find("solid") != std::string::npos) {
+			re.assign("k=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::solid.k = atof(matches[1].str().c_str());
+
+			re.assign("rho=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::solid.rho = atof(matches[1].str().c_str());
+
+			re.assign("cp=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::solid.cp = atof(matches[1].str().c_str());
+		}
+
+		if (line.find("liquid") != std::string::npos) {
+			re.assign("k=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::liquid.k = atof(matches[1].str().c_str());
+
+			re.assign("rho=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::liquid.rho = atof(matches[1].str().c_str());
+
+			re.assign("cp=(.*)");
+			std::regex_search(line.c_str(), matches, re);
+			if (matches.size() > 1) params::liquid.cp = atof(matches[1].str().c_str());
+		}
+
+		re.assign("L=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::L = atof(matches[1].str().c_str());
+
+		re.assign("Ts=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::T_s = atof(matches[1].str().c_str());
+
+		re.assign("Tm=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::T_m = atof(matches[1].str().c_str());
+
+		re.assign("Tl=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::T_l = atof(matches[1].str().c_str());
+
+		re.assign("De=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::De = atof(matches[1].str().c_str());
+
+		re.assign("gamma=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) params::gamma = atof(matches[1].str().c_str());
+	}
+
+	file.close();
+
+	params::tsteps = (unsigned int) ((params::tend - params::tstart) / params::dt);
+	printf("tsteps set to %u\n", params::tsteps);
+
+	if (isnan(params::solid.k) || isnan(params::solid.rho) || isnan(params::solid.cp) ||
+		isnan(params::liquid.k) || isnan(params::liquid.rho) || isnan(params::liquid.cp) ||
+		isnan(params::L) || isnan(params::De) || 
+		isnan(params::T_s) || isnan(params::T_m) || isnan(params::T_l)
+	) {
+		
+		printf("Properties not set correctly, exiting...\n\n");
+		exit(1);
 	}
 
 	char sub_dname[512];

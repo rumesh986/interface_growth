@@ -123,19 +123,19 @@ def parse_cmdline_args():
 
 	materials_group.add_argument('--Ts',
 		type=float,
-		default=-1.0,
+		default=None,
 		help='Boundary condition at x = 0.0 (solid)'
 	)
 
 	materials_group.add_argument('--Tm',
 		type=float,
-		default=.0,
+		default=None,
 		help='Boundary condition at interface'
 	)
 
 	materials_group.add_argument('--Tl',
 		type=float,
-		default=1.0,
+		default=None,
 		help='Boundary condition at x = 1.0 (liquid)'
 	)
 
@@ -225,5 +225,11 @@ def parse_cmdline_args():
 	)
 
 	system = MaterialSystem.default_material(args.pop('material'))
+
+	# update temperatures if needed
+	for T in ['Ts', 'Tm', 'Tl']:
+		temp = args.pop(T)
+		if temp is not None:
+			system.__setattr__(T, temp)
 
 	return params, system, args
