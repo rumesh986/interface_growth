@@ -200,6 +200,8 @@ def parse_cmdline_args():
 		for pair in args.pop('nxs'):
 			nx1, nx2 = pair.split(',')
 			nxs.append((int(nx1), int(nx2)))
+		args.pop('nx1')
+		args.pop('nx2')
 	else:
 		if args.get('nx2') is not None:
 			for nx1, nx2 in product(args.pop('nx1'), args.pop('nx2')):
@@ -207,6 +209,7 @@ def parse_cmdline_args():
 		else:
 			for nx1 in args.pop('nx1'):
 				nxs.append((nx1, nx1))
+		args.pop('nx')
 
 	nys = []
 	for ny in args.pop('ny'):

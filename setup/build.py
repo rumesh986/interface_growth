@@ -73,7 +73,7 @@ class Build:
 	def process_args(self, params: Params, *args, **kwargs) -> list[str]:
 		ret = [
 			*params.args,
-			*self.system.args
+			# *self.system.args
 		]
 		
 		for k, v in kwargs.items():
