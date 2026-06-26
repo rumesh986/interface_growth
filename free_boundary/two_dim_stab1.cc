@@ -250,25 +250,25 @@ class TwoDimStefanProblem : public Problem {
 			time_pt()->time() = time;
 			time_pt()->dt() = params::dt;
 
-			double h = params::get_exact_h(time);
+			// double h = params::get_exact_h(time);
 			double eps;
-			for (unsigned int s = 0; s < bulk_mesh_pt->nspine(); s++) {
-				Spine *spine = bulk_mesh_pt->spine_pt(s);
-				params::get_initial_interface_profile(spine->geom_parameter(0), eps);
-				spine->height() = h + eps;
-				geometry->geom_data_pt(s)->set_value(0, h + eps);
-			}
-			bulk_mesh_pt->node_update();
+			// for (unsigned int s = 0; s < bulk_mesh_pt->nspine(); s++) {
+			// 	Spine *spine = bulk_mesh_pt->spine_pt(s);
+			// 	params::get_initial_interface_profile(spine->geom_parameter(0), eps);
+			// 	spine->height() = h + eps;
+			// 	geometry->geom_data_pt(s)->set_value(0, h + eps);
+			// }
+			// bulk_mesh_pt->node_update();
 
-			for (unsigned int n = 0; n < nnode; n++) {
-				bulk_mesh_pt->node_pt(n)->position(x);
-				params::get_exact_u(time, x, u);
-				bulk_mesh_pt->node_pt(n)->set_value(0, u);
-			}
+			// for (unsigned int n = 0; n < nnode; n++) {
+			// 	bulk_mesh_pt->node_pt(n)->position(x);
+			// 	params::get_exact_u(time, x, u);
+			// 	bulk_mesh_pt->node_pt(n)->set_value(0, u);
+			// }
 
-			printf("[%2u] Setting initial condition at t=%8.6f\n", step, time);
-			doc_step(step);
-			step++;
+			// printf("[%2u] Setting initial condition at t=%8.6f\n", step, time);
+			// doc_step(step);
+			// step++;
 
 			for (unsigned int t = 0; t < tsteps; t++) {
 				shift_time_values();
@@ -550,7 +550,7 @@ int main(int argc, char **argv) {
 	problem.prepare_docs(info);
 	problem.set_initial_condition();
 
-	int prev_steps = problem.time_stepper_pt()->nprev_values()+1;
+	int prev_steps = problem.time_stepper_pt()->nprev_values();
 	for (unsigned int t = 0;t < params::tsteps; t++) {
 		problem.unsteady_newton_solve(params::dt);
 
