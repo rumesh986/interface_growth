@@ -64,10 +64,11 @@ namespace params {
 		flux = 0.0;
 	}
 
+	double _k = 8.0;
+	double _A = 0.001;
+
 	void get_initial_interface_profile(const double &zeta, double &r) {
-		double k = 8.0;
-		double A = 0.001;
-		r = A * sin(k * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
+		r = _A * sin(_k * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
 	}
 
 	double get_exact_h(const double &t) {
@@ -79,15 +80,19 @@ namespace params {
 		double eps = 0.0;
 		get_initial_interface_profile(x[1], eps);
 
+		double k = _k * 2.0 * MathematicalConstants::Pi;
+
 		double h = h_ana + eps;
+		double perturb = -gamma * k * k * eps;
+		double z = x[0] - h_ana;
 
 		if (x[0] < h) {
 			double denom = 0.5 / sqrt(t);
 			double trans_Ts = (T_s - T_m) / (T_m - T_l);
-			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom));
+			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom)) + perturb * exp(k * z);
 		} else {
 			double denom = 0.5 / sqrt(D * t);
-			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom));
+			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom)) + perturb * exp(-k * z);
 		}
 	}
 
