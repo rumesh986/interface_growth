@@ -191,7 +191,7 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 				double J = this->shape_and_test(s, psi, phi);
 				this->dshape_local(s, phi, dphi);
 				double w = this->integral_pt()->weight(ipt);
-				double W = J * w;
+				double JW = J * w;
 
 				Vector<double> tangent(2, 0.0), th(2, 0.0), nh(2, 0.0);
 				for (unsigned int l = 0; l < this->nnode(); l++) {
@@ -202,7 +202,7 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 				
 				double tangent_mag = VectorHelpers::magnitude(tangent);
 				for (unsigned int i = 0; i < 2; i++) th[i] = tangent[i] / tangent_mag;
-				nh[0] = th[1];
+				nh[0] =  th[1];
 				nh[1] = -th[0];
 
 				Vector<DenseMatrix<double>> dthdX(this->nnode()), dnhdX(this->nnode());
@@ -210,16 +210,14 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 					for (unsigned int l = 0; l < this->nnode(); l++) {
 						dthdX[l].resize(2, 2, 0.0);
 						dnhdX[l].resize(2, 2, 0.0);
-					} 
 
-					for (unsigned int l = 0; l < this->nnode(); l++) {
 						dthdX[l](0, 0) = dphi(l, 0) * (1.0 - th[0] * th[0]) / tangent_mag;
 						dthdX[l](0, 1) = dphi(l, 0) * (0.0 - th[0] * th[1]) / tangent_mag;
 						dthdX[l](1, 0) = dphi(l, 0) * (0.0 - th[1] * th[0]) / tangent_mag;
 						dthdX[l](1, 1) = dphi(l, 0) * (1.0 - th[1] * th[1]) / tangent_mag;
 
 						for (unsigned int j = 0; j < 2; j++) {
-							dnhdX[l](0, j) = dthdX[l](1, j);
+							dnhdX[l](0, j) =  dthdX[l](1, j);
 							dnhdX[l](1, j) = -dthdX[l](0, j);
 						}
 					}
@@ -238,29 +236,30 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 					int Kx_eqn = this->nodal_local_eqn(l, Kx_index);
 					int Ky_eqn = this->nodal_local_eqn(l, Ky_index);
 
-					residuals[X_eqn] += phi(l) * (this->nodal_value(l, T_index) + _gamma * kappa) * W;
-					residuals[T_eqn] -= phi(l) * _St * dhdt * nh[0] * W;
-					residuals[Kx_eqn] += phi(l) * this->nodal_value(l, Kx_index) * W + dphi(l, 0) * th[0] * w;
-					residuals[Ky_eqn] += phi(l) * this->nodal_value(l, Ky_index) * W + dphi(l, 0) * th[1] * w;
-
+					
+					residuals[X_eqn] += phi(l) * this->nodal_value(l, T_index) * JW - phi(l) * _gamma * kappa * JW;
+					residuals[T_eqn] -= phi(l) * _St * dhdt * nh[0] * JW;
+					residuals[Kx_eqn] += phi(l) * this->nodal_value(l, Kx_index) * JW + dphi(l, 0) * th[0] * w;
+					residuals[Ky_eqn] += phi(l) * this->nodal_value(l, Ky_index) * JW + dphi(l, 0) * th[1] * w;
+					
 					if (compute_jacobian) {
-						jacobian(X_eqn, T_eqn) += phi(l) * W;
-
-						jacobian(X_eqn, Kx_eqn) += phi(l) * _gamma * nh[0] * W;
-						jacobian(X_eqn, Ky_eqn) += phi(l) * _gamma * nh[1] * W;
+						jacobian(X_eqn, T_eqn) += phi(l) * JW;
+						
+						jacobian(X_eqn, Kx_eqn) -= phi(l) * _gamma * nh[0] * JW;
+						jacobian(X_eqn, Ky_eqn) -= phi(l) * _gamma * nh[1] * JW;
 						for (unsigned int p = 0; p < this->nnode(); p++) {
 							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
-							jacobian(X_eqn, P_eqn) += phi(l) * _gamma * (Kappa[0] * dnhdX[p](0, 0) + Kappa[1] * dnhdX[p](1, 0)) * W;
+							jacobian(X_eqn, P_eqn) -= phi(l) * _gamma * (Kappa[0] * dnhdX[p](0, 0) + Kappa[1] * dnhdX[p](1, 0)) * JW;
 						}
 
-						jacobian(T_eqn, X_eqn) -= phi(l) * _St * geom->time_stepper_pt()->weight(1, 0) * nh[0] * W;
+						jacobian(T_eqn, X_eqn) -= phi(l) * _St * geom->time_stepper_pt()->weight(1, 0) * nh[0] * JW;
 						for (unsigned int p = 0; p < this->nnode(); p++) {
 							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
-							jacobian(T_eqn, P_eqn) -= phi(l) * _St * dhdt * dnhdX[p](0, 0) * W;
+							jacobian(T_eqn, P_eqn) -= phi(l) * _St * dhdt * dnhdX[p](0, 0) * JW;
 						}
 
-						jacobian(Kx_eqn, Kx_eqn) += phi(l) * W;
-						jacobian(Ky_eqn, Ky_eqn) += phi(l) * W;
+						jacobian(Kx_eqn, Kx_eqn) += phi(l) * JW;
+						jacobian(Ky_eqn, Ky_eqn) += phi(l) * JW;
 						for (unsigned int p = 0; p < this->nnode(); p++) {
 							int P_eqn = this->external_local_eqn(geom_indices[p], 0);
 							jacobian(Kx_eqn, P_eqn) += dphi(l, 0) * dthdX[p](0, 0) * w;
