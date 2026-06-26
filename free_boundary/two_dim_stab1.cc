@@ -424,7 +424,7 @@ int main(int argc, char **argv) {
 
 	if (!CommandLineArgs::command_line_flag_has_been_set("--dname")) {
 		char temp[256];
-		sprintf(temp, "RESLT/%dn%u+%u_%dt%.2e", X_ORDER, params::nxs[0], params::nxs[1], T_ORDER, params::dt);
+		sprintf(temp, "RESLT/%dn%u+%u_%u_%dt%.2e", X_ORDER, params::nxs[0], params::nxs[1], params::ny, T_ORDER, params::dt);
 		params::dname.assign(temp);
 	}
 
