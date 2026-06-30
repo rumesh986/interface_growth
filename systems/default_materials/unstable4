@@ -1,0 +1,15 @@
+solid.name=solid
+solid.k=1.0
+solid.rho=1.0
+solid.cp=1.0
+liquid.name=liquid
+liquid.k=0.3
+liquid.rho=2.5
+liquid.cp=1.0
+L=10
+Ts=1.0
+Tm=1.0
+Tl=0.0
+De=0.0137
+sigma=0.01
+length_scale=1.0
