@@ -45,12 +45,13 @@ class MaterialSystem:
 	solid: Material
 	liquid: Material
 	L: float
-	gamma: float
+	sigma: float
 
 	Ts: float
 	Tm: float
 	Tl: float
 
+	length_scale: float
 	De: float = field(default=None)
 
 	def __post_init__(self):
@@ -74,7 +75,7 @@ class MaterialSystem:
 		liquid = {}
 		L = None
 		De = None
-		gamma = None
+		sigma = None
 
 		material_types = {k.name: k.type for k in fields(Material)}
 		cls_types = {k.name: k.type for k in fields(cls)}
@@ -130,8 +131,16 @@ class MaterialSystem:
 		return self.liquid.beta / self.solid.beta
 	
 	@property
+	def delT(self):
+		return self.Tm - self.Tl
+
+	@property
 	def St(self):
-		return self.L / (self.solid.cp * (self.Tm - self.Tl))
+		return self.L / (self.solid.cp * self.delT)
+	
+	@property
+	def gamma(self):
+		return (self.sigma / (self.solid.rho * self.L)) * (self.Tm / self.delT) / self.length_scale
 	
 	def _calculate_De(self):
 		alpha = self.liquid.alpha / self.solid.alpha

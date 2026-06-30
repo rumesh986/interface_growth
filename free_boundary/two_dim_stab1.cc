@@ -447,7 +447,8 @@ int main(int argc, char **argv) {
 		printf("Failed to open material file, exiting...\n");
 		exit(1);
 	}
-
+	
+	double T_s = 0.0, T_m = 0.0, T_l = 0.0, sigma=0.0, length_scale=1.0;
 	std::string line;
 	std::regex re;
 	std::cmatch matches;
@@ -486,29 +487,53 @@ int main(int argc, char **argv) {
 
 		re.assign("Ts=(.*)");
 		std::regex_search(line.c_str(), matches, re);
-		if (matches.size() > 1) params::T_s = atof(matches[1].str().c_str());
+		if (matches.size() > 1) T_s = atof(matches[1].str().c_str());
 
 		re.assign("Tm=(.*)");
 		std::regex_search(line.c_str(), matches, re);
-		if (matches.size() > 1) params::T_m = atof(matches[1].str().c_str());
+		if (matches.size() > 1) T_m = atof(matches[1].str().c_str());
 
 		re.assign("Tl=(.*)");
 		std::regex_search(line.c_str(), matches, re);
-		if (matches.size() > 1) params::T_l = atof(matches[1].str().c_str());
+		if (matches.size() > 1) T_l = atof(matches[1].str().c_str());
 
 		re.assign("De=(.*)");
 		std::regex_search(line.c_str(), matches, re);
 		if (matches.size() > 1) params::De = atof(matches[1].str().c_str());
 
-		re.assign("gamma=(.*)");
+		re.assign("sigma=(.*)");
 		std::regex_search(line.c_str(), matches, re);
-		if (matches.size() > 1) params::gamma = atof(matches[1].str().c_str());
+		if (matches.size() > 1) sigma = atof(matches[1].str().c_str());
+
+		re.assign("length_scale=(.*)");
+		std::regex_search(line.c_str(), matches, re);
+		if (matches.size() > 1) length_scale = atof(matches[1].str().c_str());
 	}
 
 	file.close();
 
 	params::tsteps = (unsigned int) ((params::tend - params::tstart) / params::dt);
 	printf("tsteps set to %u\n", params::tsteps);
+
+	params::T_s = (T_s - T_m) / (T_m - T_l);
+	params::T_m = (T_m - T_m) / (T_m - T_l);
+	params::T_l = (T_l - T_m) / (T_m - T_l);
+	params::alpha = (params::liquid.cp * params::liquid.rho) / (params::solid.cp * params::solid.rho);
+	params::beta = params::liquid.k / params::solid.k;
+	params::D = params::beta / params::alpha;
+	params::St = params::L / (params::solid.cp * (params::T_m - params::T_l));
+	params::nx = params::nxs[0] + params::nxs[1];
+	params::xs[1] = params::get_exact_h(params::tstart);
+	params::gamma = (sigma / (params::solid.rho * params::L)) * (T_m / (T_m - T_l)) / length_scale;
+
+	printf("sigma=%f gamma=%f\n", sigma, params::gamma);
+	printf("Problem Def:\n");
+	printf("\tsolid: k=%8.6f rho=%8.6f cp=%8.6f\n", params::solid.k, params::solid.rho, params::solid.cp);
+	printf("\tliquid: k=%8.6f rho=%8.6f cp=%8.6f\n", params::liquid.k, params::liquid.rho, params::liquid.cp);
+	printf("\tL=%8.6f De=%8.6f\n", params::L, params::De);
+	printf("\tTs=%8.6f Tm=%8.6f Tl=%8.6f\n", params::T_s, params::T_m, params::T_l);
+	printf("\talpha=%8.6f beta=%8.6f St=%8.6f gamma=%8.6f\n", params::alpha, params::beta, params::St, params::gamma);
+	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", params::xs[0], params::xs[1], params::xs[2]);
 
 	if (isnan(params::solid.k) || isnan(params::solid.rho) || isnan(params::solid.cp) ||
 		isnan(params::liquid.k) || isnan(params::liquid.rho) || isnan(params::liquid.cp) ||
@@ -533,21 +558,6 @@ int main(int argc, char **argv) {
 	info.number() = 0;
 
 	printf("Output directory: %s\n", info.directory().c_str());
-
-	params::alpha = (params::liquid.cp * params::liquid.rho) / (params::solid.cp * params::solid.rho);
-	params::beta = params::liquid.k / params::solid.k;
-	params::D = params::beta / params::alpha;
-	params::St = params::L / (params::solid.cp * (params::T_m - params::T_l));
-	params::nx = params::nxs[0] + params::nxs[1];
-	params::xs[1] = params::get_exact_h(params::tstart);
-
-	printf("Problem Def:\n");
-	printf("\tsolid: k=%8.6f rho=%8.6f cp=%8.6f\n", params::solid.k, params::solid.rho, params::solid.cp);
-	printf("\tliquid: k=%8.6f rho=%8.6f cp=%8.6f\n", params::liquid.k, params::liquid.rho, params::liquid.cp);
-	printf("\tL=%8.6f De=%8.6f\n", params::L, params::De);
-	printf("\tTs=%8.6f Tm=%8.6f Tl=%8.6f\n", params::T_s, params::T_m, params::T_l);
-	printf("\talpha=%8.6f beta=%8.6f St=%8.6f gamma=%8.6f\n", params::alpha, params::beta, params::St, params::gamma);
-	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", params::xs[0], params::xs[1], params::xs[2]);
 
 	auto problem = TwoDimStefanProblem<QUnsteadyHeatElement<2, X_ORDER>>();
 
