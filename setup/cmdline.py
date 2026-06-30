@@ -129,7 +129,7 @@ def parse_cmdline_args():
 	materials_group.add_argument('--material',
 		type=str,
 		choices=MaterialSystem.list_default_materials(),
-		default='water_und',
+		default='water_ice_und',
 		help='Material system to use'
 	)
 

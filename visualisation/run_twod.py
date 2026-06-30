@@ -79,7 +79,7 @@ class Run_TwoD(RunBase):
 		return plot
 
 	@override
-	def plot_profile(self, ax: Axes, step: int, y_idx: inst = 0, markerstep: int = 10, *args, **kwargs) -> None:
+	def plot_profile(self, ax: Axes, step: int, y_idx: int = 0, markerstep: int = 10, *args, **kwargs) -> None:
 		frame = self.step(step)
 		iface = self.interface.filter(step=step)
 

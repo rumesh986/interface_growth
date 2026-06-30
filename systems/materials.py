@@ -112,7 +112,7 @@ class MaterialSystem:
 		]
 	
 	@classmethod
-	def list_default_materials(cls) -> List[str]:
+	def list_default_materials(cls) -> list[str]:
 		material_dir = resources.files('systems').joinpath('default_materials')
 		return os.listdir(material_dir)
 	
