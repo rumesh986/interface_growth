@@ -64,11 +64,11 @@ namespace params {
 		flux = 0.0;
 	}
 
-	double _k = 8.0;
-	double _A = 0.001;
+	double k = 6.0;
+	double A = 0.001;
 
 	void get_initial_interface_profile(const double &zeta, double &r) {
-		r = _A * sin(_k * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
+		r = A * sin(k * 2.0 * MathematicalConstants::Pi * zeta);// + 0.05 * sin(2.0 * MathematicalConstants::Pi * zeta);
 	}
 
 	double get_exact_h(const double &t) {
@@ -80,19 +80,19 @@ namespace params {
 		double eps = 0.0;
 		get_initial_interface_profile(x[1], eps);
 
-		double k = _k * 2.0 * MathematicalConstants::Pi;
+		double _k = k * 2.0 * MathematicalConstants::Pi;
 
 		double h = h_ana + eps;
-		double perturb = -gamma * k * k * eps;
+		double perturb = -gamma * _k * _k * eps;
 		double z = x[0] - h_ana;
 
 		if (x[0] < h) {
 			double denom = 0.5 / sqrt(t);
 			double trans_Ts = (T_s - T_m) / (T_m - T_l);
-			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom)) + perturb * exp(k * z);
+			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom)) + perturb * exp(_k * z);
 		} else {
 			double denom = 0.5 / sqrt(D * t);
-			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom)) + perturb * exp(-k * z);
+			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom)) + perturb * exp(-_k * z);
 		}
 	}
 
@@ -418,6 +418,8 @@ int main(int argc, char **argv) {
 	CommandLineArgs::specify_command_line_flag("--nx1", &params::nxs[0]);
 	CommandLineArgs::specify_command_line_flag("--nx2", &params::nxs[1]);
 	CommandLineArgs::specify_command_line_flag("--ny", &params::ny);
+	CommandLineArgs::specify_command_line_flag("--k", &params::k);
+	CommandLineArgs::specify_command_line_flag("--A", &params::A);
 	CommandLineArgs::specify_command_line_flag("--dt", &params::dt);
 	CommandLineArgs::specify_command_line_flag("--tstart", &params::tstart);
 	CommandLineArgs::specify_command_line_flag("--tend", &params::tend);
@@ -548,6 +550,7 @@ int main(int argc, char **argv) {
 	printf("\tTs=%8.6f Tm=%8.6f Tl=%8.6f\n", params::T_s, params::T_m, params::T_l);
 	printf("\talpha=%8.6f beta=%8.6f St=%8.6f gamma=%8.6f\n", params::alpha, params::beta, params::St, params::gamma);
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", params::xs[0], params::xs[1], params::xs[2]);
+	printf("\tgeometry: k=%f A=%f\n", params::k, params::A);
 
 	auto problem = TwoDimStefanProblem<QUnsteadyHeatElement<2, X_ORDER>>();
 

@@ -78,6 +78,18 @@ def parse_cmdline_args():
 		help='Number of elements in y-direction of domain'
 	)
 
+	params_group.add_argument('--k',
+		type=int,
+		default=1,
+		help='wavenumber of perturbation - 2pi * k'
+	)
+
+	params_group.add_argument('--A',
+		type=float,
+		default=0.001,
+		help='Amplitude of perturbation'
+	)
+
 	params_group.add_argument('--dts', '--dt',
 		nargs='+', 
 		type=float,

@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
 	if args.pop('run') is True:
 		try:
-			run.run_all()
+			run.run_all(**args)
 		except Exception as e:
 			if not args.pop('force_vis'):
 				raise e
