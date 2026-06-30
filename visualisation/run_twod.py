@@ -39,7 +39,6 @@ class Run_TwoD(RunBase):
 		except Exception as e:
 			print(f"Failed to fit De for {self.params.title}, error: {e}")
 		
-
 	@override
 	def plot_error_norm(self, ax: Axes, *args, **kwargs) -> None:
 		pass
@@ -50,11 +49,14 @@ class Run_TwoD(RunBase):
 
 	@override
 	def plot_interface(self, ax: Axes, de: bool = True, label: str = 'Interface location', *args, **kwargs) -> None:
-		for yi in self.interface.columns[2:]:
-			de = self.fitted_De(yi)
-			ax.plot(self.interface[self.COLS.time], self.interface[yi], label=f'y={float(yi):.3f} de={de:e}')
+		x = [float(i) for i in self.interface.columns[2:]]
 
-			print(f'y={yi} de={de}')
+		start = 0
+		end = self.interface.shape[0]
+		step = 10
+
+		for t in range(start, end, step):
+			ax.plot(x, self.interface[t, 2:].transpose().to_series(), label=f'{self.interface[t, self.COLS.time]}')
 		
 		ax.legend()
 
@@ -64,7 +66,15 @@ class Run_TwoD(RunBase):
 
 	@override
 	def plot_de(self, ax: Axes) -> None:
-		pass
+		for yi in self.interface.columns[2:]:
+			de = self.fitted_De(yi)
+			ax.plot(self.interface[self.COLS.time], self.interface[yi], label=f'y={float(yi):.3f} de={de:e}')
+
+			# print(f'y={yi} de={de}')
+		
+		ax.plot(self.results[self.COLS.time], self.results[self.COLS.exact_h], ls=':', label=fr'Analytical $D_e={{{self.system.De:.5f}}}$')
+		
+		# ax.legend()
 
 	@override
 	def plot_mesh(self, ax: Axes, step: int, cmap: str = 'jet', *args, **kwargs) -> None:

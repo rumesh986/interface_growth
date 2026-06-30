@@ -11,4 +11,5 @@ Ts=0.0
 Tm=0.0
 Tl=-1.0
 De=0.201
-gamma=0.001
+sigma=0.001
+length_scale=1.0
