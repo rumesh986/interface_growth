@@ -78,15 +78,19 @@ def parse_cmdline_args():
 		help='Number of elements in y-direction of domain'
 	)
 
-	params_group.add_argument('--k',
+	params_group.add_argument('--k', '--ks',
+		nargs="+",
 		type=int,
-		default=1,
+		default=[0],
+		dest='ks',
 		help='wavenumber of perturbation - 2pi * k'
 	)
 
-	params_group.add_argument('--A',
+	params_group.add_argument('--A', '--As',
+		nargs="+",
 		type=float,
-		default=0.001,
+		default=[0.001],
+		dest='As',
 		help='Amplitude of perturbation'
 	)
 
@@ -105,7 +109,7 @@ def parse_cmdline_args():
 		help='Start time of simulation'
 	)
 
-	params_group.add_argument('--tend', '--tend',
+	params_group.add_argument('--tend', '--end',
 		type=float,
 		dest='tend',
 		default=1.0,
@@ -226,17 +230,26 @@ def parse_cmdline_args():
 	nys = []
 	for ny in args.pop('ny'):
 		nys.append(ny)
+	
+	ks = []
+	for k in args.pop('ks'):
+		ks.append(k)
+	As = []
+	for A in args.pop('As'):
+		As.append(A)
 
 	params = SimParams(
-		args.pop('xs'),
-		args.pop('ts'),
-		nxs,
-		nys,
-		args.pop('dts'),
-		args.pop('tstart'),
-		args.pop('tend'),
-		args.pop('wf'),
-		args.pop('analysis_type')
+		xs=args.pop('xs'),
+		ts=args.pop('ts'),
+		nxs=nxs,
+		nys=nys,
+		dts=args.pop('dts'),
+		tstart=args.pop('tstart'),
+		tend=args.pop('tend'),
+		write_freq=args.pop('wf'),
+		ks=ks,
+		As=As,
+		analysis_type=args.pop('analysis_type')
 	)
 
 	system = MaterialSystem.default_material(args.pop('material'))

@@ -49,6 +49,8 @@ class Params(_Base):
 	tstart: float
 	tend: float
 	write_freq: int
+	k: int
+	A: float
 	nx: int = field(init=False)
 
 	def __post_init__(self):
@@ -63,8 +65,24 @@ class Params(_Base):
 			'--dt', str(self.dt),
 			'--tstart', str(self.tstart),
 			'--tend', str(self.tend),
-			'--write-freq', str(self.write_freq)
+			'--write-freq', str(self.write_freq),
+			'--k', str(self.k),
+			'--A', str(self.A)
 		]
+
+	@property
+	def args_cmd(self) -> str:
+		return (
+			f" --nx1 {self.nx1}"
+			f" --nx2 {self.nx2}"
+			f" --ny {self.ny}"
+			f" --dt {self.dt}"
+			f" --tstart {self.tstart}"
+			f" --tend {self.tend}"
+			f" --write-freq {self.write_freq}"
+			f" --k {self.k}"
+			f" --A {self.A}"
+		)
 
 	@property
 	def title(self) -> str:
@@ -77,7 +95,7 @@ class Params(_Base):
 	
 	@property
 	def directory(self) -> str:
-		return f'{self.x}n{self.nx1}+{self.nx2}_{self.ny}_{self.t}t{self.dt:.2e}'
+		return f'{self.x}n{self.nx1}+{self.nx2}_{self.ny}_{self.t}t{self.dt:.2e}_{self.k}k{self.A}'
 
 @dataclass(frozen=True)
 class SimParams(_Base):
@@ -86,31 +104,34 @@ class SimParams(_Base):
 	nxs: list[tuple[int, int]]
 	nys: list[int]
 	dts: list[float]
+	ks: list[int]
+	As: list[float]
 	tstart: float
 	tend: float
 	write_freq: int
 	analysis_type: AnalysisType
-	num_jobs: int = field(init=False)
 
-	def __post_init__(self):
-		object.__setattr__(self, 'num_jobs', len(self.xs) * len(self.ts) * len(self.nxs) * len(self.dts))
+	def __len__(self):
+		return len(self.xs) * len(self.ts) * len(self.nxs) * len(self.nys) * len(self.dts) * len(self.ks) * len(self.As)
 
 	@property
 	def jobs(self) -> Iterator[Params]:
-		for x, t, (nx1, nx2), ny, dt in product(self.xs, self.ts, self.nxs, self.nys, self.dts):
+		for x, t, (nx1, nx2), ny, dt, k, A in product(self.xs, self.ts, self.nxs, self.nys, self.dts, self.ks, self.As):
 			if self.analysis_type == AnalysisType.dt:
 				wf = int(max(self.dts) / dt)
 			else:
 				wf = self.write_freq
 
 			yield Params(
-				x,
-				t,
-				nx1,
-				nx2,
-				ny,
-				dt,
-				self.tstart,
-				self.tend,
-				wf
+				x=x,
+				t=t,
+				nx1=nx1,
+				nx2=nx2,
+				ny=ny,
+				dt=dt,
+				tstart=self.tstart,
+				tend=self.tend,
+				write_freq=wf,
+				k=k,
+				A=A
 			)
