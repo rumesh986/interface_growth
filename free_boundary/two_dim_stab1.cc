@@ -77,22 +77,22 @@ namespace params {
 
 	void get_exact_u(const double &t, const Vector<double> &x, double &u) {
 		double h_ana = get_exact_h(t);
+		double v_ana = 0.5 * sqrt(De / t);
 		double eps = 0.0;
 		get_initial_interface_profile(x[1], eps);
 
 		double _k = k * 2.0 * MathematicalConstants::Pi;
 
 		double h = h_ana + eps;
-		double perturb = -gamma * _k * _k * eps;
 		double z = x[0] - h_ana;
 
 		if (x[0] < h) {
 			double denom = 0.5 / sqrt(t);
 			double trans_Ts = (T_s - T_m) / (T_m - T_l);
-			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom)) + perturb * exp(_k * z);
+			u = trans_Ts * (1.0 - erf(x[0] * denom) / erf(h * denom)) - gamma * _k * _k * eps * exp(_k * z);
 		} else {
 			double denom = 0.5 / sqrt(D * t);
-			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom)) + perturb * exp(-_k * z);
+			u = (erf(h * denom) - erf(x[0] * denom)) / (1.0 - erf(h * denom)) + ((v_ana / D)  - gamma * _k * _k) * eps * exp(-_k * z);
 		}
 	}
 
@@ -536,6 +536,7 @@ int main(int argc, char **argv) {
 	printf("\tTs=%8.6f Tm=%8.6f Tl=%8.6f\n", params::T_s, params::T_m, params::T_l);
 	printf("\talpha=%8.6f beta=%8.6f St=%8.6f gamma=%8.6f\n", params::alpha, params::beta, params::St, params::gamma);
 	printf("\tx0=%8.6f x1=%8.6f x2=%8.6f\n", params::xs[0], params::xs[1], params::xs[2]);
+	printf("\tk=%f A=%f\n", params::k, params::A);
 
 	if (isnan(params::solid.k) || isnan(params::solid.rho) || isnan(params::solid.cp) ||
 		isnan(params::liquid.k) || isnan(params::liquid.rho) || isnan(params::liquid.cp) ||

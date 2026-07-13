@@ -236,7 +236,6 @@ class FreeBoundaryFluxElement : public UnsteadyHeatFluxElement<EL> {
 					int Kx_eqn = this->nodal_local_eqn(l, Kx_index);
 					int Ky_eqn = this->nodal_local_eqn(l, Ky_index);
 
-					
 					residuals[X_eqn] += phi(l) * this->nodal_value(l, T_index) * JW - phi(l) * _gamma * kappa * JW;
 					residuals[T_eqn] -= phi(l) * _St * dhdt * nh[0] * JW;
 					residuals[Kx_eqn] += phi(l) * this->nodal_value(l, Kx_index) * JW + dphi(l, 0) * th[0] * w;
