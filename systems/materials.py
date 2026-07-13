@@ -129,6 +129,10 @@ class MaterialSystem:
 	@property
 	def beta(self):
 		return self.liquid.beta / self.solid.beta
+
+	@property
+	def D(self):
+		return self.beta / self.alpha
 	
 	@property
 	def delT(self):
