@@ -56,7 +56,7 @@ class Run_TwoD(RunBase):
 		step = 10
 
 		for t in range(start, end, step):
-			ax.plot(x, self.interface[t, 2:].transpose().to_series(), label=f'{self.interface[t, self.COLS.time]}')
+			ax.plot(self.interface[t, 2:].transpose().to_series(), x, label=f'{self.interface[t, self.COLS.time]}')
 		
 		ax.legend()
 
