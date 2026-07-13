@@ -28,6 +28,7 @@ class Build:
 		self.system = system
 		self.results_dir = results_dir
 		self.nthreads = nthreads
+		self.clear_results = kwargs.pop('clear_results')
 
 		if dname is None:
 			dname = f'{self.prog}_{datetime.today().strftime("%Y-%m-%d_%H:%M:%S")}'
@@ -44,7 +45,7 @@ class Build:
 		if not os.path.exists(self.wd):
 			os.mkdir(self.wd)
 
-		if kwargs['clear_results'] and os.path.exists(f'{self.wd}/{self.results_dir}'):
+		if self.clear_results and os.path.exists(f'{self.wd}/{self.results_dir}'):
 			shutil.rmtree(f'{self.wd}/{self.results_dir}')
 		os.mkdir(f'{self.wd}/{self.results_dir}')
 
@@ -68,7 +69,10 @@ class Build:
 			os.mkdir(self.wd)
 
 		for item in self.bins.values():
-			os.rename(f'build/{item}', f'{self.wd}/{item}')
+			# os.rename(f'build/{item}', f'{self.wd}/{item}')
+			shutil.copy2(f'build/{item}', f'{self.wd}/{item}')
+
+		os.chdir(self.od)
 	
 	def process_args(self, params: Params, *args, **kwargs) -> list[str]:
 		ret = [

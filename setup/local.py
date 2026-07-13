@@ -13,7 +13,7 @@ class RunLocal(Build):
 		try:
 			dname = f'{self.wd}/{self.results_dir}/{params.directory}'
 
-			if kwargs['clear_results'] and os.path.exists(dname):
+			if self.clear_results and os.path.exists(dname):
 				shutil.rmtree(dname)
 			os.mkdir(dname)
 
@@ -42,7 +42,7 @@ class RunLocal(Build):
 			raise
 
 	def run_all(self, *args, **kwargs) -> None:
-		num_workers = self.params.num_jobs
+		num_workers = len(self.params)
 		if (num_workers > self.nthreads):
 			num_workers = self.nthreads
 		
