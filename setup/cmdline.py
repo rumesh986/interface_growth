@@ -1,10 +1,24 @@
 import os
 from itertools import product
-from argparse import ArgumentParser, ArgumentError, BooleanOptionalAction
+from argparse import ArgumentParser, ArgumentError, ArgumentTypeError, BooleanOptionalAction
 
-from systems.params import SimParams, AnalysisType
+from systems.params import SimParams, AnalysisType, SimDomain
 from systems.materials import MaterialSystem
 from visualisation.visualisation import PltStyle
+
+def bound_type_x(inp):
+	inp_arr = inp.split(',')
+	if len(inp_arr) != 3:
+		raise ArgumentTypeError('x bounds should have 3 arguments in the form x_min,x_iface,x_max')
+
+	return tuple(float(i) for i in inp_arr)
+
+def bound_type_y(inp):
+	inp_arr = inp.split(',')
+	if len(inp_arr) != 2:
+		raise ArgumentTypeError('y bounds should have 3 arguments in the form y_min,y_max')
+
+	return tuple(float(i) for i in inp_arr)
 
 def parse_cmdline_args():
 	parser = ArgumentParser()
@@ -78,6 +92,20 @@ def parse_cmdline_args():
 		help='Number of elements in y-direction of domain'
 	)
 
+	params_group.add_argument('--xbound',
+		nargs='+',
+		type=bound_type_x,
+		default=[(0.0, 0.5, 1.0)],
+		help='Domain size in x direction'
+	)
+
+	params_group.add_argument('--ybound',
+		nargs=2,
+		type=bound_type_y,
+		default=[(0.0, 1.0)],
+		help='Domain size in x direction'
+	)
+
 	params_group.add_argument('--k', '--ks',
 		nargs="+",
 		type=int,
@@ -92,6 +120,14 @@ def parse_cmdline_args():
 		default=[0.001],
 		dest='As',
 		help='Amplitude of perturbation'
+	)
+
+	params_group.add_argument('--v', '--vs',
+		nargs="+",
+		type=float,
+		default=[0.01],
+		dest='vs',
+		help='Prescribed interface speed'
 	)
 
 	params_group.add_argument('--dts', '--dt',
@@ -216,8 +252,8 @@ def parse_cmdline_args():
 		for pair in args.pop('nxs'):
 			nx1, nx2 = pair.split(',')
 			nxs.append((int(nx1), int(nx2)))
-		args.pop('nx1')
-		args.pop('nx2')
+		args.pop('nx1', None)
+		args.pop('nx2', None)
 	else:
 		if args.get('nx2') is not None:
 			for nx1, nx2 in product(args.pop('nx1'), args.pop('nx2')):
@@ -225,7 +261,7 @@ def parse_cmdline_args():
 		else:
 			for nx1 in args.pop('nx1'):
 				nxs.append((nx1, nx1))
-		args.pop('nx')
+		args.pop('nx', None)
 
 	nys = []
 	for ny in args.pop('ny'):
@@ -238,17 +274,23 @@ def parse_cmdline_args():
 	for A in args.pop('As'):
 		As.append(A)
 
+	domains = []
+	for xb, yb in product(args.pop('xbound'), args.pop('ybound')):
+		domains.append(SimDomain(*xb, *yb))
+
 	params = SimParams(
 		xs=args.pop('xs'),
 		ts=args.pop('ts'),
 		nxs=nxs,
 		nys=nys,
+		domains=domains,
 		dts=args.pop('dts'),
 		tstart=args.pop('tstart'),
 		tend=args.pop('tend'),
 		write_freq=args.pop('wf'),
 		ks=ks,
 		As=As,
+		vs=args.pop('vs'),
 		analysis_type=args.pop('analysis_type')
 	)
 
