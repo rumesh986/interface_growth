@@ -140,8 +140,11 @@ class Run_TwoD(RunBase):
 		if 'anim_length' in kwargs:
 			warn("Animation length control has not been implemented yet")
 
+		anim_length = kwargs.get('anim_length')
 		return FuncAnimation(
 			fig, 
 			_update,
-			self.results.shape[0]
+			range(self.results.shape[0])[::anim_length]
+			# self.results.shape[0],
+			# save_count=anim_length
 		)
