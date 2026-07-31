@@ -3,10 +3,15 @@ name = "interface_growth"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "polars>=1.38.1",
     "scipy>=1.16.3",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
 ]
