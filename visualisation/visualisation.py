@@ -20,6 +20,7 @@ class Visualiser:
 		prefix: str,
 		analysis_type: AnalysisType,
 		style: PltStyle = PltStyle.standard,
+		load_data: bool = True,
 		results_dir: str = 'RESLT',
 		out_dir: str = 'imgs',
 		reference: Run | None = None,
@@ -52,7 +53,8 @@ class Visualiser:
 				rund,
 				f'{self.out_dir}/{rundir}',
 				system,
-				analysis_type == AnalysisType.standard,
+				# analysis_type == AnalysisType.standard,
+				load_data = load_data,
 				reference = self.reference
 			))
 	
@@ -101,13 +103,13 @@ class Visualiser:
 		# 	for run, threads in zip(self.runs, executor.map(self._make, self.runs)):
 		# 		print(f'Standard processing for: \n{run.params}')
 
-	def savefig(self, fig, outdir, title, ext='png'):
+	def savefig(self, fig, outdir, title, ext='png', transparent=False):
 		if self.report:
 			title = f'{outdir}/{self.prefix}-report-{title}.{ext}'
 		else:
 			title = f'{outdir}/{self.prefix}-{title}.{ext}'
 
-		fig.savefig(title)
+		fig.savefig(title, transparent=transparent)
 		plt.close()
 
 	def plot_errors(self, run, *args, **kwargs) -> None:
@@ -154,7 +156,7 @@ class Visualiser:
 			axs['iface'].set_title('Interface position with time')
 			axs['error'].set_title('Error in interface position')
 		
-		self.savefig(fig, run.out_dir, 'interface')
+		self.savefig(fig, run.out_dir, 'interface', ext='svg', transparent=False)
 
 	def plot_interfaces(self, *args, **kwargs) -> None:
 		fig, ax = plt.subplots(1,1)
