@@ -51,9 +51,9 @@ class Run_TwoD(RunBase):
 	def plot_interface(self, ax: Axes, de: bool = True, label: str = 'Interface location', *args, **kwargs) -> None:
 		x = [float(i) for i in self.interface.columns[2:]]
 
-		start = 0
-		end = self.interface.shape[0]
-		step = 10
+		start = kwargs.get('start', 0)
+		end = kwargs.get('end', self.interface.shape[0])
+		step = kwargs.get('step', 10)
 
 		for t in range(start, end, step):
 			ax.plot(self.interface[t, 2:].transpose().to_series(), x, label=f'{self.interface[t, self.COLS.time]}')

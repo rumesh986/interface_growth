@@ -148,13 +148,17 @@ class Visualiser:
 				figsize=(7, 10)
 			)
 
-		run.plot_interface(axs['iface'])
+		run.plot_interface(axs['iface'], *args, **kwargs)
 
 		if not self.report:
 			run.plot_interface_error(axs['error'])
 
 			axs['iface'].set_title('Interface position with time')
 			axs['error'].set_title('Error in interface position')
+		else:
+			axs['iface'].set_title(f'k = {run.params.k}')
+			axs['iface'].set_xlabel('x')
+			axs['iface'].set_ylabel('y')
 		
 		self.savefig(fig, run.out_dir, 'interface', ext='svg', transparent=False)
 
