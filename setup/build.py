@@ -33,6 +33,8 @@ class Build:
 		if dname is None:
 			dname = f'{self.prog}_{datetime.today().strftime("%Y-%m-%d_%H:%M:%S")}'
 
+		self.workspace = workspacesf
+		self.name = dname
 		self.od = os.getcwd()
 		self.wd = f'{self.od}/{workspacesf}/{prog}/{dname}'
 

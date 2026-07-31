@@ -2,6 +2,7 @@
 **/imgs/**
 **/runs/**
 **/workspaces/**
+**/workspaces_slurm
 **/build/**
 **/*.o
 **/*.pyc
