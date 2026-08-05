@@ -4,6 +4,7 @@ from warnings import warn
 import numpy as np
 import polars as pl
 from scipy.optimize import curve_fit
+from matplotlib.collections import Collection
 from matplotlib.pyplot import Axes, Figure
 from matplotlib.animation import Animation, FuncAnimation
 
@@ -44,11 +45,25 @@ class Run_TwoD(RunBase):
 		pass
 
 	@override
-	def plot_error_at_node(self, ax: Axes, data: pl.DataFrame | None = None, node: int | None = None, *args, **kwargs) -> pl.DataFrame | None:
+	def plot_error_at_node(
+		self, 
+		ax: Axes, 
+		data: pl.DataFrame | None = None, 
+		node: int | None = None, 
+		*args, 
+		**kwargs
+	) -> pl.DataFrame | None:
 		return None
 
 	@override
-	def plot_interface(self, ax: Axes, de: bool = True, label: str = 'Interface location', *args, **kwargs) -> None:
+	def plot_interface(
+		self, 
+		ax: Axes, 
+		de: bool = True, 
+		label: str = 'Interface location', 
+		*args, 
+		**kwargs
+	) -> None:
 		x = [float(i) for i in self.interface.columns[2:]]
 
 		start = kwargs.get('start', 0)
@@ -77,7 +92,14 @@ class Run_TwoD(RunBase):
 		# ax.legend()
 
 	@override
-	def plot_mesh(self, ax: Axes, step: int, cmap: str = 'jet', *args, **kwargs) -> None:
+	def plot_mesh(
+		self, 
+		ax: Axes, 
+		step: int, 
+		cmap: str = 'jet', 
+		*args, 
+		**kwargs
+	) -> Collection:
 		frame = self.step(step)
 		iface = self.interface.filter(step=step)
 
@@ -89,21 +111,41 @@ class Run_TwoD(RunBase):
 		return plot
 
 	@override
-	def plot_profile(self, ax: Axes, step: int, y_idx: int = 0, markerstep: int = 10, *args, **kwargs) -> None:
+	def plot_profile(
+		self, 
+		ax: Axes, 
+		step: int, 
+		levels: np.ndarray, 
+		cmap: str = 'jet', 
+		y_idx: int = 0, 
+		markerstep: int = 10, 
+		*args, 
+		**kwargs
+	) -> Collection:
 		frame = self.step(step)
 		iface = self.interface.filter(step=step)
 
 		xs = iface.row(0)[2:]
 		ys = tuple([float(i) for i in iface.columns[2:]])
 
-		ax.tricontourf(frame[self.COLS.x], frame[self.COLS.y], frame[self.COLS.temp])
+		plot = ax.tricontourf(frame[self.COLS.x], frame[self.COLS.y], frame[self.COLS.temp], levels=levels, cmap=cmap)
 		ax.plot(xs, ys, label='Interface', c='black')
 
 		ax.set_title(f't={self.results[step, self.COLS.time]:.4f}')
 
+		return plot
 
 	@override
-	def anim_profile(self, fig: Figure, prof: Axes | None = None, error: Axes | None = None, nodes: int | None = 15, zoom: bool = False, *args, **kwargs) -> Animation:
+	def anim_profile(
+		self, 
+		fig: Figure, 
+		prof: Axes | None = None, 
+		error: Axes | None = None, 
+		nodes: int | None = 15, 
+		zoom: bool = False, 
+		*args, 
+		**kwargs
+	) -> Animation:
 		def _update(step):
 			for time in times:
 				time.set_text(f't={self.results[step, self.COLS.time]:.4f}')

@@ -207,7 +207,7 @@ class Visualiser:
 
 		self.savefig(fig, run.out_dir, 'mesh')
 
-	def plot_profiles(self, run, num_ax=4, *args, **kwargs) -> None:
+	def plot_profiles(self, run, num_ax=4, levels=40, *args, **kwargs) -> None:
 		nrows = int(np.ceil(np.sqrt(num_ax)))
 		ncols = int(np.ceil(num_ax / nrows))
 
@@ -221,14 +221,20 @@ class Visualiser:
 		)
 
 		frame_step = int(np.floor(run.results.shape[0]) / num_ax)
+		T_min = run.steps[run.COLS.temp].min()
+		T_max = run.steps[run.COLS.temp].max()
+		cbar_levels = np.linspace(T_min, T_max, levels)
+
+		if axs is not list:
+			axs = np.array([[axs]])
 
 		for i, ax in enumerate(axs.flat):
 			frame = i * frame_step
 			if frame > run.results.shape[0]:
-				run.plot_profile(ax, run.results.shape[0] - 1)
+				run.plot_profile(ax, run.results.shape[0] - 1, levels=cbar_levels)
 				break
 
-			run.plot_profile(ax, frame)
+			cmap = run.plot_profile(ax, frame, levels=cbar_levels)
 
 		axs.flat[0].legend()
 
@@ -236,6 +242,8 @@ class Visualiser:
 			fig.suptitle('Temperature profiles')
 		fig.supxlabel('X')
 		fig.supylabel('Temperature')
+
+		fig.colorbar(cmap, ax=axs[0])
 
 		self.savefig(fig, run.out_dir, 'profiles')
 
