@@ -94,5 +94,10 @@ cust_add_executables(
   SOURCES two_dim_stab2.cc two_phase_free_boundary_mesh.h
 )
 
+cust_add_executables(
+  TARGET two_dim_stab3
+  SOURCES two_dim_stab3.cc unsteady_heat_moving.h two_phase_free_boundary_mesh.h 
+)
+
 message(VERBOSE "Leaving one_dim subdirectory")
 # ------------------------------------------------------------------------------
